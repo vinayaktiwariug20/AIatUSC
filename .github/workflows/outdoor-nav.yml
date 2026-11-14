@@ -1,0 +1,88 @@
+# Test every PR; deploy the Cloudflare Worker when main changes and tests pass.
+#
+# One-time setup (repo → Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN   Cloudflare dashboard → My Profile → API Tokens →
+#                          "Edit Cloudflare Workers" template, plus D1:Edit
+#   CLOUDFLARE_ACCOUNT_ID  Cloudflare dashboard → Workers & Pages → right sidebar
+# ADMIN_TOKEN stays a Worker secret in Cloudflare; deploys do not touch it.
+
+name: outdoor-nav
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: outdoor-nav-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: npm ci
+      - name: JS syntax
+        run: npm run check
+      - name: JS tests (Worker + D1 in memory)
+        run: npm test
+
+      - name: Python tests
+        working-directory: outdoor-nav
+        run: |
+          pip install -r requirements.txt
+          python -m pytest -q
+
+      - name: Python/JS route parity
+        run: python outdoor-nav/tools/check_cloudflare_parity.py
+
+      # The Worker serves the compiled graph.json, not the data files. If data
+      # changed and nobody rebuilt it, the live site would route on stale data.
+      # Compare content only: source checksums differ with line endings.
+      - name: graph.json is up to date with data/
+        run: |
+          cp outdoor-nav/cloudflare/graph.json /tmp/committed.json
+          python outdoor-nav/tools/build_cloudflare_graph.py
+          python - <<'EOF'
+          import json, sys
+          a = json.load(open("/tmp/committed.json")); b = json.load(open("outdoor-nav/cloudflare/graph.json"))
+          a.pop("source_sha256", None); b.pop("source_sha256", None)
+          if a != b:
+              sys.exit("graph.json is stale: run `python outdoor-nav/tools/build_cloudflare_graph.py` and commit it")
+          print("graph.json matches data/")
+          EOF
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Apply D1 migrations (no-op when already applied)
+        run: npx wrangler d1 migrations apply DB --remote --config outdoor-nav/wrangler.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy Worker
+        run: npx wrangler deploy --config outdoor-nav/wrangler.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
