@@ -24,7 +24,9 @@ def main():
                 edge_cells.setdefault("%d,%d" % (i, j), []).append(index)
     latitudes, longitudes = zip(*g.nodes.values())
     data_files = sorted((ROOT / "data").glob("*.json"))
-    sources = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+    # Hash with line endings normalised: git checks these files out as CRLF on
+    # Windows (core.autocrlf) and LF on Linux CI, and the data is the same.
+    sources = {path.name: hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
                for path in data_files if path.name != "closures.json"}
     graph = {"attribution": g.attribution, "nodes": g.nodes, "edges": g.edges,
              "buildings": g.buildings, "places": g.places, "targets": g.targets,

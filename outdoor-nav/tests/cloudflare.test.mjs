@@ -111,7 +111,9 @@ test('request-size and JSON syntax guards work before storage or routing',async(
 test('compiled graph is up to date with its source JSON datasets',()=>{
   const graph=JSON.parse(readFileSync(new URL('../cloudflare/graph.json',import.meta.url),'utf8'));
   for(const [file,expected] of Object.entries(graph.source_sha256)){
-    const actual=createHash('sha256').update(readFileSync(new URL('../data/'+file,import.meta.url))).digest('hex');
+    // Line endings normalised, as in build_cloudflare_graph.py: CRLF on Windows checkouts, LF on CI.
+    const text=readFileSync(new URL('../data/'+file,import.meta.url),'utf8').replace(/\r\n/g,'\n');
+    const actual=createHash('sha256').update(text,'utf8').digest('hex');
     assert.equal(actual,expected,'Source data changed: run npm run build:graph before deployment.');
   }
 });
