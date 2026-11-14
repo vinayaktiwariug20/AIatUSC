@@ -1,5 +1,10 @@
 # outdoor-nav
 
+**Cloudflare / VS Code:** see [../CLOUDFLARE_KO.md](../CLOUDFLARE_KO.md).
+The Cloudflare entrypoint is `cloudflare/worker.mjs`; the local server below is unchanged.
+The deployed version uses D1 for persistent closures and runs read-only until D1
+is connected. It does not implement driving routes or turn-by-turn navigation.
+
 The **far-from-venue** half of the event wayfinding app: walk from wherever you
 are on campus to the right door of the venue building, around whatever is
 closed right now. At the door it hands off to indoor navigation.

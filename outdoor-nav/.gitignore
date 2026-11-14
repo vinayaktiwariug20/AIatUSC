@@ -1,3 +1,14 @@
 __pycache__/
 .pytest_cache/
 data/closures.json
+
+.venv/
+.wrangler/
+python_modules/
+node_modules/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env
+.env.*
+.uv-cache/
