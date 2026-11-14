@@ -1,0 +1,313 @@
+{
+ "source": "on-site survey (field-guide)",
+ "nodes": [
+  {
+   "id": "DOWNEY.veh.mcclintock",
+   "kind": "vehicle_entrance",
+   "lat": 34.02077789075529,
+   "lon": -118.28997731807364,
+   "structure": "DOWNEY",
+   "street": "McClintock Ave"
+  },
+  {
+   "id": "DOWNEY.veh.downey",
+   "kind": "vehicle_entrance",
+   "lat": 34.02155085589507,
+   "lon": -118.29046687186089,
+   "structure": "DOWNEY",
+   "street": "Downey Way"
+  },
+  {
+   "id": "DOWNEY.ped.main",
+   "kind": "pedestrian_exit",
+   "lat": 34.0210727772062,
+   "lon": -118.28978951773013,
+   "structure": "DOWNEY"
+  },
+  {
+   "id": "GATE.mcclintock",
+   "kind": "campus_gate",
+   "lat": 34.0250085,
+   "lon": -118.2871694,
+   "name": "the McClintock entrance"
+  },
+  {
+   "id": "ISECT.downey_mcclintock",
+   "kind": "junction",
+   "lat": 34.0211862,
+   "lon": -118.2895941
+  },
+  {
+   "id": "JEFFERSON.veh.main",
+   "kind": "vehicle_entrance",
+   "lat": 34.0247703,
+   "lon": -118.2900896,
+   "name": "main normal entrance",
+   "structure": "JEFFERSON"
+  },
+  {
+   "id": "ROYAL.veh.34th",
+   "kind": "vehicle_entrance",
+   "lat": 34.0219832,
+   "lon": -118.2820514,
+   "structure": "ROYAL",
+   "street": "34th St"
+  },
+  {
+   "id": "ROYAL.veh.jefferson",
+   "kind": "vehicle_entrance",
+   "lat": 34.0224909,
+   "lon": -118.2819458,
+   "structure": "ROYAL",
+   "street": "Jefferson Blvd"
+  },
+  {
+   "id": "MCCARTHY.veh.main",
+   "kind": "vehicle_entrance",
+   "lat": 34.0209239,
+   "lon": -118.2822214,
+   "name": "main",
+   "structure": "MCCARTHY"
+  },
+  {
+   "id": "MCCARTHY.veh.permits",
+   "kind": "vehicle_entrance",
+   "lat": 34.020594,
+   "lon": -118.281528,
+   "name": "short-circuit permits entrance",
+   "structure": "MCCARTHY",
+   "restricted_to": [
+    "permit"
+   ]
+  },
+  {
+   "id": "FIGUEROA.veh.hotel",
+   "kind": "vehicle_entrance",
+   "lat": 34.0195114,
+   "lon": -118.2806315,
+   "name": "main boothed USC hotel entrance",
+   "structure": "FIGUEROA",
+   "also_pedestrian": true
+  },
+  {
+   "id": "POI.galen",
+   "kind": "poi_centroid",
+   "lat": 34.0210289,
+   "lon": -118.2797289,
+   "name": "galen",
+   "display": "Galen Center",
+   "bound_only": true,
+   "poi": "Galen Center"
+  },
+  {
+   "id": "POI.coliseum.gate28",
+   "kind": "poi",
+   "lat": 34.0152203,
+   "lon": -118.2865582,
+   "name": "coliseum",
+   "display": "LA Memorial Coliseum - Gate 28",
+   "poi": "Coliseum Gate 28"
+  },
+  {
+   "id": "POI.ostrow",
+   "kind": "poi",
+   "lat": 34.0238492,
+   "lon": -118.2864492,
+   "name": "ostrow",
+   "display": "Herman Ostrow School of Dentistry",
+   "poi": "Herman Ostrow / Norris Dental Science Center"
+  },
+  {
+   "id": "POI.village.lot",
+   "kind": "lot_entrance",
+   "lat": 34.0255206,
+   "lon": -118.2845804,
+   "name": "village",
+   "display": "USC Village",
+   "poi": "University Village parking lot entrance"
+  },
+  {
+   "id": "POI.dedeaux.gate",
+   "kind": "poi",
+   "lat": 34.0224859,
+   "lon": -118.2898848,
+   "name": "dedeaux",
+   "display": "Dedeaux Field (baseball)",
+   "poi": "Dedeaux Field main gate"
+  },
+  {
+   "id": "JEFFERSON.veh.orchard",
+   "kind": "vehicle_entrance",
+   "lat": 34.0248214,
+   "lon": -118.2888018,
+   "structure": "JEFFERSON",
+   "street": "Orchard Ave",
+   "also_pedestrian": true
+  },
+  {
+   "id": "JEFFERSON.ped.small",
+   "kind": "pedestrian_exit",
+   "lat": 34.0252244,
+   "lon": -118.2897989,
+   "structure": "JEFFERSON"
+  },
+  {
+   "id": "MCCARTHY.ped.hellman",
+   "kind": "pedestrian_exit",
+   "lat": 34.020277,
+   "lon": -118.2826385,
+   "structure": "MCCARTHY",
+   "street": "Hellman Way"
+  },
+  {
+   "id": "ROYAL.junction.jefferson",
+   "kind": "junction",
+   "lat": 34.0226607,
+   "lon": -118.2825794,
+   "structure": "ROYAL"
+  },
+  {
+   "id": "ROYAL.junction.34th",
+   "kind": "pedestrian_exit",
+   "lat": 34.0223119,
+   "lon": -118.2829362,
+   "structure": "ROYAL",
+   "street": "34th St"
+  },
+  {
+   "id": "POI.sca",
+   "kind": "poi_cluster",
+   "lat": 34.0234,
+   "lon": -118.2856,
+   "name": "sca",
+   "display": "School of Cinematic Arts",
+   "aliases": [
+    "sca",
+    "cinematic",
+    "cinematic arts",
+    "lucas"
+   ],
+   "poi": "USC School of Cinematic Arts"
+  },
+  {
+   "id": "POI.norris.theatre",
+   "kind": "poi",
+   "lat": 34.0221994,
+   "lon": -118.285502,
+   "name": "norris theatre",
+   "display": "Eileen Norris Cinema Theatre",
+   "aliases": [
+    "norris theatre",
+    "norris cinema",
+    "sinatra hall",
+    "eileen norris"
+   ],
+   "poi": "Eileen Norris Cinema Theatre"
+  },
+  {
+   "id": "ROYAL.ped.jefferson",
+   "kind": "pedestrian_exit",
+   "lat": 34.0225223,
+   "lon": -118.2819022,
+   "structure": "ROYAL"
+  },
+  {
+   "id": "WALK.royal_norris.1",
+   "kind": "waypoint",
+   "lat": 34.0227557,
+   "lon": -118.28245
+  },
+  {
+   "id": "WALK.royal_norris.2",
+   "kind": "waypoint",
+   "lat": 34.0222594,
+   "lon": -118.2829861
+  },
+  {
+   "id": "WALK.royal_norris.3",
+   "kind": "waypoint",
+   "lat": 34.0229413,
+   "lon": -118.2846642
+  },
+  {
+   "id": "WALK.royal_norris.4",
+   "kind": "waypoint",
+   "lat": 34.0226809,
+   "lon": -118.284861
+  },
+  {
+   "id": "WALK.royal_norris.5",
+   "kind": "waypoint",
+   "lat": 34.0224111,
+   "lon": -118.2855138
+  },
+  {
+   "id": "GATE.watt",
+   "kind": "campus_gate",
+   "lat": 34.0184081,
+   "lon": -118.2889172,
+   "name": "Watt Way gate mouth"
+  },
+  {
+   "id": "WATT.booth",
+   "kind": "junction",
+   "lat": 34.0187508,
+   "lon": -118.2887629,
+   "name": "Watt Way booth"
+  },
+  {
+   "id": "LOT_2.veh.main",
+   "kind": "vehicle_entrance",
+   "lat": 34.0207168,
+   "lon": -118.2883063,
+   "structure": "LOT_2",
+   "also_pedestrian": true
+  },
+  {
+   "id": "LOT_V.veh.main",
+   "kind": "vehicle_entrance",
+   "lat": 34.0244169,
+   "lon": -118.2859426,
+   "structure": "LOT_V",
+   "also_pedestrian": true
+  }
+ ],
+ "edges": [
+  {
+   "u": "ROYAL.ped.jefferson",
+   "v": "WALK.royal_norris.1",
+   "s": 42.0,
+   "m": 57.0
+  },
+  {
+   "u": "WALK.royal_norris.1",
+   "v": "WALK.royal_norris.2",
+   "s": 54.9,
+   "m": 74.0
+  },
+  {
+   "u": "WALK.royal_norris.2",
+   "v": "WALK.royal_norris.3",
+   "s": 127.6,
+   "m": 172.0
+  },
+  {
+   "u": "WALK.royal_norris.3",
+   "v": "WALK.royal_norris.4",
+   "s": 25.3,
+   "m": 34.0
+  },
+  {
+   "u": "WALK.royal_norris.4",
+   "v": "WALK.royal_norris.5",
+   "s": 49.8,
+   "m": 67.0
+  },
+  {
+   "u": "WALK.royal_norris.5",
+   "v": "POI.norris.theatre",
+   "s": 17.5,
+   "m": 24.0
+  }
+ ]
+}

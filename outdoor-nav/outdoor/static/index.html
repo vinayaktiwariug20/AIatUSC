@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Campus Wayfinding</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--line:#dde2ea;--ink:#16191f;--dim:#5b6374;
+ --accent:#1f4fd8;--ok:#0d7a4f;--warn:#9a5b00;--warnbg:#fff4dc;--stop:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#121419;--card:#1b1e26;--line:#2c3140;
+ --ink:#e8ebf1;--dim:#98a0b3;--accent:#7aa2ff;--ok:#5ad19a;--warn:#f0b849;
+ --warnbg:rgba(240,184,73,.12);--stop:#ff6b6b}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);display:flex;flex-direction:column;
+ font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+#map{flex:1;min-height:45vh}
+#panel{padding:12px 16px calc(12px + env(safe-area-inset-bottom));max-height:52vh;overflow:auto;
+ border-top:1px solid var(--line);background:var(--bg)}
+.row{display:flex;gap:8px}
+input,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);
+ border-radius:10px;min-height:44px;padding:0 12px}
+input{flex:1;min-width:0}
+button{cursor:pointer;white-space:nowrap}
+button.go{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button[aria-pressed=true]{background:var(--stop);border-color:var(--stop);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:10px}
+.big{font-size:20px;font-weight:650}
+.dim{color:var(--dim);font-size:13px}
+.warn{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:6px 9px;margin-top:6px;font-size:14px}
+.avoid{color:var(--ok);font-size:14px;margin-top:6px}
+.stop{color:var(--stop)}
+#handoff{display:none;background:var(--ok);color:#fff;border-radius:12px;padding:12px;margin-top:10px;
+ font-weight:600;text-decoration:none;text-align:center}
+details{margin-top:12px}
+summary{cursor:pointer;color:var(--dim);font-size:13px}
+.rep{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:14px}
+.rep span{flex:1}
+.rep button{min-height:34px;padding:0 9px;font-size:13px}
+#reportForm{display:none}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="panel">
+  <div class="row">
+    <input id="to" list="blds" placeholder="Where to? (building)" autocomplete="off">
+    <datalist id="blds"></datalist>
+    <button class="go" id="goBtn">Go</button>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button id="locBtn">Use my location</button>
+    <button id="repBtn" aria-pressed="false">Report blockage</button>
+    <label class="dim" style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="stepFree" style="min-height:auto;flex:none"> step-free</label>
+  </div>
+  <div class="dim" id="hint" style="margin-top:6px">Tap the map to set where you are, or use your location.</div>
+
+  <div class="card" id="reportForm">
+    <div class="dim">Report at the pin you placed</div>
+    <div class="row" style="margin-top:6px">
+      <input id="repNote" placeholder="What's blocked? e.g. fence across path">
+      <button class="go" id="repSend">Send</button>
+    </div>
+  </div>
+
+  <div id="result"></div>
+  <a id="handoff" href="#">You're here, so continue inside →</a>
+
+  <details>
+    <summary>Staff / organizer</summary>
+    <div class="row" style="margin-top:8px">
+      <input id="token" type="password" placeholder="Admin token">
+    </div>
+    <div class="dim" style="margin-top:4px">With a token, your reports are official and reroute everyone at once.</div>
+    <div id="queue"></div>
+  </details>
+  <div class="dim" style="margin-top:12px" id="attr"></div>
+</div>
+
+<script>
+const API = (new URLSearchParams(location.search).get('api')) || '';
+const qs = new URLSearchParams(location.search);
+const INDOOR = qs.get('indoor') || '/indoor';   // the indoor app's URL
+const $ = id => document.getElementById(id);
+const store = {get(k){try{return localStorage.getItem(k)}catch{return null}},
+               set(k,v){try{localStorage.setItem(k,v)}catch{}}};
+
+const map = L.map('map', {zoomControl: false}).setView([34.0205, -118.2856], 16);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'}).addTo(map);
+
+let buildings = [], start = null, startMk = null, routeLayer = null,
+    closureLayer = L.layerGroup().addTo(map), reporting = false, repPin = null, watchId = null;
+
+const headers = () => {
+  const h = {'Content-Type': 'application/json'};
+  const t = $('token').value.trim(); if (t) h['X-Admin-Token'] = t; return h;
+};
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, {headers: headers(), ...opts});
+  return r.json();
+}
+function esc(s){return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+function buildingId(text) {
+  const t = text.trim().toLowerCase();
+  const b = buildings.find(b => b.id === t || b.name.toLowerCase() === t);
+  return b ? b.id : text.trim();
+}
+
+function setStart(lat, lon, fromGps) {
+  start = {lat, lon};
+  if (!startMk) startMk = L.circleMarker([lat, lon], {radius: 8, color: '#fff', weight: 3,
+    fillColor: '#1f4fd8', fillOpacity: 1}).addTo(map);
+  startMk.setLatLng([lat, lon]);
+  $('hint').textContent = fromGps ? 'Following your location.' : 'Start set by tap (demo mode).';
+  route();
+}
+
+async function route() {
+  const to = $('to').value.trim();
+  if (!start || !to) return;
+  const r = await api('/api/outdoor/route', {method: 'POST', body: JSON.stringify(
+    {from: start, to: buildingId(to), step_free: $('stepFree').checked})});
+  if (routeLayer) routeLayer.remove();
+  if (!r.ok) {
+    const choices = (r.choices || []).map(c =>
+      `<button data-pick="${esc(c.id)}" style="margin:6px 6px 0 0">${esc(c.name)}</button>`).join('');
+    $('result').innerHTML = choices
+      ? `<div class="card">Which one?<div>${choices}</div></div>`
+      : `<div class="card stop">${esc(r.reason || r.error)}</div>`;
+    $('handoff').style.display = 'none';
+    return;
+  }
+  routeLayer = L.geoJSON(r, {
+    style: {color: '#1f4fd8', weight: 6, opacity: .85},
+    pointToLayer: (f, ll) => f.properties.kind === 'entrance'
+      ? L.circleMarker(ll, {radius: 9, color: '#0d7a4f', weight: 3, fillOpacity: .9})
+          .bindTooltip(f.properties.guess ? 'nearest side of building (door not mapped)' : esc(f.properties.name))
+      : L.circleMarker(ll, {radius: 0, opacity: 0})
+  }).addTo(map);
+  const s = r.summary;
+  let h = `<div class="card"><div class="big">${s.minutes} min walk</div>
+    <div class="dim">${s.metres} m to ${esc(s.building_name)}${r.handoff.entrance_name ? ' · ' + esc(r.handoff.entrance_name) : ''}</div>`;
+  if (s.entrance_source === 'outline') h += `<div class="dim">Door not mapped, so this ends at the nearest side of the building.</div>`;
+  if (s.off_network) h += `<div class="warn">You're ${s.snap_m} m from the nearest campus path. Get to campus first.</div>`;
+  for (const a of s.avoided) h += `<div class="avoid">✓ Avoiding a closure (+${a.extra_min} min)</div>`;
+  for (const w of s.warnings) h += `<div class="warn">Unconfirmed report on this route: ${esc(w.note || 'blockage')}</div>`;
+  $('result').innerHTML = h + '</div>';
+  const hand = $('handoff');
+  if (s.near_venue) {
+    const u = new URL(INDOOR, location.href);
+    u.searchParams.set('building', r.handoff.building);
+    if (r.handoff.entrance_id) u.searchParams.set('entrance', r.handoff.entrance_id);
+    if (r.handoff.indoor_node) u.searchParams.set('node', r.handoff.indoor_node);
+    hand.href = u.toString(); hand.style.display = 'block';
+  } else hand.style.display = 'none';
+  if (!route.fitted) { map.fitBounds(routeLayer.getBounds(), {padding: [30, 30]}); route.fitted = true; }
+}
+
+async function loadClosures() {
+  const cs = await api('/api/closures');
+  closureLayer.clearLayers();
+  const admin = !!$('token').value.trim();
+  let q = '';
+  for (const c of cs) {
+    const approved = c.status === 'approved';
+    L.circle([c.lat, c.lon], {radius: Math.max(c.radius_m, 8),
+      color: approved ? '#b3261e' : '#d48806', weight: 2, dashArray: approved ? null : '5 5',
+      fillOpacity: approved ? .35 : .15})
+      .bindTooltip(`${approved ? 'Closed' : 'Unconfirmed'}: ${esc(c.note || c.kind)} (until ${c.ends.slice(11)})`)
+      .addTo(closureLayer);
+    if (admin) q += `<div class="rep"><span>${approved ? '🔴' : '🟠'} ${esc(c.note || c.kind)} <span class="dim">${c.source}</span></span>
+      ${approved ? '' : `<button data-act="approve" data-id="${c.id}">Approve</button>`}
+      <button data-act="reject" data-id="${c.id}">${approved ? 'Lift' : 'Reject'}</button></div>`;
+  }
+  $('queue').innerHTML = admin ? (q || '<div class="dim" style="margin-top:6px">No active closures.</div>') : '';
+}
+
+$('queue').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  await api(`/api/closures/${b.dataset.id}/${b.dataset.act}`, {method: 'POST'});
+  await loadClosures(); route();
+});
+
+map.on('click', e => {
+  if (reporting) {
+    if (!repPin) repPin = L.marker(e.latlng).addTo(map); else repPin.setLatLng(e.latlng);
+    $('reportForm').style.display = 'block'; $('repNote').focus();
+    return;
+  }
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  setStart(e.latlng.lat, e.latlng.lng, false);
+});
+
+$('repBtn').onclick = () => {
+  reporting = !reporting;
+  $('repBtn').setAttribute('aria-pressed', reporting);
+  $('hint').textContent = reporting ? 'Tap where the blockage is.' : '';
+  if (!reporting) { $('reportForm').style.display = 'none'; if (repPin) { repPin.remove(); repPin = null; } }
+};
+$('repSend').onclick = async () => {
+  if (!repPin) return;
+  const ll = repPin.getLatLng();
+  const c = await api('/api/closures', {method: 'POST', body: JSON.stringify(
+    {lat: ll.lat, lon: ll.lng, note: $('repNote').value.trim(), radius_m: 15})});
+  $('repNote').value = ''; $('repBtn').click();
+  $('hint').textContent = c.status === 'approved' ? 'Closure posted. Routes now avoid it.'
+                                                  : 'Thanks. Shown as unconfirmed until staff check it.';
+  await loadClosures(); route();
+};
+
+$('locBtn').onclick = () => {
+  if (!navigator.geolocation) { $('hint').textContent = 'No location on this device. Tap the map instead.'; return; }
+  $('hint').textContent = 'Finding you…';
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  let last = null;
+  watchId = navigator.geolocation.watchPosition(p => {
+    const {latitude: la, longitude: lo} = p.coords;
+    // reroute only after a real move, not every GPS jitter
+    if (last && map.distance(last, [la, lo]) < 15) return;
+    last = [la, lo]; setStart(la, lo, true);
+  }, err => { $('hint').textContent = 'Location unavailable (' + err.message + '). Tap the map instead.'; },
+  {enableHighAccuracy: true, maximumAge: 5000});
+};
+
+$('result').addEventListener('click', e => {
+  const b = e.target.closest('button[data-pick]'); if (!b) return;
+  $('to').value = b.textContent; route.fitted = false; route();
+});
+$('goBtn').onclick =() => { route.fitted = false; route(); };
+$('to').addEventListener('change', () => { route.fitted = false; route(); });
+$('stepFree').onchange = route;
+$('token').value = store.get('adminToken') || '';
+$('token').addEventListener('change', () => { store.set('adminToken', $('token').value.trim()); loadClosures(); });
+
+(async () => {
+  buildings = await api('/api/buildings');
+  $('blds').innerHTML = buildings.map(b => `<option value="${esc(b.name)}">`).join('');
+  $('attr').innerHTML = 'Paths and buildings &copy; OpenStreetMap contributors (ODbL)';
+  if (qs.get('to')) {
+    const id = qs.get('to');
+    const b = buildings.find(b => b.id === id);
+    $('to').value = b ? b.name : id;
+  }
+  await loadClosures();
+  const at = qs.get('at');          // ?at=lat,lon  fakes the start for a demo
+  if (at) { const [la, lo] = at.split(',').map(Number); setStart(la, lo, false); }
+  setInterval(async () => { await loadClosures(); route(); }, 30000);
+})();
+</script>
+</body>
+</html>

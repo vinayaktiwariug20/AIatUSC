@@ -1,0 +1,7 @@
+[
+ {"building": "edward-l-doheny-junior-memorial-library",
+  "id": "doheny-main", "name": "Main doors (north)",
+  "lat": 34.02028, "lon": -118.28397,
+  "indoor_node": "F1_entrance", "replace_osm": true,
+  "_note": "EXAMPLE ONLY. Coordinates copied from OSM, not surveyed. Stand at the real door and drop a pin."}
+]

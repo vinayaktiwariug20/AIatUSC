@@ -1,0 +1,440 @@
+"""Outdoor walking router: start point -> the best entrance of a building,
+around whatever is closed right now.
+
+Lifted from field-guide's campus graph and cut down to the one mode a
+hackathon needs (walking). What carries over is the part a general-purpose
+map cannot do: closures are first-class, every refusal names what is in the
+way, and the route says which closure it went around and what that cost.
+
+Closures come from `closures.ClosureStore`. Only APPROVED closures change the
+route. Unverified public reports are returned alongside it as warnings and
+never re-route anyone on their own say-so.
+"""
+
+import heapq
+import json
+from datetime import datetime
+from pathlib import Path
+
+from .geo import haversine_m, point_segment_m, walk_seconds
+
+DATA = Path(__file__).resolve().parent.parent / "data"
+
+SNAP_LIMIT_M = 60         # an entrance further than this from any path is not wired in
+OFF_NETWORK_M = 150       # a start point further than this is "not on campus yet"
+NEAR_VENUE_M = 75         # within this of the chosen entrance: hand off to indoor
+REPORT_WARN_M = 30        # unverified reports this close to the route are surfaced
+
+
+class Unreachable(Exception):
+    def __init__(self, reason, blocked_by=()):
+        super().__init__(reason)
+        self.reason = reason
+        self.blocked_by = list(blocked_by)
+        self.choices = []
+
+
+class WalkGraph:
+    def __init__(self, walk=None, buildings=None, overrides=None, data_dir=None,
+                 surveyed=None):
+        d = Path(data_dir) if data_dir else DATA
+        walk = walk if walk is not None else _load(d / "walk.json")
+        buildings = (buildings if buildings is not None
+                     else _load(d / "buildings.json"))
+        if overrides is None:
+            overrides = _load(d / "entrances.override.json", default=[])
+        if surveyed is None:
+            surveyed = _load(d / "surveyed.json", default={})
+
+        self.attribution = walk.get("attribution", "")
+        self.nodes = {n["id"]: (n["lat"], n["lon"]) for n in walk["nodes"]}
+        self.edges = []                    # (u, v, seconds, metres, steps, name)
+        for e in walk["edges"]:
+            self._add(e["u"], e["v"], e["s"], e.get("m", e["s"] * 1.35),
+                      e.get("steps", False), e.get("name", ""))
+
+        self.buildings = {b["id"]: dict(b) for b in buildings.get("buildings", [])}
+        self.places = {}                   # start points: "I parked at Royal"
+        self._apply_surveyed(surveyed)
+        self._apply_overrides(overrides)
+        self._wire_entrances()
+
+    def _apply_surveyed(self, s):
+        """Hand-surveyed points and walked footpaths (from field-guide).
+
+        Every point is stitched to the nearest OSM path node, and the walked
+        segments go in as real edges. Surveyed destinations become doors that
+        win over anything OSM guessed; parking exits and campus gates become
+        named start places.
+        """
+        pts = [n for n in s.get("nodes", []) if n.get("lat") is not None]
+        if not pts:
+            return
+        # stitch against OSM only, before the surveyed points join the index
+        stitches = [(n, *self.nearest(n["lat"], n["lon"])) for n in pts]
+        for n, nid, d in stitches:
+            self.nodes["S:" + n["id"]] = (n["lat"], n["lon"])
+            if nid is not None and d <= SNAP_LIMIT_M:
+                self._add("S:" + n["id"], nid, walk_seconds(d), d)
+        for e in s.get("edges", []):
+            self._add("S:" + e["u"], "S:" + e["v"], e["s"], e.get("m", e["s"] * 1.35),
+                      name="surveyed footpath")
+        self._cells = None                  # rebuild the index with them in it
+
+        for n in pts:
+            label = n.get("display") or n.get("poi") or n.get("name") or n["id"]
+            if n["kind"] == "poi" and not n.get("bound_only"):
+                bid = _slug(label)
+                door = {"id": n["id"], "lat": n["lat"], "lon": n["lon"],
+                        "name": label, "kind": "surveyed"}
+                b = self.buildings.get(bid)
+                if b is None:
+                    b = self.buildings[bid] = {
+                        "id": bid, "name": label, "aliases": list(n.get("aliases", [])),
+                        "lat": n["lat"], "lon": n["lon"], "entrances": []}
+                    if n.get("name") and n["name"].lower() != label.lower():
+                        b["aliases"].append(n["name"])
+                b["entrances"] = [door]
+                b["entrance_source"] = "surveyed"
+                b["surveyed"] = True
+            elif n.get("restricted_to"):
+                continue                    # a permit-only door is not a way out for a guest
+            elif n.get("structure") and (n["kind"] == "pedestrian_exit"
+                                         or n.get("also_pedestrian")
+                                         or n["kind"] == "vehicle_entrance"):
+                # people walk out of vehicle entrances too
+                p = self.places.setdefault(n["structure"].lower(), {
+                    "id": n["structure"].lower(), "kind": "parking",
+                    "name": n["structure"].replace("_", " ").title(), "nodes": []})
+                p["nodes"].append("S:" + n["id"])
+            elif n["kind"] == "campus_gate":
+                pid = n["id"].lower()
+                self.places[pid] = {"id": pid, "kind": "gate", "name": label,
+                                    "nodes": ["S:" + n["id"]]}
+
+    # ------------------------------------------------------------ building
+    def _add(self, u, v, s, m, steps=False, name=""):
+        self.edges.append((u, v, s, m, steps, name))
+        self.edges.append((v, u, s, m, steps, name))
+
+    def _apply_overrides(self, overrides):
+        """Hand-placed entrances win over OSM. This is where the venue's real
+        door goes -- the same door the indoor graph starts from."""
+        for o in overrides:
+            b = self.buildings.get(o["building"])
+            if b is None:
+                b = self.buildings[o["building"]] = {
+                    "id": o["building"], "name": o.get("building_name", o["building"]),
+                    "aliases": [], "lat": o["lat"], "lon": o["lon"],
+                    "entrances": []}
+            if o.get("replace_osm"):
+                b["entrances"] = []
+            b["entrances"] = [e for e in b["entrances"] if e["id"] != o["id"]]
+            b["entrances"].append({k: o.get(k) for k in
+                                   ("id", "lat", "lon", "name", "indoor_node",
+                                    "wheelchair")} | {"kind": "surveyed"})
+            b["entrance_source"] = "surveyed"
+
+    def _wire_entrances(self):
+        """Connect every entrance (or, failing that, every outline vertex) to
+        the nearest path node. Outline vertices are a labelled guess: the
+        route ends at the side of the building nearest a path, which may not
+        be a door."""
+        self.targets = {}
+        for b in self.buildings.values():
+            pts = [(e["id"], e["lat"], e["lon"]) for e in b.get("entrances", [])]
+            if not pts:
+                pts = [("%s:outline%d" % (b["id"], i), lat, lon)
+                       for i, (lat, lon) in enumerate(b.get("outline", [])[:-1])]
+            ids = []
+            for pid, lat, lon in pts:
+                nid, d = self.nearest(lat, lon)
+                if nid is None or d > SNAP_LIMIT_M:
+                    continue
+                key = "E:" + pid
+                self.nodes[key] = (lat, lon)
+                self._add(key, nid, walk_seconds(d), d)
+                ids.append(key)
+            self.targets[b["id"]] = ids
+        self._index()
+
+    def _index(self):
+        self.out = {}
+        for i, (u, v, *_rest) in enumerate(self.edges):
+            self.out.setdefault(u, []).append(i)
+
+    CELL = 0.001            # ~110m of latitude, ~92m of longitude here
+
+    def _grid(self):
+        g = {}
+        for nid, (lat, lon) in self.nodes.items():
+            if not nid.startswith(("E:", "O:")):
+                g.setdefault((int(lat // self.CELL), int(lon // self.CELL)), []).append(nid)
+        return g
+
+    def nearest(self, lat, lon):
+        """Nearest path node: grid rings outward until no closer cell can exist."""
+        if getattr(self, "_cells", None) is None:
+            self._cells = self._grid()
+        ci, cj = int(lat // self.CELL), int(lon // self.CELL)
+        best, bd = None, float("inf")
+        for r in range(0, 400):
+            # every cell at ring r is at least (r-1) cells away
+            if best is not None and (r - 1) * self.CELL * 92000 > bd:
+                break
+            for i in range(ci - r, ci + r + 1):
+                for j in range(cj - r, cj + r + 1):
+                    if max(abs(i - ci), abs(j - cj)) != r:
+                        continue
+                    for nid in self._cells.get((i, j), ()):
+                        d = haversine_m((lat, lon), self.nodes[nid])
+                        if d < bd:
+                            best, bd = nid, d
+            if r > 2 and not self._cells:
+                break
+        return best, bd
+
+    # ------------------------------------------------------------- search
+    SAME_PLACE_M = 60       # matches closer than this are one place, not a choice
+
+    def candidates(self, text):
+        """Every building the text could mean."""
+        t = (text or "").strip().lower()
+        if not t:
+            return []
+        if t in self.buildings:
+            return [self.buildings[t]]
+        exact = [b for b in self.buildings.values()
+                 if t == b["name"].lower()
+                 or t in (a.lower() for a in b.get("aliases", []))]
+        if exact:
+            return exact
+        return [b for b in self.buildings.values()
+                if t in b["name"].lower()
+                or any(t in a.lower() for a in b.get("aliases", []))]
+
+    def find_building(self, text):
+        """One building, or None when the text is unknown or ambiguous.
+
+        "Norris" is a cinema theatre and a dental school ~200m apart, on
+        opposite errands. A surveyed door only settles a tie when every other
+        match is the SAME place (OSM's "Norris Cinema Center" around the
+        surveyed theatre door); otherwise the honest answer is a question.
+        """
+        c = self.candidates(text)
+        if len(c) == 1:
+            return c[0]
+        surveyed = [b for b in c if b.get("surveyed")]
+        if len(surveyed) == 1:
+            s = surveyed[0]
+            if all(haversine_m((s["lat"], s["lon"]), (b["lat"], b["lon"]))
+                   <= self.SAME_PLACE_M for b in c):
+                return s
+        return None
+
+    def find_place(self, text):
+        t = (text or "").strip().lower()
+        if t in self.places:
+            return self.places[t]
+        hits = [p for p in self.places.values() if t and t in p["name"].lower()]
+        return hits[0] if len(hits) == 1 else None
+
+    def _blocked_edges(self, closures):
+        """Edge index -> closure id, for every edge passing within a closure's
+        radius."""
+        blocked = {}
+        for c in closures:
+            p, r = (c["lat"], c["lon"]), c.get("radius_m", 15)
+            for i, (u, v, *_r) in enumerate(self.edges):
+                if i in blocked:
+                    continue
+                a, b = self.nodes[u], self.nodes[v]
+                # cheap reject before the exact test
+                if (haversine_m(p, a) > r + 400 and haversine_m(p, b) > r + 400):
+                    continue
+                if point_segment_m(p, a, b) <= r:
+                    blocked[i] = c["id"]
+        return blocked
+
+    def _dijkstra(self, src, targets, blocked, step_free):
+        targets = set(targets)
+        best, prev, pq = {src: 0.0}, {}, [(0.0, src)]
+        hit = set()
+        while pq:
+            cost, n = heapq.heappop(pq)
+            if cost > best.get(n, float("inf")):
+                continue
+            if n in targets:
+                path, cur = [n], n
+                while cur != src:
+                    cur, _i = prev[cur]
+                    path.append(cur)
+                edges = []
+                cur = n
+                while cur != src:
+                    p, i = prev[cur]
+                    edges.append(i)
+                    cur = p
+                return cost, path[::-1], edges[::-1], hit
+            for i in self.out.get(n, []):
+                u, v, s, m, steps, name = self.edges[i]
+                if i in blocked:
+                    hit.add(blocked[i])
+                    continue
+                if steps and step_free:
+                    hit.add("steps")
+                    continue
+                nc = cost + s
+                if nc < best.get(v, float("inf")):
+                    best[v], prev[v] = nc, (n, i)
+                    heapq.heappush(pq, (nc, v))
+        return None, None, None, hit
+
+    def route(self, lat, lon, building, closures=(), reports=(), step_free=False,
+              place=None):
+        """Returns a GeoJSON FeatureCollection; raises Unreachable.
+
+        `place` (e.g. "royal") starts from every walk-out point of that
+        structure at once, so the route picks the exit itself.
+        """
+        pl = None
+        if place is not None:
+            pl = place if isinstance(place, dict) else self.find_place(place)
+            if pl is None:
+                raise Unreachable("unknown place: %r" % (place,))
+        b = building if isinstance(building, dict) else self.find_building(building)
+        if b is None:
+            c = [] if isinstance(building, dict) else self.candidates(building)
+            if len(c) > 1:
+                e = Unreachable("%r could mean %d places -- which one?"
+                                % (building, len(c)))
+                e.choices = [{"id": x["id"], "name": x["name"]} for x in c]
+                raise e
+            raise Unreachable("unknown building: %r" % (building,))
+        targets = self.targets.get(b["id"]) or []
+        if not targets:
+            raise Unreachable("%s has no entrance within %dm of a mapped path"
+                              % (b["name"], SNAP_LIMIT_M))
+
+        origin = "O:start"
+        if pl:
+            links = [(n, 0.0, 0.0) for n in pl["nodes"]]
+            lat, lon = self.nodes[pl["nodes"][0]]
+            snap_m = 0.0
+        else:
+            snap, snap_m = self.nearest(lat, lon)
+            links = [(snap, walk_seconds(snap_m), snap_m)]
+        self.nodes[origin] = (lat, lon)
+        for n, sec, m in links:
+            self.edges.append((origin, n, sec, m, False, ""))
+            self.out.setdefault(origin, []).append(len(self.edges) - 1)
+        try:
+            blocked = self._blocked_edges(closures)
+            cost, path, eidx, hit = self._dijkstra(origin, targets, blocked,
+                                                   step_free)
+            if cost is None:
+                named = sorted(h for h in hit if h != "steps")
+                why = ("every way in is closed" if named
+                       else "stairs on every way in" if "steps" in hit
+                       else "no path in the map")
+                raise Unreachable("%s: %s" % (b["name"], why), named)
+            # What would the route have been with nothing closed? The closures
+            # on THAT path are the ones this route went around.
+            base_cost, base_closures = None, []
+            if blocked:
+                bc, _bp, beidx, _h = self._dijkstra(origin, targets, {}, step_free)
+                if bc is not None:
+                    base_cost = bc
+                    base_closures = sorted({blocked[i] for i in beidx
+                                            if i in blocked})
+            metres = sum(self.edges[i][3] for i in eidx)
+            if pl:                          # start at the exit actually used
+                path = path[1:]
+                lat, lon = self.nodes[path[0]]
+            coords = [self.nodes[n] for n in path]
+        finally:
+            for _ in links:
+                self.edges.pop()
+            del self.out[origin]
+            del self.nodes[origin]
+
+        ent_id = path[-1][2:]
+        ent = next((e for e in b.get("entrances", []) if e["id"] == ent_id), None)
+        ent_ll = self.nodes[path[-1]]
+        to_door = haversine_m((lat, lon), ent_ll)
+
+        avoided = []
+        if base_closures:
+            extra = round(max(0.0, cost - base_cost) / 60, 1)
+            avoided = [{"closure": cid, "extra_min": extra}
+                       for cid in base_closures]
+
+        warn = []
+        for r in reports:
+            p = (r["lat"], r["lon"])
+            if any(point_segment_m(p, a, c) <= REPORT_WARN_M + r.get("radius_m", 0)
+                   for a, c in zip(coords, coords[1:])):
+                warn.append(r)
+
+        def pt(ll, **props):
+            return {"type": "Feature", "properties": props,
+                    "geometry": {"type": "Point", "coordinates": [ll[1], ll[0]]}}
+
+        return {
+            "type": "FeatureCollection",
+            "summary": {
+                "building": b["id"], "building_name": b["name"],
+                "minutes": round(cost / 60, 1), "metres": round(metres),
+                "near_venue": to_door <= NEAR_VENUE_M,
+                "distance_to_entrance_m": round(to_door),
+                "off_network": snap_m > OFF_NETWORK_M,
+                "snap_m": round(snap_m),
+                "entrance_source": ("outline" if ent is None
+                                    else b.get("entrance_source", "osm")),
+                "step_free": step_free,
+                "start_place": ({"id": pl["id"], "name": pl["name"],
+                                 "exit": path[0][2:]} if pl else None),
+                "avoided": avoided,
+                "warnings": [{"id": r["id"], "note": r.get("note", ""),
+                              "status": r["status"]} for r in warn],
+            },
+            "handoff": {
+                "building": b["id"],
+                "entrance_id": ent["id"] if ent else None,
+                "entrance_name": ent.get("name") if ent else None,
+                "indoor_node": ent.get("indoor_node") if ent else None,
+                "lat": ent_ll[0], "lon": ent_ll[1],
+            },
+            "features": [
+                {"type": "Feature",
+                 "properties": {"kind": "route", "minutes": round(cost / 60, 1),
+                                "metres": round(metres)},
+                 "geometry": {"type": "LineString",
+                              "coordinates": [[c[1], c[0]] for c in coords]}},
+                pt((lat, lon), kind="start"),
+                pt(ent_ll, kind="entrance",
+                   name=(ent or {}).get("name") or b["name"],
+                   guess=ent is None),
+            ],
+            "attribution": self.attribution,
+        }
+
+
+def _load(path, default=None):
+    p = Path(path)
+    if not p.exists():
+        if default is not None:
+            return default
+        raise FileNotFoundError("%s missing -- run tools/fetch_osm.py" % p)
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+def _slug(s):
+    out = "".join(c.lower() if c.isalnum() else "-" for c in s)
+    while "--" in out:
+        out = out.replace("--", "-")
+    return out.strip("-")
+
+
+def parse_when(s):
+    return datetime.fromisoformat(s) if s else datetime.now()
