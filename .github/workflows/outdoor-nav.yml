@@ -34,6 +34,16 @@ jobs:
           python-version: "3.12"
 
       - run: npm ci
+
+      # Build graph.json HERE, from data/, before anything reads it. Python's
+      # math uses the OS libm, so a graph built on Windows can break a
+      # near-tie differently from Python on Linux; building in CI means the
+      # parity check compares both routers on identical data, and the deploy
+      # job ships exactly this build -- a stale committed graph.json cannot
+      # reach production.
+      - name: Build graph.json from data/
+        run: python outdoor-nav/tools/build_cloudflare_graph.py
+
       - name: JS syntax
         run: npm run check
       - name: JS tests (Worker + D1 in memory)
@@ -48,22 +58,6 @@ jobs:
       - name: Python/JS route parity
         run: python outdoor-nav/tools/check_cloudflare_parity.py
 
-      # The Worker serves the compiled graph.json, not the data files. If data
-      # changed and nobody rebuilt it, the live site would route on stale data.
-      # Compare content only: source checksums differ with line endings.
-      - name: graph.json is up to date with data/
-        run: |
-          cp outdoor-nav/cloudflare/graph.json /tmp/committed.json
-          python outdoor-nav/tools/build_cloudflare_graph.py
-          python - <<'EOF'
-          import json, sys
-          a = json.load(open("/tmp/committed.json")); b = json.load(open("outdoor-nav/cloudflare/graph.json"))
-          a.pop("source_sha256", None); b.pop("source_sha256", None)
-          if a != b:
-              sys.exit("graph.json is stale: run `python outdoor-nav/tools/build_cloudflare_graph.py` and commit it")
-          print("graph.json matches data/")
-          EOF
-
   deploy:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -75,7 +69,12 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - run: npm ci
+      - name: Build graph.json from data/ (same as the tested build)
+        run: python outdoor-nav/tools/build_cloudflare_graph.py
       - name: Apply D1 migrations (no-op when already applied)
         run: npx wrangler d1 migrations apply DB --remote --config outdoor-nav/wrangler.jsonc
         env:
