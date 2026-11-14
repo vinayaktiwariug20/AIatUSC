@@ -47,7 +47,11 @@ test('unverified reports persist across calls and never change the walking route
   const next=(await call(e,'/api/outdoor/route','POST',route)).data;assert.deepEqual(next.features,plain.features);
 });
 test('approval is authenticated, persists, and produces a detour',async()=>{
-  const e=env(),c=(await call(e,'/api/closures','POST',report)).data,p='/api/closures/'+c.id;
+  // Close a point ON the current route (its midpoint), so the test does not
+  // depend on which paths the map happens to have.
+  const e=env(),line=(await call(e,'/api/outdoor/route','POST',route)).data.features[0].geometry.coordinates;
+  const [mlon,mlat]=line[Math.floor(line.length/2)];
+  const c=(await call(e,'/api/closures','POST',{...report,lat:mlat,lon:mlon,radius_m:10})).data,p='/api/closures/'+c.id;
   assert.equal((await call(e,p+'/approve','POST',{})).status,403);
   assert.equal((await call(e,p+'/approve','POST',{},'test-secret')).data.status,'approved');
   const out=(await call(e,'/api/outdoor/route','POST',route)).data;assert.ok(out.summary.avoided.some(x=>x.closure===c.id));
@@ -115,4 +119,14 @@ test('object prototype names cannot masquerade as buildings or start places',asy
   assert.equal((await call({},'/api/buildings/constructor')).status,404);
   assert.equal((await call({},'/api/outdoor/route','POST',{...route,to:'__proto__'})).data.ok,false);
   assert.equal((await call({},'/api/outdoor/route','POST',{...route,from:{place:'constructor'}})).data.ok,false);
+});
+test('start on a long footway snaps to the segment, not a far node (no loop)',async()=>{
+  // Tutor Center footway: nearest-NODE snapping walked west to a corner and back.
+  const out=(await call({},'/api/outdoor/route','POST',{from:{lat:34.01995,lon:-118.28690},to:'Doheny'})).data;
+  assert.equal(out.ok,true);assert.ok(out.summary.snap_m<15);
+  const lons=out.features[0].geometry.coordinates.map(c=>c[0]);assert.ok(Math.min(...lons)>-118.28690-0.0003);
+});
+test('campus malls tagged cycleway are walkable (Childs Way / Watt Way)',async()=>{
+  const out=(await call({},'/api/outdoor/route','POST',{from:{lat:34.02065,lon:-118.28720},to:'Doheny'})).data;
+  assert.ok(out.summary.metres<500,out.summary.metres);
 });

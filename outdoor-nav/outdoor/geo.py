@@ -19,6 +19,22 @@ def walk_seconds(metres):
     return metres / WALK_MPS
 
 
+def project(p, a, b):
+    """(metres from p to segment a-b, fraction t along a->b, (lat, lon) of the foot)."""
+    k = math.cos(math.radians(p[0]))
+
+    def xy(q):
+        return ((q[1] - p[1]) * k * 111320.0, (q[0] - p[0]) * 110540.0)
+
+    ax, ay = xy(a)
+    bx, by = xy(b)
+    dx, dy = bx - ax, by - ay
+    L = dx * dx + dy * dy
+    t = 0.0 if L == 0 else max(0.0, min(1.0, -(ax * dx + ay * dy) / L))
+    foot = (a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]))
+    return math.hypot(ax + t * dx, ay + t * dy), t, foot
+
+
 def point_segment_m(p, a, b):
     """Metres from point p to segment a-b (all (lat, lon)).
 
