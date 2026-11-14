@@ -1,0 +1,31 @@
+{
+ "sources": {
+  "schedule": "https://usctrojans.com/sports/football/schedule/2026",
+  "post_game": "https://gameday.usc.edu/getting-here/post-game-traffic-flow/",
+  "retrieved": "2026-11-14"
+ },
+ "scope": "VEHICLE closures. The post-game page says pedestrian crossings are marked on all closed streets, so these never close a walking route.",
+ "home_games": [
+  {"date": "2026-08-29", "kickoff": "12:00", "opponent": "San Jose State", "venue": "Coliseum"},
+  {"date": "2026-09-04", "kickoff": "18:00", "opponent": "Fresno State", "venue": "Coliseum"},
+  {"date": "2026-09-12", "kickoff": "20:00", "opponent": "Louisiana", "venue": "Coliseum"},
+  {"date": "2026-09-26", "kickoff": "16:30", "opponent": "Oregon", "venue": "Coliseum"},
+  {"date": "2026-10-03", "kickoff": "16:30", "opponent": "Washington", "venue": "Coliseum"},
+  {"date": "2026-10-31", "kickoff": "16:30", "opponent": "Ohio State", "venue": "Coliseum"},
+  {"date": "2026-11-21", "kickoff": "15:15", "opponent": "Maryland", "venue": "Coliseum"}
+ ],
+ "post_game_closures": {
+  "streets": ["Exposition Blvd", "Figueroa St", "Martin Luther King Jr. Blvd", "Flower St"],
+  "starts": "end of the third quarter",
+  "ends": "approximately 60 minutes after the game",
+  "estimate": {
+   "starts_after_kickoff_min": 135,
+   "ends_after_kickoff_min": 270,
+   "note": "OUR ESTIMATE, not published: ~3.5h game, Q3 ends ~2h15m in. Use only as a window with that label."
+  },
+  "traffic_directed_to": ["I-10", "I-110"],
+  "pedestrians": "Pedestrian crossings marked on all closed streets; obey LAPD/LADOT staff.",
+  "map_image": "https://gameday.usc.edu/files/2023/08/image.png",
+  "map_image_note": "Exact closure extents are only on this image, dated 2023."
+ }
+}
