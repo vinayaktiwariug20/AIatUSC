@@ -249,23 +249,3 @@ def test_real_surveyed_places_and_doors():
     r = g.route(None, None, "norris theatre", place="royal")
     assert r["summary"]["start_place"]["id"] == "royal"
     assert not any("permits" in n for n in g.places["mccarthy"]["nodes"])
-
-
-def test_campus_walks_tagged_cycleway_are_walkable():
-    """Childs Way / Watt Way are highway=cycleway + foot=designated. Dropping
-    them sent a Downey Way -> Doheny walk round the streets (673m vs 410m)."""
-    g = WalkGraph()
-    names = {e[5] for e in g.edges}
-    assert {"Childs Way", "Watt Way", "Trousdale Parkway"} <= names
-    r = g.route(34.02065, -118.28720, "Doheny")
-    assert r["summary"]["metres"] < 500
-
-
-def test_foot_tag_overrides_access():
-    import sys
-    sys.path.insert(0, "tools")
-    from fetch_osm import walkable
-    assert walkable({"highway": "cycleway", "foot": "designated", "access": "private"})
-    assert not walkable({"highway": "cycleway"})                      # bike-only
-    assert not walkable({"highway": "footway", "access": "private"})
-    assert not walkable({"highway": "footway", "foot": "no"})

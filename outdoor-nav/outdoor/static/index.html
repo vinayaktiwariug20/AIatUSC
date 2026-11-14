@@ -45,6 +45,8 @@ summary{cursor:pointer;color:var(--dim);font-size:13px}
 <body>
 <div id="map"></div>
 <div id="panel">
+  <div class="dim" style="margin-bottom:6px">Walking preview · vehicle routing and indoor navigation are not connected yet.</div>
+  <div id="deploymentNotice" class="warn" style="display:none;margin-bottom:8px"></div>
   <div class="row">
     <input id="to" list="blds" placeholder="Where to? (building)" autocomplete="off">
     <datalist id="blds"></datalist>
@@ -80,12 +82,20 @@ summary{cursor:pointer;color:var(--dim);font-size:13px}
 </div>
 
 <script>
-const API = (new URLSearchParams(location.search).get('api')) || '';
+// Same-origin API: a query parameter must never redirect staff tokens elsewhere.
+const API = '';
 const qs = new URLSearchParams(location.search);
 const INDOOR = qs.get('indoor') || '/indoor';   // the indoor app's URL
 const $ = id => document.getElementById(id);
-const store = {get(k){try{return localStorage.getItem(k)}catch{return null}},
-               set(k,v){try{localStorage.setItem(k,v)}catch{}}};
+// Staff credentials stay in this tab only. Clear the old demo's stored value.
+try { localStorage.removeItem('adminToken'); } catch {}
+let deployment = null, closureFingerprint = '';
+function updateReportAvailability() {
+  if (!deployment) return;
+  const enabled = deployment.database === 'connected' && (deployment.public_reports || $('token').value.trim());
+  $('repBtn').disabled = !enabled;
+  $('repBtn').title = enabled ? '' : 'Reports require D1 and either public reporting enabled or a staff token.';
+}
 
 const map = L.map('map', {zoomControl: false}).setView([34.0205, -118.2856], 16);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -100,8 +110,16 @@ const headers = () => {
 };
 async function api(path, opts = {}) {
   const r = await fetch(API + path, {headers: headers(), ...opts});
-  return r.json();
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || 'API request failed (' + r.status + ')');
+  return data;
 }
+window.addEventListener('unhandledrejection', event => {
+  $('hint').textContent = event.reason?.message || 'Connection failed. Please retry.';
+  if (routeLayer) { routeLayer.remove(); routeLayer = null; }
+  $('handoff').style.display = 'none';
+  event.preventDefault();
+});
 function esc(s){return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 
 function buildingId(text) {
@@ -144,6 +162,7 @@ async function route() {
   const s = r.summary;
   let h = `<div class="card"><div class="big">${s.minutes} min walk</div>
     <div class="dim">${s.metres} m to ${esc(s.building_name)}${r.handoff.entrance_name ? ' · ' + esc(r.handoff.entrance_name) : ''}</div>`;
+  if (s.storage === 'read_only_preview') h += '<div class="warn">Preview: live closures are not connected. Follow posted access instructions.</div>';
   if (s.entrance_source === 'outline') h += `<div class="dim">Door not mapped, so this ends at the nearest side of the building.</div>`;
   if (s.off_network) h += `<div class="warn">You're ${s.snap_m} m from the nearest campus path. Get to campus first.</div>`;
   for (const a of s.avoided) h += `<div class="avoid">✓ Avoiding a closure (+${a.extra_min} min)</div>`;
@@ -162,6 +181,9 @@ async function route() {
 
 async function loadClosures() {
   const cs = await api('/api/closures');
+  const fingerprint = JSON.stringify(cs);
+  const changed = fingerprint !== closureFingerprint;
+  closureFingerprint = fingerprint;
   closureLayer.clearLayers();
   const admin = !!$('token').value.trim();
   let q = '';
@@ -170,13 +192,14 @@ async function loadClosures() {
     L.circle([c.lat, c.lon], {radius: Math.max(c.radius_m, 8),
       color: approved ? '#b3261e' : '#d48806', weight: 2, dashArray: approved ? null : '5 5',
       fillOpacity: approved ? .35 : .15})
-      .bindTooltip(`${approved ? 'Closed' : 'Unconfirmed'}: ${esc(c.note || c.kind)} (until ${c.ends.slice(11)})`)
+      .bindTooltip(`${approved ? 'Closed' : 'Unconfirmed'}: ${esc(c.note || c.kind)} (until ${c.ends.slice(11,16)})`)
       .addTo(closureLayer);
     if (admin) q += `<div class="rep"><span>${approved ? '🔴' : '🟠'} ${esc(c.note || c.kind)} <span class="dim">${c.source}</span></span>
       ${approved ? '' : `<button data-act="approve" data-id="${c.id}">Approve</button>`}
       <button data-act="reject" data-id="${c.id}">${approved ? 'Lift' : 'Reject'}</button></div>`;
   }
   $('queue').innerHTML = admin ? (q || '<div class="dim" style="margin-top:6px">No active closures.</div>') : '';
+  return changed;
 }
 
 $('queue').addEventListener('click', async e => {
@@ -233,8 +256,8 @@ $('result').addEventListener('click', e => {
 $('goBtn').onclick =() => { route.fitted = false; route(); };
 $('to').addEventListener('change', () => { route.fitted = false; route(); });
 $('stepFree').onchange = route;
-$('token').value = store.get('adminToken') || '';
-$('token').addEventListener('change', () => { store.set('adminToken', $('token').value.trim()); loadClosures(); });
+$('token').value = '';
+$('token').addEventListener('change', () => { updateReportAvailability(); loadClosures(); });
 
 (async () => {
   buildings = await api('/api/buildings');
@@ -245,10 +268,19 @@ $('token').addEventListener('change', () => { store.set('adminToken', $('token')
     const b = buildings.find(b => b.id === id);
     $('to').value = b ? b.name : id;
   }
+  try {
+    deployment = await api('/api/health');
+    const notice = $('deploymentNotice');
+    if (deployment.database !== 'connected') {
+      notice.textContent = 'Read-only preview: closure storage is not connected. Reports are disabled.';
+      notice.style.display = 'block';
+    }
+    updateReportAvailability();
+  } catch { /* The original local Python server has no health endpoint. */ }
   await loadClosures();
   const at = qs.get('at');          // ?at=lat,lon  fakes the start for a demo
   if (at) { const [la, lo] = at.split(',').map(Number); setStart(la, lo, false); }
-  setInterval(async () => { await loadClosures(); route(); }, 30000);
+  setInterval(async () => { if (await loadClosures()) route(); }, 30000);
 })();
 </script>
 </body>
