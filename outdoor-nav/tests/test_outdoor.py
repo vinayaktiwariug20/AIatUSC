@@ -269,3 +269,20 @@ def test_foot_tag_overrides_access():
     assert not walkable({"highway": "cycleway"})                      # bike-only
     assert not walkable({"highway": "footway", "access": "private"})
     assert not walkable({"highway": "footway", "foot": "no"})
+
+
+def test_start_on_a_long_footway_does_not_loop():
+    """Start on the footway by the Tutor Center: snapping to the nearest NODE
+    walked to the footway's far west end and back. Snap to the segment."""
+    g = WalkGraph()
+    start = (34.01995, -118.28690)
+    r = g.route(*start, "Doheny")
+    lons = [c[0] for c in r["features"][0]["geometry"]["coordinates"]]
+    assert min(lons) > start[1] - 0.0003          # never heads >~30m west
+    assert r["summary"]["snap_m"] < 15
+
+
+def test_segment_snap_is_cleaned_up(g):
+    n, e = len(g.nodes), len(g.edges)
+    g.route(*start(), "hall")
+    assert (len(g.nodes), len(g.edges)) == (n, e)
