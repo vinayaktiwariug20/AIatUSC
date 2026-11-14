@@ -1,0 +1,26 @@
+{
+  "name": "aiatusc-cloudflare",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "wrangler dev --config outdoor-nav/wrangler.jsonc",
+    "deploy": "wrangler deploy --config outdoor-nav/wrangler.jsonc",
+    "check": "node --check outdoor-nav/cloudflare/router.mjs && node --check outdoor-nav/cloudflare/api.mjs && node --check outdoor-nav/cloudflare/worker.mjs",
+    "test": "node --test outdoor-nav/tests/cloudflare.test.mjs",
+    "build:graph": "python3 outdoor-nav/tools/build_cloudflare_graph.py",
+    "check:parity": "python3 outdoor-nav/tools/check_cloudflare_parity.py",
+    "cf:login": "wrangler login",
+    "db:create": "wrangler d1 create aiatusc-closures --config outdoor-nav/wrangler.jsonc",
+    "db:local": "wrangler d1 migrations apply DB --local --config outdoor-nav/wrangler.jsonc",
+    "db:remote": "wrangler d1 migrations apply DB --remote --config outdoor-nav/wrangler.jsonc",
+    "secret:admin": "wrangler secret put ADMIN_TOKEN --config outdoor-nav/wrangler.jsonc",
+    "db:bind": "node outdoor-nav/tools/configure-d1.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
