@@ -13,7 +13,7 @@
     ]
   },
   "vars": {
-    "PUBLIC_REPORTS_ENABLED": "false"
+    "PUBLIC_REPORTS_ENABLED": "true"
   },
   "d1_databases": [
     {
