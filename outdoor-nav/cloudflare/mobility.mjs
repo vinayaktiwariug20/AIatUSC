@@ -192,6 +192,19 @@ export const START_TO_ROAD_LIMIT_M=300;
 // from the entrance; the rest is drawn dotted. Different structures' entrances
 // are >= 176 m apart, so this cannot land at the wrong structure.
 export const END_TO_ENTRANCE_LIMIT_M=150;
+// Better than ending outside: where a structure has a surveyed campus_route (the
+// drive from the public street, through its gate, to the vehicle entrance), the
+// provider is only asked for the public-road part, up to where that line starts,
+// and the campus part is appended from our own data. Without this the provider
+// "reached" Downey from Vermont Ave, outside the fence, and never used the gate.
+export const CAMPUS_JOIN_RADIUS_M=40,CAMPUS_SPEED_MPS=4.5;
+const lineMetres=line=>line.slice(1).reduce((sum,c,i)=>sum+haversine([line[i][1],line[i][0]],[c[1],c[0]]),0);
+function campusLine(p){
+  const line=p.campus_route?.line;
+  if(!Array.isArray(line)||line.length<2||line.some(c=>!Array.isArray(c)||c.length<2||!c.slice(0,2).every(Number.isFinite)))return null;
+  // The line must really end at this structure's entrance.
+  return haversine([line.at(-1)[1],line.at(-1)[0]],ll(p.entrance))<=30?line.map(c=>[c[0],c[1]]):null;
+}
 export async function drivingRoute(context,body,when,rules,closures,env,fetcher=fetch) {
   if(!env.ORS_API_KEY)throw new MobilityError(503,'Driving needs an openrouteservice API key. Staff: run npm run secret:routing, then npm run deploy.');
   if(!env.DB)throw new MobilityError(503,'Connect D1 before using driving routes and live gate restrictions.');
@@ -218,13 +231,17 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
   for(const {p} of candidates.slice(0,2)) {
     const gate=gateState(context,when,rules,credentials).find(g=>g.id===p.gate);
     const via=gate.lat!==undefined?{lat:gate.lat,lon:gate.lon}:p.entrance;
+    const campus=campusLine(p);
     const coordinates=[xy(origin)];
     // How far the provider may look for a road from each point. The user is often
     // off-road (live: "Could not find routable point within 25 m of coordinate 0"),
     // approximate gate pins sit in intersections, the parking entrance must be exact.
     const viaRadius=knownGate(gate)?30:60,radiuses=[START_TO_ROAD_LIMIT_M];
-    if(haversine(ll(origin),ll(via))>30&&haversine(ll(via),ll(p.entrance))>30){coordinates.push(xy(via));radiuses.push(viaRadius);}
-    coordinates.push(xy(p.entrance));radiuses.push(END_TO_ENTRANCE_LIMIT_M);
+    if(campus){coordinates.push(campus[0]);radiuses.push(CAMPUS_JOIN_RADIUS_M);}
+    else{
+      if(haversine(ll(origin),ll(via))>30&&haversine(ll(via),ll(p.entrance))>30){coordinates.push(xy(via));radiuses.push(viaRadius);}
+      coordinates.push(xy(p.entrance));radiuses.push(END_TO_ENTRANCE_LIMIT_M);
+    }
     // Start with a conservative horizon; recheck the exact resulting arrival.
     const horizon=when+Math.max(1800000,haversine(ll(origin),ll(p.entrance))/5*1000);
     const areas=[...avoidance(context,when,horizon,rules,credentials),...reportAreas];
@@ -232,14 +249,19 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     attempts++;
     const feature=await directions(coordinates,areas,env.ORS_API_KEY,fetcher,env.DB,radiuses);
     if(!feature||feature.failed){reject(p,'provider returned no route',feature?{status:feature.failed,detail:feature.detail}:{});continue;}
-    const coords=feature.geometry.coordinates,duration=feature.properties.summary.duration,arrival=when+duration*1000;
+    const road=feature.geometry.coordinates;
+    // Public-road part from the provider, then (if surveyed) our campus roads to the entrance.
+    const joinGap=campus?haversine([road.at(-1)[1],road.at(-1)[0]],[campus[0][1],campus[0][0]]):0;
+    if(campus&&joinGap>CAMPUS_JOIN_RADIUS_M+5){reject(p,'route does not reach the campus entrance road',{metres:Math.round(joinGap)});continue;}
+    const campusMetres=campus?joinGap+lineMetres(campus):0,campusSeconds=campusMetres/CAMPUS_SPEED_MPS;
+    const coords=campus?[...road,...campus]:road,duration=feature.properties.summary.duration+campusSeconds,arrival=when+duration*1000;
     const actual=[...avoidance(context,when,arrival,rules,credentials),...reportAreas];
     const crossed=actual.filter(a=>intersectsPolygon(coords,a.geometry));if(crossed.length){reject(p,'route crosses an avoided area',{areas:crossed.map(a=>a.name||a.id)});continue;}
     const toRoad=haversine([coords[0][1],coords[0][0]],ll(origin));
     const endGap=haversine([coords.at(-1)[1],coords.at(-1)[0]],ll(p.entrance));
     if(toRoad>START_TO_ROAD_LIMIT_M){reject(p,'route starts too far from you',{metres:Math.round(toRoad)});continue;}
     if(endGap>END_TO_ENTRANCE_LIMIT_M){reject(p,'route does not reach the parking entrance',{metres:Math.round(endGap)});continue;}
-    if(coordinates.length===3&&!coords.some(c=>haversine([c[1],c[0]],ll(via))<=viaRadius+5)){reject(p,'route skips the planned gate',{gate:gate.id});continue;}
+    if(!campus&&coordinates.length===3&&!coords.some(c=>haversine([c[1],c[0]],ll(via))<=viaRadius+5)){reject(p,'route skips the planned gate',{gate:gate.id});continue;}
     if(!parkingState(context,arrival,rules,credentials).find(row=>row.id===p.id)?.eligible){reject(p,'parking not available at arrival time');continue;}
     // Check every mapped gate touched by the polyline at the approximate crossing
     // time, as well as departure/arrival. A route is discarded on any violation.
@@ -263,14 +285,16 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
       reports:walking.filter(c=>c.status==='unverified')});}
     catch(error){if(error instanceof Unreachable){reject(p,'no walking route from the parking exit');continue;}throw error;}
     const connector=toRoad>10?[{type:'Feature',properties:{kind:'to_road',metres:Math.round(toRoad)},geometry:{type:'LineString',coordinates:[xy(origin),coords[0]]}}]:[];
+    if(campus)connector.push({type:'Feature',properties:{kind:'campus_road',metres:Math.round(campusMetres),source:p.campus_route.source||'surveyed campus roads'},geometry:{type:'LineString',coordinates:[road.at(-1),...campus]}});
     if(endGap>10)connector.push({type:'Feature',properties:{kind:'to_entrance',metres:Math.round(endGap)},geometry:{type:'LineString',coordinates:[coords.at(-1),xy(p.entrance)]}});
     return {ok:true,type:'FeatureCollection',mode:'driving',features:[...connector,{...feature,properties:{...feature.properties,kind:'route',mode:'driving'}},
       point(xy(via),{kind:'gate',name:gate.name}),point(xy(p.entrance),{kind:'parking',name:p.name})],
-      summary:{minutes:Math.round(duration/6)/10,metres:Math.round(feature.properties.summary.distance),start_to_road_m:Math.round(toRoad),end_to_entrance_m:Math.round(endGap),walking_minutes:arrivalWalk.summary.minutes,
+      summary:{minutes:Math.round(duration/6)/10,metres:Math.round(feature.properties.summary.distance+campusMetres),start_to_road_m:Math.round(toRoad),end_to_entrance_m:Math.round(endGap),campus_road_m:Math.round(campusMetres),walking_minutes:arrivalWalk.summary.minutes,
         building:building.id,building_name:building.name,parking:p,gate,arrival:context.time.campusISO(arrival),storage:'d1',
         avoided:actual.map(a=>({id:a.id,name:a.name,basis:a.basis})),provider:'openrouteservice',live_traffic:false,
         gate_locations_note:context.mobilityData.gate_locations_note,selection:'First valid candidate among at most two ranked parking options; not a guaranteed fastest route.',provider_requests:attempts},
-      steps:(feature.properties.segments||[]).flatMap(s=>s.steps||[]).map(s=>({instruction:s.instruction,distance:s.distance,duration:s.duration})),
+      steps:[...(feature.properties.segments||[]).flatMap(s=>s.steps||[]).map(s=>({instruction:s.instruction,distance:s.distance,duration:s.duration})),
+        ...(campus?[{instruction:'Enter campus at '+gate.name+' and follow the campus road to '+p.name,distance:campusMetres,duration:campusSeconds}]:[])],
       walking_preview:arrivalWalk,handoff:{action:'parked',parking:p.id,exit:p.exit,lat:p.exit?context.survey.nodes.find(n=>n.id===p.exit).lat:null,
         lon:p.exit?context.survey.nodes.find(n=>n.id===p.exit).lon:null,building:building.id},
       attribution:'© openrouteservice.org by HeiGIT | © OpenStreetMap contributors (ODbL)'};

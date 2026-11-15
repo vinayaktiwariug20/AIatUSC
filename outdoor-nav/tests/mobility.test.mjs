@@ -8,6 +8,8 @@ import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivi
 const json=name=>JSON.parse(readFileSync(new URL('../'+name,import.meta.url),'utf8'));
 const context={router:new WalkRouter(json('cloudflare/graph.json')),gateData:json('data/gates.json'),mobilityData:json('data/mobility.json'),footballData:json('data/football.json'),survey:json('data/surveyed.json'),time:{parseTime,campusISO,gateStatus}};
 class D1{constructor(){this.db=new DatabaseSync(':memory:');for(const f of ['0001_closures.sql','0002_mobility.sql'])this.db.exec(readFileSync(new URL('../migrations/'+f,import.meta.url),'utf8'));}prepare(sql){let params=[];const db=this.db;return{bind(...values){params=values;return this;},async first(column){const row=db.prepare(sql).get(...params);return row?column?row[column]:row:null;},async run(){return db.prepare(sql).run(...params);}};}}
+// Same data with the surveyed campus roads removed: the fallback for structures that have none.
+const plain={...context,mobilityData:{...context.mobilityData,parking:context.mobilityData.parking.map(({campus_route,...p})=>p)}};
 const monday=parseTime('2026-11-16T12:00:00'),saturday=parseTime('2026-11-14T12:00:00');
 const body={mode:'driving',from:{lat:34.027,lon:-118.2871694},to:'Doheny',parking:'downey'};
 const env=()=>({DB:new D1(),ORS_API_KEY:'private-test-key',ADMIN_TOKEN:'staff',PUBLIC_REPORTS_ENABLED:'true'});
@@ -46,7 +48,7 @@ test('segment crossing is detected even when neither vertex lies inside the poly
  assert.equal(intersectsPolygon([[-1,0],[2,0]],poly),true);
 });
 test('a valid driving route forces a gate, uses the vehicle entrance, and previews the surveyed walking exit',async()=>{
- const e=env(),mock=provider(),out=await drivingRoute(context,body,monday,[],[],e,mock.fn);
+ const e=env(),mock=provider(),out=await drivingRoute(plain,body,monday,[],[],e,mock.fn);
  assert.equal(out.ok,true);assert.equal(out.mode,'driving');assert.equal(out.summary.parking.id,'downey');assert.equal(out.summary.live_traffic,false);
  assert.equal(out.handoff.exit,'DOWNEY.ped.main');assert.equal(out.walking_preview.summary.start_place.exit,'DOWNEY.ped.main');
  assert.equal(mock.calls.length,1);assert.equal(mock.calls[0].body.coordinates.length,3);
@@ -63,7 +65,7 @@ test('a provider route passing a closed gate is discarded even if the provider i
 });
 test('a provider cannot skip the requested gate or snap to a different parking entrance',async()=>{
  for(const transform of [coords=>[coords[0],coords.at(-1)],coords=>[...coords.slice(0,-1),[-118.30,34.02]]]){
-  const out=await drivingRoute(context,body,monday,[],[],env(),provider(transform).fn);assert.equal(out.ok,false);
+  const out=await drivingRoute(plain,body,monday,[],[],env(),provider(transform).fn);assert.equal(out.ok,false);
  }
 });
 test('staff gate closures apply only during their exact interval',()=>{
@@ -156,7 +158,7 @@ test('a failed driving search says which check rejected each candidate',async()=
 // of 25.0 meters of specified coordinate 0" -- the off-road start. Each point now
 // gets its own search radius; the parking entrance stays strict.
 test('driving request gives the start a wide road-search radius and the entrance a strict one',async()=>{
- const mock=provider(),out=await drivingRoute(context,body,monday,[],[],env(),mock.fn);
+ const mock=provider(),out=await drivingRoute(plain,body,monday,[],[],env(),mock.fn);
  assert.equal(out.ok,true);
  const r=mock.calls[0].body.radiuses;assert.equal(r.length,mock.calls[0].body.coordinates.length);
  assert.equal(r[0],300);assert.equal(r.at(-1),150);
@@ -166,12 +168,53 @@ test('driving request gives the start a wide road-search radius and the entrance
 // END_TO_ENTRANCE_LIMIT_M from the entrance, with a dotted connector.
 test('a driving route may end on the nearest drivable road, up to 150 m from the parking entrance',async()=>{
  const short=coords=>[...coords.slice(0,-1),[coords.at(-1)[0],coords.at(-1)[1]+0.0009]];   // ~100 m short
- const mock=provider(short),out=await drivingRoute(context,body,monday,[],[],env(),mock.fn);
+ const mock=provider(short),out=await drivingRoute(plain,body,monday,[],[],env(),mock.fn);
  assert.equal(out.ok,true,JSON.stringify(out.checks));assert.ok(Math.abs(out.summary.end_to_entrance_m-100)<5);
  assert.ok(out.features.some(f=>f.properties.kind==='to_entrance'));
  assert.equal(mock.calls[0].body.radiuses.at(-1),150);
  const far=coords=>[...coords.slice(0,-1),[coords.at(-1)[0],coords.at(-1)[1]+0.0018]];     // ~200 m short
- assert.equal((await drivingRoute(context,body,monday,[],[],env(),provider(far).fn)).ok,false);
+ assert.equal((await drivingRoute(plain,body,monday,[],[],env(),provider(far).fn)).ok,false);
+});
+// Live: the provider "reached" Downey from Vermont Ave, outside the fence, 140 m from
+// the entrance, after only brushing the McClintock gate on Jefferson. Campus roads are
+// private in OSM, so the provider is asked for the public-road part only and the drive
+// through the gate to the entrance comes from campus_route in mobility.json.
+const metres=(a,b)=>{const r=Math.PI/180,x=Math.sin((b[1]-a[1])*r/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin((b[0]-a[0])*r/2)**2;return 2*6371000*Math.asin(Math.sqrt(x));};
+test('every surveyed campus road runs from a public street, past its gate, to its own vehicle entrance',()=>{
+ const withRoute=context.mobilityData.parking.filter(p=>p.campus_route);assert.ok(withRoute.some(p=>p.id==='downey'));
+ for(const p of withRoute){
+  const line=p.campus_route.line,entrance=context.survey.nodes.find(n=>n.id===p.entrance),gate=context.mobilityData.gates.find(g=>g.id===p.gate);
+  assert.ok(line.length>=2&&line.every(c=>c.length===2&&c.every(Number.isFinite)),p.id);
+  assert.ok(metres(line.at(-1),[entrance.lon,entrance.lat])<=10,p.id+' ends at its entrance');
+  assert.ok(Math.min(...line.map(c=>metres(c,[gate.lon,gate.lat])))<=20,p.id+' passes its gate');
+  assert.ok(line.slice(1).every((c,i)=>metres(line[i],c)<200),p.id+' has no jumps');
+ }
+});
+test('a drive to Downey enters at the McClintock gate and follows campus roads to the entrance',async()=>{
+ const mock=provider(),out=await drivingRoute(context,body,monday,[],[],env(),mock.fn);
+ assert.equal(out.ok,true,JSON.stringify(out.checks));
+ const line=context.mobilityData.parking.find(p=>p.id==='downey').campus_route.line,sent=mock.calls[0].body;
+ // The provider is only asked to reach the public end of the campus road, never the entrance.
+ assert.equal(sent.coordinates.length,2);assert.deepEqual(sent.coordinates[1],line[0]);assert.deepEqual(sent.radiuses,[300,40]);
+ const campus=out.features.find(f=>f.properties.kind==='campus_road');
+ assert.deepEqual(campus.geometry.coordinates.at(-1),line.at(-1));assert.ok(campus.geometry.coordinates.length>line.length-1);
+ assert.equal(out.features.some(f=>f.properties.kind==='to_entrance'),false);
+ assert.ok(out.summary.end_to_entrance_m<=10);assert.ok(Math.abs(out.summary.campus_road_m-560)<15,String(out.summary.campus_road_m));
+ // 240 s on public roads (mock) plus the campus part at 4.5 m/s.
+ assert.ok(Math.abs(out.summary.minutes-(240+out.summary.campus_road_m/4.5)/60)<0.2);assert.equal(out.summary.metres,1200+out.summary.campus_road_m);
+ assert.match(out.steps.at(-1).instruction,/McClintock.*campus road.*Downey/);
+ assert.equal(out.handoff.exit,'DOWNEY.ped.main');
+});
+test('a provider route that stops away from the campus road is rejected, not joined by a long straight line',async()=>{
+ const vermont=coords=>[coords[0],[-118.291499,34.020786]];   // where the live route ended
+ const out=await drivingRoute(context,body,monday,[],[],env(),provider(vermont).fn);
+ assert.equal(out.ok,false);assert.ok(out.checks.some(c=>c.check==='route does not reach the campus entrance road'));
+});
+test('a staff-approved driving blockage on the campus road discards the route',async()=>{
+ const closure={id:'mid',lat:34.0228403,lon:-118.2885214,radius_m:15,status:'approved',starts:'2026-11-16T10:00',ends:'2026-11-16T14:00',modes:['driving']};
+ const out=await drivingRoute(context,body,monday,[],[closure],env(),provider().fn);
+ assert.equal(out.ok,false);assert.ok(out.checks.some(c=>c.check==='route crosses an avoided area'));
+ assert.equal((await drivingRoute(context,body,monday,[],[{...closure,modes:['walking']}],env(),provider().fn)).ok,true);
 });
 // Staff rules say who they close: cars (default, and all older rules), people on
 // foot, or both. On-foot rules reach the walking router; cars-only rules don't.

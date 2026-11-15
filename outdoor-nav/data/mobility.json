@@ -60,7 +60,40 @@
       "exit": "DOWNEY.ped.main",
       "game_access": "public",
       "address": "Downey Way / McClintock Ave",
-      "note": "Vehicle entrance on McClintock; walking begins at the surveyed pedestrian exit."
+      "note": "Vehicle entrance on McClintock; walking begins at the surveyed pedestrian exit.",
+      "campus_route": {
+        "source": "OpenStreetMap contributors (ODbL), campus service roads",
+        "line": [
+          [-118.2871137, 34.0250615],
+          [-118.2871666, 34.0249825],
+          [-118.2871815, 34.0249577],
+          [-118.2872132, 34.0249069],
+          [-118.2873812, 34.0246381],
+          [-118.2874214, 34.0245355],
+          [-118.287457, 34.0244763],
+          [-118.2875199, 34.0243751],
+          [-118.2875506, 34.0243342],
+          [-118.2875897, 34.0242865],
+          [-118.2876403, 34.0242338],
+          [-118.2876627, 34.0242061],
+          [-118.2880722, 34.0235511],
+          [-118.2885214, 34.0228403],
+          [-118.2885355, 34.0228173],
+          [-118.2885605, 34.0227787],
+          [-118.289002, 34.0220852],
+          [-118.2890566, 34.0219981],
+          [-118.2891055, 34.0219232],
+          [-118.2895237, 34.0212686],
+          [-118.2895374, 34.0212474],
+          [-118.2895727, 34.0211966],
+          [-118.2896022, 34.0211472],
+          [-118.2896143, 34.0211278],
+          [-118.2896606, 34.0210564],
+          [-118.289885, 34.0207099],
+          [-118.2899493, 34.0207412],
+          [-118.2900057, 34.0207686]
+        ]
+      }
     },
     {
       "id": "jefferson",
@@ -70,7 +103,21 @@
       "exit": "JEFFERSON.ped.small",
       "game_access": "unconfirmed",
       "address": "Jefferson Blvd",
-      "note": "Game-day visitor access requires staff confirmation; excluded on home-game dates."
+      "note": "Game-day visitor access requires staff confirmation; excluded on home-game dates.",
+      "campus_route": {
+        "source": "OpenStreetMap contributors (ODbL), campus service roads",
+        "line": [
+          [-118.2899528, 34.0254465],
+          [-118.2899518, 34.02538],
+          [-118.289954, 34.025299],
+          [-118.2899539, 34.0252617],
+          [-118.2899709, 34.025057],
+          [-118.2900063, 34.0249565],
+          [-118.2900933, 34.024843],
+          [-118.2901027, 34.0248207],
+          [-118.290102, 34.0247977]
+        ]
+      }
     },
     {
       "id": "royal",
@@ -80,7 +127,23 @@
       "exit": "ROYAL.ped.jefferson",
       "game_access": "parking_pass",
       "address": "Jefferson Blvd / Royal St",
-      "note": "Game-day prepaid parking may be sold through ParkWhiz. A parking pass does not override a closed gate."
+      "note": "Game-day prepaid parking may be sold through ParkWhiz. A parking pass does not override a closed gate.",
+      "campus_route": {
+        "source": "OpenStreetMap contributors (ODbL), campus service roads",
+        "line": [
+          [-118.2823781, 34.0229256],
+          [-118.2824002, 34.0228323],
+          [-118.2824135, 34.0228091],
+          [-118.2824289, 34.0227835],
+          [-118.2824705, 34.0227295],
+          [-118.2823269, 34.0226629],
+          [-118.2820649, 34.0225527],
+          [-118.2820199, 34.0225334],
+          [-118.2819997, 34.0225212],
+          [-118.281986, 34.022501],
+          [-118.2819684, 34.0224702]
+        ]
+      }
     },
     {
       "id": "mccarthy",
@@ -90,7 +153,21 @@
       "exit": "MCCARTHY.ped.hellman",
       "game_access": "public",
       "address": "McCarthy Way from Figueroa St",
-      "note": "Walking exit is on Hellman Way."
+      "note": "Walking exit is on Hellman Way.",
+      "campus_route": {
+        "source": "OpenStreetMap contributors (ODbL), campus service roads",
+        "line": [
+          [-118.2809696, 34.0204134],
+          [-118.2810711, 34.020459],
+          [-118.281091, 34.0204679],
+          [-118.2812363, 34.0205328],
+          [-118.2814259, 34.0206126],
+          [-118.2814841, 34.0206372],
+          [-118.2816293, 34.0206967],
+          [-118.2821087, 34.0209015],
+          [-118.282188, 34.0209354]
+        ]
+      }
     },
     {
       "id": "figueroa",
@@ -102,5 +179,6 @@
       "address": "USC Hotel / Figueroa St",
       "note": "Surveyed shared vehicle/pedestrian entrance. Game-day visitor access is unconfirmed."
     }
-  ]
+  ],
+  "campus_routes_note": "campus_route.line is the drive from the public street, through the structure's gate, to its vehicle entrance, as [lon,lat] points along OpenStreetMap campus roads (tagged private, so the driving provider cannot route them). Extracted 2026-11-15; re-check if a gate or entrance moves."
 }
