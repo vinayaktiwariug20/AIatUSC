@@ -150,8 +150,8 @@ async function reserveQuota(db,kind='driving') {
   await db.prepare('DELETE FROM routing_usage WHERE expires_ms<?').bind(now).run();
 }
 export const reserveReportQuota=db=>reserveQuota(db,'report');
-async function directions(coordinates,areas,key,fetcher,db) {
-  const body={coordinates,radiuses:coordinates.map(()=>25),instructions:true,geometry_simplify:false,units:'m',language:'en',
+async function directions(coordinates,areas,key,fetcher,db,radiuses=coordinates.map(()=>25)) {
+  const body={coordinates,radiuses,instructions:true,geometry_simplify:false,units:'m',language:'en',
     options:{avoid_polygons:{type:'MultiPolygon',coordinates:areas.map(a=>a.geometry.coordinates)}}};
   if(!areas.length)delete body.options;
   await reserveQuota(db);
@@ -201,14 +201,18 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     const gate=gateState(context,when,rules,credentials).find(g=>g.id===p.gate);
     const via=gate.lat!==undefined?{lat:gate.lat,lon:gate.lon}:p.entrance;
     const coordinates=[xy(origin)];
-    if(haversine(ll(origin),ll(via))>30&&haversine(ll(via),ll(p.entrance))>30)coordinates.push(xy(via));
-    coordinates.push(xy(p.entrance));
+    // How far the provider may look for a road from each point. The user is often
+    // off-road (live: "Could not find routable point within 25 m of coordinate 0"),
+    // approximate gate pins sit in intersections, the parking entrance must be exact.
+    const viaRadius=knownGate(gate)?30:60,radiuses=[START_TO_ROAD_LIMIT_M];
+    if(haversine(ll(origin),ll(via))>30&&haversine(ll(via),ll(p.entrance))>30){coordinates.push(xy(via));radiuses.push(viaRadius);}
+    coordinates.push(xy(p.entrance));radiuses.push(25);
     // Start with a conservative horizon; recheck the exact resulting arrival.
     const horizon=when+Math.max(1800000,haversine(ll(origin),ll(p.entrance))/5*1000);
     const areas=[...avoidance(context,when,horizon,rules,credentials),...reportAreas];
     if(areas.some(a=>intersectsPolygon([xy(origin)],a.geometry)||intersectsPolygon([xy(p.entrance)],a.geometry))){reject(p,'start or entrance inside an avoided area');continue;}
     attempts++;
-    const feature=await directions(coordinates,areas,env.ORS_API_KEY,fetcher,env.DB);
+    const feature=await directions(coordinates,areas,env.ORS_API_KEY,fetcher,env.DB,radiuses);
     if(!feature||feature.failed){reject(p,'provider returned no route',feature?{status:feature.failed,detail:feature.detail}:{});continue;}
     const coords=feature.geometry.coordinates,duration=feature.properties.summary.duration,arrival=when+duration*1000;
     const actual=[...avoidance(context,when,arrival,rules,credentials),...reportAreas];
@@ -217,7 +221,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     const endGap=haversine([coords.at(-1)[1],coords.at(-1)[0]],ll(p.entrance));
     if(toRoad>START_TO_ROAD_LIMIT_M){reject(p,'route starts too far from you',{metres:Math.round(toRoad)});continue;}
     if(endGap>30){reject(p,'route does not reach the parking entrance',{metres:Math.round(endGap)});continue;}
-    if(coordinates.length===3&&!coords.some(c=>haversine([c[1],c[0]],ll(via))<=35)){reject(p,'route skips the planned gate',{gate:gate.id});continue;}
+    if(coordinates.length===3&&!coords.some(c=>haversine([c[1],c[0]],ll(via))<=viaRadius+5)){reject(p,'route skips the planned gate',{gate:gate.id});continue;}
     if(!parkingState(context,arrival,rules,credentials).find(row=>row.id===p.id)?.eligible){reject(p,'parking not available at arrival time');continue;}
     // Check every mapped gate touched by the polyline at the approximate crossing
     // time, as well as departure/arrival. A route is discarded on any violation.
