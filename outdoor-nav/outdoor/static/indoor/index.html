@@ -4,36 +4,894 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Doorstep · Inside</title>
+<link rel="icon" href="data:,">
 <style>
-:root{--bg:#f6f5f2;--card:#fff;--ink:#202329;--dim:#59616e;--line:#dcdedc;--brand:#8b1e2c;--ok:#08734d}
+:root{--bg:#e2e2de;--card:#fafaf7;--tile:#fff;--ink:#1b2220;--dim:#5b6561;--line:#d2d6d1;--brand:#8b1e2c;--ok:#08734d;--route:#0a8f5f;--you:#1a66d6}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:24px 18px}
-main{max-width:560px;margin:0 auto}
-h1{font-size:24px;margin:0 0 4px}
-.dim{color:var(--dim);font-size:14px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:16px}
-dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
-dt{color:var(--dim)}dd{margin:0;font-family:ui-monospace,Consolas,monospace;word-break:break-all}
-a{color:var(--brand)}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit}
+
+/* ---------- layout: the 3D view on top and the panel under it; side by side on wide or short-and-wide screens */
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+.stage{position:relative;flex:0 0 44%;min-height:220px;overflow:hidden;background:var(--bg)}
+.panel{flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:var(--card);border-top:1px solid var(--line);padding:18px calc(16px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+.inner{max-width:760px;margin:0 auto}
+body.walking .stage{flex:1 1 0}
+body.walking .panel{flex:0 0 auto}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:640px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:900px),(orientation:landscape) and (max-height:560px){
+  .app{flex-direction:row-reverse}
+  .stage{flex:1 1 0;min-width:0;min-height:0}
+  .panel,body.walking .panel{flex:0 0 clamp(320px,38vw,460px);border-top:0;border-right:1px solid var(--line);padding-top:calc(22px + env(safe-area-inset-top));padding-right:18px;padding-left:calc(18px + env(safe-area-inset-left))}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* ---------- the 3D view and what floats on it */
+#view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lab{position:absolute;transform:translate(-50%,-50%);font-size:11px;font-weight:600;letter-spacing:.02em;color:#2b3038;background:rgba(255,255,255,.82);border:1px solid rgba(0,0,0,.08);padding:1px 6px;border-radius:9px;white-space:nowrap}
+.lab.pin{transform:translate(-50%,-150%);color:#fff;border-color:transparent;font-size:12px;padding:2px 8px}
+.lab.start{background:var(--you)}
+.lab.end{background:var(--brand)}
+.chip{position:absolute;left:calc(10px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top));max-width:min(62%,300px);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 11px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.chip .dim{font-size:10.5px;letter-spacing:.06em;color:var(--dim)}
+.chip b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip a{color:var(--brand);font-size:12.5px;text-decoration:none;display:inline-block;padding:2px 0}
+@media (max-width:639px),(max-height:560px){.chip .dim{display:none}}
+.stagebar{position:absolute;right:calc(10px + env(safe-area-inset-right));bottom:10px;display:flex;gap:8px;align-items:stretch}
+.seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.seg button{appearance:none;border:0;background:none;font-weight:650;font-size:14px;color:var(--ink);padding:0 13px;min-height:44px;cursor:pointer;white-space:nowrap}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed=true]{background:var(--ink);color:#fff}
+.icon{appearance:none;display:grid;place-items:center;width:44px;min-height:44px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.1);cursor:pointer;color:var(--ink)}
+.seg button:focus-visible,.icon:focus-visible,.chip a:focus-visible{outline:3px solid var(--you);outline-offset:-3px}
+body.walking .chip,body.walking .stagebar,body.walking #labels{display:none}
+#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(226,226,222,.88);z-index:5;padding:16px}
+#loading .box{width:min(300px,82%);text-align:center}
+#loading .dim{color:var(--dim);font-size:14px}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;width:0;background:var(--ok)}
+#more{position:absolute;left:0;top:0;height:3px;width:0;background:var(--ok);z-index:6}
+
+/* ---------- the panel */
+h1{margin:0;font-size:24px;line-height:1.15;font-weight:750;letter-spacing:-.015em;outline:none}
+h2{margin:18px 0 8px;font-size:12.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.sub{margin:4px 0 0;color:var(--dim);font-size:16px}
+.hint{margin:16px 0 0;color:var(--dim);font-size:14px}
+#notice{margin:0 0 12px;padding:9px 12px;border-radius:12px;background:#f7ecec;color:var(--brand);font-size:14px}
+.link{appearance:none;border:0;background:none;padding:0 2px;min-height:44px;color:var(--brand);font-weight:650;font-size:14.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+.link:focus-visible,.btn:focus-visible,.primary:focus-visible{outline:3px solid var(--you);outline-offset:2px}
+.dot{flex:none;width:11px;height:11px;border-radius:50%;box-shadow:0 0 0 2px #fff,0 0 0 3px rgba(0,0,0,.14)}
+.dot.you{background:var(--you)}
+.dot.dest{background:var(--brand)}
+.crumb{display:flex;align-items:center;gap:9px;margin:-6px 0 8px;font-size:14.5px;color:var(--dim)}
+.crumb .grow{flex:1;min-width:0}
+.crumb b{color:var(--ink);font-weight:650}
+#pickBack{display:block;margin:-10px 0 2px}
+
+.spot{appearance:none;display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;width:100%;text-align:left;background:var(--tile);border:1.5px solid var(--line);border-radius:16px;padding:7px 7px 11px;cursor:pointer;transition:border-color .12s,transform .12s}
+.spot:hover{border-color:#8f9994}
+.spot:active{transform:scale(.985)}
+.spot:focus-visible{outline:3px solid var(--you);outline-offset:2px}
+.spot[aria-pressed=true]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.shot{display:block;aspect-ratio:2/1;border-radius:10px;overflow:hidden;background:linear-gradient(100deg,#e3e5e0 40%,#eef0ec 50%,#e3e5e0 60%) 0 0/300% 100%;animation:shimmer 1.6s linear infinite}
+.shot.ready{animation:none;background:#dfe1dc}
+.shot img{display:block;width:100%;height:100%;object-fit:cover}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.shot{animation:none}.spot{transition:none}}
+.spot .t{display:block;margin:9px 5px 0;font-weight:700;font-size:16px;line-height:1.2;letter-spacing:-.005em}
+.spot .s{display:block;margin:3px 5px 0;font-size:13.5px;line-height:1.3;color:var(--dim)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips .btn{min-height:44px}
+
+.ends{margin:14px 0 0;border:1.5px solid var(--line);border-radius:16px;background:var(--tile)}
+.end{display:flex;align-items:center;gap:10px;padding:8px 12px}
+.end+.end{border-top:1px solid var(--line)}
+.end .mini{flex:none;width:64px;height:32px;border-radius:7px;object-fit:cover;background:#dfe1dc}
+.endtext{flex:1;min-width:0}
+.endtext .k{display:block;font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.endtext b{display:block;font-weight:650;font-size:15px;line-height:1.25}
+.primary{appearance:none;display:block;width:100%;margin-top:12px;min-height:50px;border:0;border-radius:14px;background:var(--ink);color:#fff;font-weight:700;font-size:16px;cursor:pointer}
+.btn{appearance:none;min-height:46px;padding:0 16px;border:1.5px solid var(--line);border-radius:12px;background:var(--tile);font-weight:650;font-size:15px;cursor:pointer}
+ol{margin:0;padding-left:22px}
+ol li{margin:7px 0;padding-left:2px}
+#wStep{font-size:19px;font-weight:700;line-height:1.25;letter-spacing:-.01em}
+#wLeft{min-height:1.4em}
+#wSeek{display:block;width:100%;margin:8px 0 6px;accent-color:var(--route);min-height:40px}
+.btnrow{display:flex;gap:10px}
+.btnrow .btn{flex:1}
 </style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}
+</script>
 </head>
 <body>
-<main>
-  <div class="dim">DOORSTEP · INSIDE</div>
-  <h1>Indoor directions</h1>
-  <p class="dim">Placeholder. The indoor team's 3D viewer replaces this page. The outdoor app sends people here when they arrive, with these details:</p>
-  <div class="card"><dl id="params"></dl></div>
-  <p class="dim">Contract: <code>outdoor-nav/INDOOR_HANDOFF.md</code>. <a href="/" id="back">← Back to the map</a></p>
-</main>
+<div class="app">
+  <section class="stage" id="stage" aria-label="3D map">
+    <canvas id="view" aria-label="3D view of the building. Drag to turn, pinch to zoom."></canvas>
+    <div id="labels" aria-hidden="true"></div>
+    <div class="chip"><span class="dim">DOORSTEP · INSIDE</span><b id="bname">Building</b><a href="/" id="back">← Back to the map</a></div>
+    <div class="stagebar">
+      <button type="button" class="icon" id="recenter" aria-label="Recenter the view" title="Recenter">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="5.2"/><path d="M10 1.8v3M10 15.2v3M1.8 10h3M15.2 10h3"/></svg>
+      </button>
+      <div class="seg" role="group" aria-label="Floor shown">
+        <button type="button" data-floor="1" aria-pressed="false">Floor 1</button>
+        <button type="button" data-floor="2" aria-pressed="false">Floor 2</button>
+        <button type="button" data-floor="0" aria-pressed="true">Both</button>
+      </div>
+    </div>
+    <div id="loading"><div class="box"><b id="loadTitle">Loading the building</b><div class="dim" id="loadText">Starting…</div><div class="bar"><i id="loadBar"></i></div></div></div>
+    <div id="more" hidden></div>
+  </section>
+
+  <main class="panel" id="panel">
+    <div class="inner">
+      <div id="notice" role="status" hidden></div>
+
+      <!-- choosing where you are, or where you are going -->
+      <div id="vPick">
+        <button type="button" class="link" id="pickBack" hidden>← Back</button>
+        <div class="crumb" id="crumb" hidden>
+          <span class="dot you"></span>
+          <span class="grow">You are at <b id="crumbName"></b></span>
+          <button type="button" class="link" id="crumbChange">Change</button>
+        </div>
+        <h1 id="pickTitle" tabindex="-1">Where are you now?</h1>
+        <p class="sub" id="pickSub">Pick the spot that matches what you see.</p>
+        <section id="rooms" hidden><h2>Rooms</h2><div class="chips" id="roomList"></div></section>
+        <div id="spots"></div>
+        <p class="hint" id="pickHint"></p>
+      </div>
+
+      <!-- the route -->
+      <div id="vRoute" hidden>
+        <h1 id="summary" tabindex="-1" aria-live="polite"></h1>
+        <p class="sub" id="via" hidden></p>
+        <div class="ends">
+          <div class="end">
+            <span class="dot you"></span><img class="mini" id="fromMini" alt="" hidden>
+            <div class="endtext"><span class="k">From</span><b id="fromName"></b></div>
+            <button type="button" class="link" id="changeFrom" aria-label="Change where you are">Change</button>
+          </div>
+          <div class="end">
+            <span class="dot dest"></span><img class="mini" id="toMini" alt="" hidden>
+            <div class="endtext"><span class="k">To</span><b id="toName"></b></div>
+            <button type="button" class="link" id="changeTo" aria-label="Change the destination">Change</button>
+          </div>
+        </div>
+        <button type="button" class="primary" id="walkBtn">Preview the walk</button>
+        <div id="stepsBox"><h2>Steps</h2><ol id="steps"></ol></div>
+      </div>
+
+      <!-- first-person preview -->
+      <div id="vWalk" hidden>
+        <div id="wStep" aria-live="polite"></div>
+        <div class="sub" id="wLeft"></div>
+        <input type="range" id="wSeek" min="0" max="1000" value="0" aria-label="Position along the route">
+        <div class="btnrow">
+          <button type="button" class="btn" id="wPlay">Pause</button>
+          <button type="button" class="btn" id="wExit">Exit preview</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
 <script>
-// The viewer should read the same four parameters.
-const q = new URLSearchParams(location.search), dl = document.getElementById('params');
-for (const [k, label] of [['building', 'Building'], ['entrance', 'Entrance used'], ['anchor', 'Start anchor (indoor)'], ['room', 'Destination room']]) {
-  const dt = document.createElement('dt'), dd = document.createElement('dd');
-  dt.textContent = label; dd.textContent = q.get(k) || '(not given)';
-  dl.append(dt, dd);
+// If the viewer script cannot start (opened as a file, or a script failed to download), say so instead of loading forever.
+(function () {
+  function stop(msg) {
+    if (window.__indoorStarted) return;
+    document.getElementById('loadTitle').textContent = 'The 3D viewer could not start';
+    document.getElementById('loadText').textContent = msg;
+    document.getElementById('loadBar').parentElement.hidden = true;
+  }
+  if (location.protocol === 'file:') { stop('Open this page through the site, not as a file. Locally: start the server and go to http://localhost:8787/indoor/'); return; }
+  addEventListener('error', function (e) {
+    if (e.target && e.target.tagName === 'SCRIPT') stop('A script did not download. Check the connection and reload.');
+  }, true);
+  setTimeout(function () { stop('It is taking too long to start. Check the connection and reload.'); }, 15000);
+})();
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {route, describe, snapToGraph, findPlace, placeEnd, formatDuration} from './nav.mjs';
+
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const fail = msg => { $('loadText').textContent = msg; $('loadBar').parentElement.hidden = true; };
+
+let B, S;
+try {
+  [B, S] = await Promise.all([fetch('building.json').then(r => r.json()), fetch('scene/scene.json').then(r => r.json())]);
+} catch (e) { fail('Could not load the building data.'); throw e; }
+window.__indoorStarted = true;
+const H = B.storey_height, NAV = B.nav, FLOOR_Y = {1: 0, 2: H};
+$('bname').textContent = B.name;
+// What this page calls things where it differs from building.json: the two breezeways are the building's entrances.
+const RENAME = {
+  places: {'entrance': 'Left entrance, front', 'entrance-courtyard': 'Left entrance, courtyard side',
+    'breezeway-right': 'Right entrance, front', 'breezeway-right-courtyard': 'Right entrance, courtyard side'},
+  areas: {'the entrance breezeway': 'the left entrance', 'the right breezeway': 'the right entrance'},
+  labels: {'Entrance': 'Left entrance'},
+};
+for (const p of B.places) p.name = RENAME.places[p.id] || p.name;
+for (const n of Object.values(NAV.nodes)) n.area = RENAME.areas[n.area] || n.area;
+for (const l of B.labels) l.text = RENAME.labels[l.text] || l.text;
+B.labels.push({text: 'Right entrance', x: 50.8, y: 0.3, z: 19.6, floors: [1, 2]});
+if (qs.get('building')) $('back').href = '/?to=' + encodeURIComponent(qs.get('building'));
+
+// ---------------------------------------------------------------- renderer, camera
+const stage = $('stage'), canvas = $('view');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({canvas, antialias: true, powerPreference: 'high-performance'}); }
+catch (e) { fail('This browser cannot show 3D here.'); throw e; }
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color().setRGB(226 / 255, 226 / 255, 222 / 255, THREE.SRGBColorSpace);
+const OVERVIEW_FOV = 38, WALK_FOV = 70, EYE = 1.55;
+const camera = new THREE.PerspectiveCamera(OVERVIEW_FOV, 1, 0.3, 900);
+const controls = new OrbitControls(camera, canvas);
+Object.assign(controls, {enableDamping: true, dampingFactor: 0.12, maxPolarAngle: 1.47, minDistance: 4, maxDistance: 260, screenSpacePanning: false, zoomSpeed: 1.2});
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd9d7d0, 2.1));
+const sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(-30, 60, 40); scene.add(sun);
+
+const rgb = (r, g, b) => new THREE.Color().setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace);
+const SURF = {hall: rgb(200, 190, 172), tile: rgb(206, 203, 192), paving: rgb(126, 102, 82), stairhall: rgb(214, 211, 202)};
+const floors = {1: new THREE.Group(), 2: new THREE.Group()};
+scene.add(floors[1], floors[2]);
+
+function box(x0, z0, x1, z1, y0, y1, material) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), material);
+  m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  return m;
 }
-if (q.get('building')) document.getElementById('back').href = '/?to=' + encodeURIComponent(q.get('building'));
+// ground, the building outline from the exit plan, floor plates, the blocked middle and the unscanned markers
+scene.add(box(-900, -900, 900, 900, -0.5, -0.2, new THREE.MeshBasicMaterial({color: rgb(226, 226, 222)})));
+for (const o of B.outline) scene.add(box(o.x0, o.z0, o.x1, o.z1, -0.2, -0.17, new THREE.MeshBasicMaterial({color: rgb(213, 214, 209)})));
+for (const p of B.plates) {
+  const top = FLOOR_Y[p.floor] - 0.05;
+  floors[p.floor].add(box(p.x0, p.z0, p.x1, p.z1, top - (p.floor === 1 ? 0.11 : 0.33), top, new THREE.MeshBasicMaterial({color: SURF[p.surface]})));
+}
+const SOLID = {blocked: new THREE.MeshLambertMaterial({color: rgb(203, 206, 210)}), unscanned: new THREE.MeshLambertMaterial({color: rgb(170, 186, 202)})};
+for (const s of B.solids) floors[s.floor].add(box(s.x0, s.z0, s.x1, s.z1, s.y0, s.y1, SOLID[s.kind]));
+
+// ---------------------------------------------------------------- labels
+const labelLayer = $('labels'), labels = [];
+function addLabel(text, pos, floorsShown, cls) {
+  const el = document.createElement('span');
+  el.className = 'lab' + (cls ? ' ' + cls : '');
+  el.textContent = text;
+  labelLayer.append(el);
+  const l = {el, pos: new THREE.Vector3(pos.x, pos.y, pos.z), floors: floorsShown, detail: false, pin: /\bpin\b/.test(cls || ''), w: 0, h: 0};
+  labels.push(l);
+  return l;
+}
+for (const l of B.labels) addLabel(l.text, {x: l.x, y: l.y + 0.4, z: l.z}, l.floors).detail = !!l.detail;
+
+// ---------------------------------------------------------------- floor switch
+let floorMode = 0, floorChosenByUser = false;
+function setFloor(mode, byUser) {
+  floorMode = mode;
+  if (byUser) floorChosenByUser = true;
+  floors[1].visible = mode !== 2;
+  floors[2].visible = mode !== 1;
+  for (const b of document.querySelectorAll('.seg button')) b.setAttribute('aria-pressed', String(Number(b.dataset.floor) === mode));
+}
+for (const b of document.querySelectorAll('.seg button')) b.addEventListener('click', () => setFloor(Number(b.dataset.floor), true));
+const floorVisible = f => floorMode === 0 || floorMode === f;
+
+// ---------------------------------------------------------------- camera framing
+let walk = null;                                                   // set while the first-person view is on
+let vw = 0, vh = 0, sized = false;                                 // size of the 3D view in CSS pixels
+const pins = [];
+// Pin dots stay about 22 px across whatever the size of the view or the lens.
+const sizePins = () => { const s = 22 / vh * 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2); for (const p of pins) p.dot.scale.setScalar(s); };
+// First-person lens: 70° tall, opened up on tall narrow screens (to 84° at most) so the view across does not get too tight.
+const walkFov = () => THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(34)) / camera.aspect)), WALK_FOV, 84);
+const VIEW_DIR = new THREE.Vector3(0, 0.74, 0.67).normalize();     // from the front, looking toward the courtyard
+let lastFrame = null;
+const _f = new THREE.Vector3();
+// Put the camera where the given points fill about `fill` of the view, keeping the direction it is looking from.
+function frame(points, fill = 0.86) {
+  lastFrame = [points, fill];
+  if (walk || !sized) return;                                      // page not laid out yet (hidden tab): framed on the first resize
+  const bb = new THREE.Box3().setFromPoints(points), c = bb.getCenter(new THREE.Vector3());
+  const dir = camera.position.clone().sub(controls.target);
+  const use = dir.lengthSq() > 1 ? dir.normalize() : VIEW_DIR;
+  const usable = Math.max(0.5, (vh - 110) / vh);                   // the chip and the floor buttons sit over the top and bottom edges
+  let d = Math.max(6, bb.getSize(_f).length() / 2) / Math.sin(THREE.MathUtils.degToRad(camera.fov) / 2);
+  for (let i = 0; i < 5; i++) {                                    // start from the bounding sphere, then tighten to what the points cover on screen
+    camera.position.copy(c).addScaledVector(use, d);
+    camera.lookAt(c); camera.updateMatrixWorld();
+    let m = 0;
+    for (const p of points) { _f.copy(p).project(camera); m = Math.max(m, Math.abs(_f.x), Math.abs(_f.y) / usable); }
+    d = THREE.MathUtils.clamp(d * m / fill, controls.minDistance + 2, controls.maxDistance);
+  }
+  controls.target.copy(c);
+  camera.position.copy(c).addScaledVector(use, d);
+  controls.update();
+}
+const buildingPoints = () => B.plates.flatMap(p => [new THREE.Vector3(p.x0, 0, p.z0), new THREE.Vector3(p.x1, H + 3, p.z1)]);
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  if (!(w > 0 && h > 0) || (w === vw && h === vh)) return;
+  vw = w; vh = h;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  if (walk) camera.fov = walkFov();
+  camera.updateProjectionMatrix();
+  sizePins();
+  if (!sized) { sized = true; if (lastFrame) frame(...lastFrame); }   // first real size: frame what was asked for while hidden
+  renderer.render(scene, camera);                                  // resizing clears the canvas: redraw before the browser paints
+}
+camera.position.copy(VIEW_DIR).multiplyScalar(120);
+frame(buildingPoints());
+resize();
+new ResizeObserver(resize).observe(stage);
+
+// ---------------------------------------------------------------- route drawing and the pins
+// Everything drawn on top of the building lives in one group, so it can be hidden while the card pictures are taken.
+const overlay = new THREE.Group();
+scene.add(overlay);
+const chev = document.createElement('canvas');
+chev.width = 128; chev.height = 64;
+{ const g = chev.getContext('2d');
+  g.fillStyle = '#0a8f5f'; g.fillRect(0, 0, 128, 64);
+  g.strokeStyle = '#ffffff'; g.lineWidth = 11; g.lineJoin = 'miter'; g.lineCap = 'butt';
+  g.beginPath(); g.moveTo(44, 8); g.lineTo(78, 32); g.lineTo(44, 56); g.stroke(); }
+const chevTex = new THREE.CanvasTexture(chev);
+chevTex.wrapS = THREE.RepeatWrapping; chevTex.colorSpace = THREE.SRGBColorSpace; chevTex.anisotropy = 4;
+const routeGroup = new THREE.Group();
+overlay.add(routeGroup);
+const routeMat = new THREE.MeshBasicMaterial({map: chevTex, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4});
+const ghostMat = new THREE.MeshBasicMaterial({map: chevTex, side: THREE.DoubleSide, transparent: true, opacity: 0.3, depthTest: false, depthWrite: false});
+
+// A pin: a dot on a stem standing on the floor, with an optional name tag above it.
+const PIN_H = 1.3;
+function makePin(color, text, cls) {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.beginPath(); g.arc(32, 32, 26, 0, 7); g.fillStyle = '#fff'; g.fill();
+  g.beginPath(); g.arc(32, 32, 19, 0, 7); g.fillStyle = color; g.fill();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const dot = new THREE.Sprite(new THREE.SpriteMaterial({map: t, depthTest: false, sizeAttenuation: false}));
+  dot.renderOrder = 9; dot.position.y = PIN_H;
+  const stem = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.05, 0), new THREE.Vector3(0, PIN_H, 0)]),
+    new THREE.LineBasicMaterial({color, depthTest: false}));
+  stem.renderOrder = 8;
+  const group = new THREE.Group();
+  group.add(stem, dot); group.visible = false;
+  overlay.add(group);
+  const label = text ? addLabel(text, {x: 0, y: 0, z: 0}, [1, 2], 'pin ' + cls) : null;
+  if (label) label.el.hidden = true;
+  const pin = {
+    group, dot,
+    place(p) {
+      group.visible = !!p;
+      if (p) group.position.set(p.x, p.y, p.z);
+      if (label) { label.el.hidden = !p; if (p) label.pos.set(p.x, p.y + PIN_H, p.z); }
+    },
+  };
+  pins.push(pin);
+  if (vh) sizePins();
+  return pin;
+}
+const startPin = makePin('#1a66d6', 'Start', 'start'), endPin = makePin('#8b1e2c', 'Destination', 'end'), hoverPin = makePin('#1b2220');
+labels.sort((a, b) => b.pin - a.pin);                              // pins get first claim on space when labels are thinned out
+
+function ribbon(points, width = 0.75) {
+  const n = points.length, pos = [], uv = [], idx = [];
+  let run = 0;
+  const flat = (a, b) => { const v = new THREE.Vector2(b.x - a.x, b.z - a.z); return v.lengthSq() < 1e-8 ? null : v.normalize(); };
+  for (let i = 0; i < n; i++) {
+    const p = points[i];
+    let din = i > 0 ? flat(points[i - 1], p) : null, dout = i < n - 1 ? flat(p, points[i + 1]) : null;
+    din = din || dout || new THREE.Vector2(1, 0); dout = dout || din;
+    const nin = new THREE.Vector2(-din.y, din.x), nout = new THREE.Vector2(-dout.y, dout.x);
+    const m = nin.clone().add(nout);
+    if (m.lengthSq() < 1e-6) m.copy(nin); else m.normalize();
+    const k = (width / 2) / Math.max(0.45, m.dot(nin));
+    if (i > 0) run += Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y, p.z - points[i - 1].z);
+    pos.push(p.x + m.x * k, p.y, p.z + m.y * k, p.x - m.x * k, p.y, p.z - m.y * k);
+    uv.push(run / 1.5, 0, run / 1.5, 1);
+    if (i < n - 1) idx.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  return g;
+}
+let current = null, currentSteps = [], routeMsg = '';
+function drawRoute(r) {
+  for (const c of [...routeGroup.children]) { c.geometry.dispose(); routeGroup.remove(c); }
+  current = r;
+  if (!r) return;
+  const pts = r.points.map(p => new THREE.Vector3(p.x, p.y + 0.09, p.z));
+  const g = ribbon(pts);
+  const ghost = new THREE.Mesh(g, ghostMat); ghost.renderOrder = 5;
+  const main = new THREE.Mesh(g.clone(), routeMat); main.renderOrder = 6;
+  routeGroup.add(ghost, main);
+  if (!floorChosenByUser) {
+    const fs = new Set(r.points.map(p => p.floor));
+    setFloor(fs.size === 1 ? [...fs][0] : 0, false);
+  }
+  frame(pts.concat([new THREE.Vector3(pts[0].x, pts[0].y + 3, pts[0].z)]), 0.7);
+}
+
+// ---------------------------------------------------------------- where you are, where you are going
+const ends = {from: null, to: null};      // {id, name, end: node id | snapped point}
+let editing = null;                       // 'from' | 'to' while an end that is already set is being changed
+const endPos = e => typeof e.end === 'string' ? NAV.nodes[e.end] : e.end;
+function mode() {
+  if (walk) return 'walk';
+  if (editing) return editing;
+  if (!ends.from) return 'from';
+  if (!ends.to) return 'to';
+  return 'route';
+}
+function setEnd(which, place, point) {
+  if (place) ends[which] = {id: place.id, name: place.name || place.id, end: placeEnd(B, place)};
+  else if (point) ends[which] = {id: null, name: `a point in ${point.area} (floor ${point.floor})`, end: point};
+  else ends[which] = null;
+  editing = null;
+  hoverPin.place(null);
+  update();
+}
+function update() {
+  let r = null;
+  currentSteps = []; routeMsg = '';
+  if (ends.from && ends.to) {
+    try { r = route(NAV, ends.from.end, ends.to.end); } catch (e) { console.error(e); }
+    if (!r) routeMsg = 'No walkable route between these two places in the scanned area.';
+    else if (r.length < 0.5) { r = null; routeMsg = 'You are already there.'; }
+    else currentSteps = describe(r, ends.from.name, ends.to.name);
+  }
+  drawRoute(r);
+  startPin.place(ends.from && endPos(ends.from));
+  endPin.place(ends.to && endPos(ends.to));
+  if (!r && !floorChosenByUser) {                                   // one end only: show the floor it is on
+    const e = ends.from || ends.to;
+    if (e) setFloor(endPos(e).floor, false);
+  }
+  render();
+}
+
+// ---------------------------------------------------------------- the cards
+// What each card's picture looks at. yaw: degrees, 0 = toward the front of the building (+z), 90 = toward the right wing (+x).
+// x/z move the eye off the place's own node. Anything not listed looks down the longest hallway that leaves the spot.
+const VIEWS = {
+  'middle-stair-1': {yaw: 172},
+  'middle-stair-2': {yaw: 315},
+  'elevator-2': {x: 16.25, z: 14.3, yaw: 180},
+  'bridge-left': {yaw: 270},
+  'bridge-right': {yaw: 90},
+  'left-stair-1': {yaw: 200},
+  'left-stair-2': {yaw: 200},
+  'right-stair-1': {yaw: 160},
+  'right-stair-2': {yaw: 140},
+};
+function viewOf(p) {
+  const n = NAV.nodes[p.node], v = VIEWS[p.id] || {};
+  let yaw = v.yaw;
+  if (yaw == null) {
+    let best = null;
+    for (const e of NAV.edges) {
+      if (e.kind === 'stairs' || (e.a !== p.node && e.b !== p.node)) continue;
+      if (!best || e.len > best.len) best = {len: e.len, o: NAV.nodes[e.a === p.node ? e.b : e.a]};
+    }
+    yaw = best ? THREE.MathUtils.radToDeg(Math.atan2(best.o.x - n.x, best.o.z - n.z)) : 180;
+  }
+  return {x: v.x ?? n.x, y: n.y, z: v.z ?? n.z, yaw, pitch: v.pitch ?? -3};
+}
+function cardText(p) {
+  const n = NAV.nodes[p.node], cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  const m = /^(.+?)\s*(?:,\s*|\()(.+?)\)?$/.exec(p.name);
+  if (!m) return {title: p.name, sub: 'Floor ' + n.floor};
+  let sub = m[2];
+  if (/^floor \d+$/i.test(sub)) {
+    const area = n.area.replace(/^the /, '');
+    if (area.toLowerCase() !== m[1].toLowerCase()) sub = `${area}, ${sub}`;
+  }
+  return {title: m[1], sub: cap(sub)};
+}
+// Places left out of the cards because another card stands a few steps away: two beside the middle stair landing,
+// and the courtyard end of the left entrance.
+// They are still on the map: a link can name them, and a tap on the floor there works.
+const NO_CARD = new Set(['elevator-2', 'bridge-left', 'entrance-courtyard']);
+const spotEls = new Map(), thumbUrl = new Map();
+function spotCard(p) {
+  const t = cardText(p), el = document.createElement('button');
+  el.type = 'button'; el.className = 'spot';
+  const shot = document.createElement('span'); shot.className = 'shot';
+  const img = document.createElement('img');
+  img.alt = ''; img.hidden = true; img.dataset.thumb = p.id; img.decoding = 'async';
+  shot.append(img);
+  const title = Object.assign(document.createElement('span'), {className: 't', textContent: t.title});
+  const sub = Object.assign(document.createElement('span'), {className: 's', textContent: t.sub});
+  el.append(shot, title, sub);
+  el.addEventListener('click', () => { const m = mode(); if (m === 'from' || m === 'to') setEnd(m, p, null); });
+  const show = () => hoverPin.place(NAV.nodes[p.node]), hide = () => hoverPin.place(null);
+  el.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') show(); });
+  el.addEventListener('pointerleave', hide);
+  el.addEventListener('focus', () => { if (el.matches(':focus-visible')) show(); });
+  el.addEventListener('blur', hide);
+  spotEls.set(p.id, el);
+  return el;
+}
+for (const fl of B.floors) {
+  const ps = B.places.filter(p => NAV.nodes[p.node].floor === fl.id && !NO_CARD.has(p.id));
+  if (!ps.length) continue;
+  const sec = document.createElement('section'), grid = document.createElement('div');
+  grid.className = 'grid';
+  grid.append(...ps.map(spotCard));
+  sec.append(Object.assign(document.createElement('h2'), {textContent: fl.name}), grid);
+  $('spots').append(sec);
+}
+for (const r of B.rooms) {
+  const b = Object.assign(document.createElement('button'), {type: 'button', className: 'btn', textContent: r.name || r.id});
+  b.addEventListener('click', () => setEnd('to', findPlace(B, r.id), null));
+  $('roomList').append(b);
+}
+function setThumb(img, id) {
+  const url = id && thumbUrl.get(id);
+  if (id) img.dataset.thumb = id; else delete img.dataset.thumb;
+  img.hidden = !url;
+  if (url && img.src !== url) img.src = url;
+  if (url && img.parentElement.classList.contains('shot')) img.parentElement.classList.add('ready');
+}
+
+// ---------------------------------------------------------------- the panel
+const PICK = {
+  from: {title: 'Where are you now?', sub: 'Pick the spot that matches what you see.', hint: 'Not in the list? Tap your spot on the map.'},
+  to: {title: 'Where are you going?', sub: 'Pick the place you want to reach.', hint: 'Not in the list? Tap the place on the map.'},
+};
+let lastMode = null;
+function render() {
+  const m = mode(), pick = m === 'from' || m === 'to';
+  $('vPick').hidden = !pick;
+  $('vRoute').hidden = m !== 'route';
+  $('vWalk').hidden = m !== 'walk';
+  if (pick) {
+    $('pickTitle').textContent = PICK[m].title;
+    $('pickSub').textContent = PICK[m].sub;
+    $('pickHint').textContent = PICK[m].hint;
+    $('pickBack').hidden = !ends[m];                               // changing an end that is already set: offer a way back
+    const crumb = m === 'to' && ends.from && !ends.to;
+    $('crumb').hidden = !crumb;
+    if (crumb) $('crumbName').textContent = ends.from.name;
+    $('rooms').hidden = m !== 'to' || !B.rooms.length;
+    const other = ends[m === 'from' ? 'to' : 'from'];
+    for (const [id, el] of spotEls) {
+      el.hidden = !!other && other.id === id;
+      el.setAttribute('aria-pressed', String(!!ends[m] && ends[m].id === id));
+    }
+  } else if (m === 'route') {
+    const stairs = current ? current.legs.filter(l => l.kind === 'stairs').map(l => l.stair) : [];
+    $('summary').textContent = current ? `${Math.round(current.length)} m · ${formatDuration(current.seconds)}` : routeMsg;
+    $('via').hidden = !stairs.length;
+    $('via').textContent = stairs.length ? `Via ${stairs.join(' and ')}` : '';
+    $('fromName').textContent = ends.from.name;
+    $('toName').textContent = ends.to.name;
+    setThumb($('fromMini'), ends.from.id);
+    setThumb($('toMini'), ends.to.id);
+    $('walkBtn').hidden = $('stepsBox').hidden = !current;
+    $('steps').replaceChildren(...currentSteps.map(s => Object.assign(document.createElement('li'), {textContent: s})));
+  }
+  canvas.setAttribute('aria-label', m === 'walk' ? 'First-person view along the route. Drag to look around.'
+    : pick ? '3D view of the building. Drag to turn, pinch to zoom, tap a hallway floor to choose that spot.'
+    : '3D view of the building. Drag to turn, pinch to zoom.');
+  if (m !== lastMode) {
+    $('panel').scrollTop = 0;
+    if (lastMode && m !== 'walk') $(pick ? 'pickTitle' : 'summary').focus({preventScroll: true});
+    lastMode = m;
+  }
+}
+$('pickBack').addEventListener('click', () => { editing = null; render(); });
+$('crumbChange').addEventListener('click', () => { editing = 'from'; render(); });
+$('changeFrom').addEventListener('click', () => { editing = 'from'; render(); });
+$('changeTo').addEventListener('click', () => { editing = 'to'; render(); });
+$('recenter').addEventListener('click', () => frame(current ? current.points.map(p => new THREE.Vector3(p.x, p.y, p.z)) : buildingPoints(), current ? 0.7 : 0.86));
+
+// ---------------------------------------------------------------- first-person walk along the route
+// The camera follows the route at eye height, looking a few metres ahead. Drag to look around; it eases back.
+const WALK_SPEED = 1.9, LOOK_AHEAD = 3.0;
+function walkCurve(r) {
+  // keep the path on the hallway centre line and round only the corners: extra points 1.2 m either side of each turn
+  const raw = r.points.map(p => new THREE.Vector3(p.x, p.y + EYE, p.z)), pts = [raw[0]];
+  for (let i = 1; i < raw.length; i++) {
+    const a = raw[i - 1], b = raw[i], len = a.distanceTo(b);
+    if (len < 0.05) continue;
+    if (len > 3.2) pts.push(a.clone().lerp(b, 1.2 / len), a.clone().lerp(b, 1 - 1.2 / len));
+    pts.push(b);
+  }
+  if (pts.length < 2) pts.push(raw[raw.length - 1].clone().add(new THREE.Vector3(0.01, 0, 0)));
+  const c = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  c.arcLengthDivisions = Math.max(200, Math.ceil(r.length * 10));
+  return c;
+}
+function startWalk() {
+  if (!current || walk) return;
+  const curve = walkCurve(current);
+  walk = {curve, length: curve.getLength(), s: 0, playing: true, yaw: 0, pitch: 0, drag: null, idle: 0, dir: null,
+    saved: {pos: camera.position.clone(), target: controls.target.clone(), floor: floorMode, byUser: floorChosenByUser}};
+  controls.enabled = false;
+  camera.fov = walkFov(); camera.near = 0.08; camera.updateProjectionMatrix(); sizePins();
+  setFloor(0, false);
+  startPin.group.visible = false;
+  ghostMat.opacity = 0.12;                 // from inside, the see-through copy only needs to hint at what is round the corner
+  document.body.classList.add('walking');
+  $('wPlay').textContent = 'Pause';
+  render();
+  placeWalkCamera(0);
+}
+function stopWalk() {
+  if (!walk) return;
+  const s = walk.saved;
+  walk = null;
+  document.body.classList.remove('walking');
+  camera.fov = OVERVIEW_FOV; camera.near = 0.3; camera.up.set(0, 1, 0);
+  camera.position.copy(s.pos); controls.target.copy(s.target);
+  camera.updateProjectionMatrix(); sizePins();
+  controls.enabled = true; controls.update();
+  floorChosenByUser = s.byUser; setFloor(s.floor, false);
+  ghostMat.opacity = 0.3;
+  startPin.group.visible = !!ends.from;
+  render();
+}
+const _p = new THREE.Vector3(), _a = new THREE.Vector3(), _d = new THREE.Vector3(), _t = new THREE.Vector3();
+function placeWalkCamera(dt) {
+  const w = walk, L = w.length, u = Math.min(1, Math.max(0, w.s / L));
+  w.curve.getPointAt(u, _p);
+  if (u < 0.999) w.curve.getPointAt(Math.min(1, u + LOOK_AHEAD / L), _a); else _a.copy(_p).add(w.curve.getTangentAt(1, _t));
+  _d.copy(_a).sub(_p);
+  if (_d.lengthSq() < 1e-6) w.curve.getTangentAt(u, _d);
+  _d.normalize();
+  if (!w.dir) w.dir = _d.clone(); else w.dir.lerp(_d, 1 - Math.exp(-dt * 5)).normalize();
+  // heading and a softened pitch from the path, plus whatever the user has dragged
+  const yaw = Math.atan2(w.dir.x, w.dir.z) + w.yaw;
+  const pitch = THREE.MathUtils.clamp(Math.asin(THREE.MathUtils.clamp(w.dir.y, -1, 1)) * 0.6 + w.pitch, -1.2, 1.2);
+  camera.position.copy(_p);
+  _t.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)).add(_p);
+  camera.lookAt(_t);
+  // the bar: where we are, which step, how far to go
+  $('wSeek').value = String(Math.round(u * 1000));
+  const along = u * current.length;
+  let acc = 0, k = 0;
+  for (; k < current.legs.length - 1; k++) { if (along < acc + current.legs[k].length) break; acc += current.legs[k].length; }
+  const left = Math.max(0, current.length * (1 - u));
+  const step = u >= 0.999 ? currentSteps[currentSteps.length - 1] : currentSteps[k + 1];
+  const togo = u >= 0.999 ? '' : `${Math.round(left)} m to go · drag the view to look around`;
+  if ($('wStep').textContent !== step) $('wStep').textContent = step;
+  if ($('wLeft').textContent !== togo) $('wLeft').textContent = togo;
+}
+function stepWalk(dt) {
+  const w = walk;
+  if (w.playing) {
+    w.s = Math.min(w.length, w.s + WALK_SPEED * dt);
+    if (w.s >= w.length) { w.playing = false; $('wPlay').textContent = 'Replay'; }
+  }
+  if (!w.drag) {                       // ease the look-around back to straight ahead after a short pause
+    w.idle += dt;
+    if (w.idle > 1.2) { const k = Math.exp(-dt * 2.5); w.yaw *= k; w.pitch *= k; }
+  }
+  placeWalkCamera(dt);
+}
+$('walkBtn').addEventListener('click', startWalk);
+$('wExit').addEventListener('click', stopWalk);
+$('wPlay').addEventListener('click', () => {
+  if (!walk) return;
+  if (walk.s >= walk.length) { walk.s = 0; walk.dir = null; walk.playing = true; }
+  else walk.playing = !walk.playing;
+  $('wPlay').textContent = walk.playing ? 'Pause' : 'Play';
+});
+$('wSeek').addEventListener('input', e => {
+  if (!walk) return;
+  walk.s = Number(e.target.value) / 1000 * walk.length;
+  walk.dir = null;
+  if (walk.s < walk.length) $('wPlay').textContent = walk.playing ? 'Pause' : 'Play';
+  placeWalkCamera(0);
+});
+addEventListener('keydown', e => {
+  if (!walk) return;
+  if (e.key === 'Escape') stopWalk();
+  else if (e.key === ' ' && e.target === document.body) { e.preventDefault(); $('wPlay').click(); }
+});
+
+// ---------------------------------------------------------------- pointer: tap the floor to choose a spot, or drag to look in walk mode
+const WALK = [...B.plates, ...B.walkable_extra];
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let down = null;
+canvas.addEventListener('pointerdown', e => {
+  down = {x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId};
+  if (walk) { walk.drag = {x: e.clientX, y: e.clientY, id: e.pointerId}; canvas.setPointerCapture(e.pointerId); }
+});
+canvas.addEventListener('pointermove', e => {
+  if (!walk || !walk.drag || e.pointerId !== walk.drag.id) return;
+  const k = 0.0045;
+  walk.yaw = THREE.MathUtils.clamp(walk.yaw + (e.clientX - walk.drag.x) * k, -2.6, 2.6);
+  walk.pitch = THREE.MathUtils.clamp(walk.pitch + (e.clientY - walk.drag.y) * k, -0.7, 0.7);
+  walk.drag.x = e.clientX; walk.drag.y = e.clientY;
+  walk.idle = 0;
+});
+const endDrag = e => { if (walk && walk.drag && e.pointerId === walk.drag.id) { walk.drag = null; walk.idle = 0; } };
+canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('pointerup', e => {
+  endDrag(e);
+  const m = mode();
+  if (m !== 'from' && m !== 'to') { down = null; return; }         // a tap only means something while a spot is being chosen
+  if (!down || e.pointerId !== down.id || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 7 || performance.now() - down.t > 500) { down = null; return; }
+  down = null;
+  const rc = canvas.getBoundingClientRect();
+  ndc.set((e.clientX - rc.left) / rc.width * 2 - 1, -((e.clientY - rc.top) / rc.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const o = ray.ray.origin, d = ray.ray.direction;
+  for (const f of [2, 1]) {
+    if (!floorVisible(f) || Math.abs(d.y) < 1e-6) continue;
+    const t = (FLOOR_Y[f] - o.y) / d.y;
+    if (t <= 0) continue;
+    const x = o.x + d.x * t, z = o.z + d.z * t;
+    if (!WALK.some(w => w.floor === f && x >= w.x0 && x <= w.x1 && z >= w.z0 && z <= w.z1)) continue;
+    const snap = snapToGraph(NAV, {x, z, floor: f});
+    if (snap && snap.dist < 4) setEnd(m, null, snap);
+    return;
+  }
+});
+
+// ---------------------------------------------------------------- the link from the outdoor map
+// anchor: the door the outdoor map brought you to, so the route starts there without asking. room: where the event is.
+const anchor = qs.get('anchor') && findPlace(B, qs.get('anchor'));
+if (anchor) ends.from = {id: anchor.id, name: anchor.name || anchor.id, end: placeEnd(B, anchor)};
+const room = qs.get('room');
+if (room) {
+  const place = findPlace(B, room);
+  if (place) ends.to = {id: place.id, name: place.name || place.id, end: placeEnd(B, place)};
+  else { $('notice').hidden = false; $('notice').textContent = `Room “${room}” is not on this map yet. Pick the place you are going instead.`; }
+}
+update();
+
+// ---------------------------------------------------------------- card pictures, taken from the scans
+// Each picture is a small first-person render at the place, drawn into a corner of the main canvas and copied out
+// in the same frame, before the real view is drawn over it.
+const TW = 320, TH = 160;
+const thumbCam = new THREE.PerspectiveCamera(66, TW / TH, 0.08, 400);
+function snapshot(view) {
+  if (vw < TW || vh < TH) return null;
+  const yaw = THREE.MathUtils.degToRad(view.yaw), pitch = THREE.MathUtils.degToRad(view.pitch || 0), y = view.y + EYE;
+  thumbCam.position.set(view.x, y, view.z);
+  thumbCam.lookAt(view.x + Math.sin(yaw) * Math.cos(pitch), y + Math.sin(pitch), view.z + Math.cos(yaw) * Math.cos(pitch));
+  const keep = [floors[1].visible, floors[2].visible, overlay.visible];
+  floors[1].visible = floors[2].visible = true; overlay.visible = false;
+  renderer.setViewport(0, 0, TW, TH); renderer.setScissor(0, 0, TW, TH); renderer.setScissorTest(true);
+  renderer.render(scene, thumbCam);
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, vw, vh);
+  [floors[1].visible, floors[2].visible, overlay.visible] = keep;
+  const pr = renderer.getPixelRatio(), c = document.createElement('canvas');
+  c.width = Math.round(TW * pr); c.height = Math.round(TH * pr);
+  c.getContext('2d').drawImage(canvas, 0, canvas.height - c.height, c.width, c.height, 0, 0, c.width, c.height);   // the viewport is measured from the bottom
+  return c;
+}
+const thumbQueue = [], thumbLevel = new Map();
+function takeThumbs(max = 2) {
+  for (let n = 0; n < max && thumbQueue.length; n++) {
+    const id = thumbQueue[0], c = snapshot(viewOf(B.places.find(p => p.id === id)));
+    if (!c) return;                                                // the view is too small right now: try again next frame
+    thumbQueue.shift();
+    c.toBlob(blob => {
+      if (!blob) return;
+      const old = thumbUrl.get(id);
+      thumbUrl.set(id, URL.createObjectURL(blob));
+      for (const img of document.querySelectorAll('img[data-thumb]')) if (img.dataset.thumb === id) setThumb(img, id);
+      if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
+    }, 'image/jpeg', 0.84);
+  }
+}
+
+// ---------------------------------------------------------------- load the scans
+const small = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && !(navigator.deviceMemory >= 8);
+function shrink(tex, size) {
+  const img = tex.image;
+  if (!img || img.width <= size) return;
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  c.getContext('2d').drawImage(img, 0, 0, size, size);
+  if (img.close) img.close();
+  tex.image = c; tex.needsUpdate = true;
+}
+const loader = new GLTFLoader(), got = {};
+const startFloor = ends.from ? endPos(ends.from).floor : 1;
+const order = [...S.scans].sort((a, b) => Math.abs(a.parts[0].floor - startFloor) - Math.abs(b.parts[0].floor - startFloor));
+let failed = 0;
+// The notice over the 3D view goes away as soon as the floor you start on is in; the rest keeps loading under a thin bar.
+const first = order.filter(s => s.parts.some(p => p.floor === startFloor)), firstBytes = first.reduce((a, s) => a + s.bytes, 0);
+const loadedKeys = new Set();
+const progress = () => {
+  const done = Object.values(got).reduce((a, b) => a + b, 0);
+  const firstDone = first.reduce((a, s) => a + Math.min(got[s.key] || 0, s.bytes), 0);
+  $('loadBar').style.width = Math.min(100, 100 * firstDone / firstBytes).toFixed(1) + '%';
+  $('loadText').textContent = `${(firstDone / 1e6).toFixed(1)} of ${(firstBytes / 1e6).toFixed(1)} MB`;
+  $('more').style.width = Math.min(100, 100 * done / S.bytes).toFixed(1) + '%';
+};
+const floorIn = f => S.scans.every(s => loadedKeys.has(s.key) || !s.parts.some(p => p.floor === f));
+function arrived(key) {
+  loadedKeys.add(key);
+  if (!$('loading').hidden && first.every(s => loadedKeys.has(s.key))) { $('loading').hidden = true; $('more').hidden = false; }
+  // a card's picture is taken once its own floor is in, and once more when the whole building is
+  const all = loadedKeys.size === S.scans.length;
+  for (const p of B.places) {
+    const level = all ? 2 : floorIn(NAV.nodes[p.node].floor) ? 1 : 0;
+    if (level <= (thumbLevel.get(p.id) || 0)) continue;
+    thumbLevel.set(p.id, level);
+    if (!thumbQueue.includes(p.id)) thumbQueue.push(p.id);
+  }
+}
+const queue = order.slice();
+async function worker() {
+  for (let s; (s = queue.shift());) {
+    try {
+      const gltf = await loader.loadAsync('scene/' + s.file, ev => { got[s.key] = ev.loaded; progress(); });
+      got[s.key] = s.bytes; progress();
+      for (const node of [...gltf.scene.children]) {
+        const f = /_F2$/.test(node.name) ? 2 : 1;
+        node.traverse(m => {
+          if (!m.isMesh) return;
+          m.geometry.computeBoundingBox(); m.geometry.computeBoundingSphere();   // measured from the vertices, not trusted from the file
+          const map = m.material.map;
+          if (map) { if (small) shrink(map, 1024); map.anisotropy = 4; }
+          m.material = new THREE.MeshBasicMaterial({map, side: THREE.FrontSide});   // back faces hidden: the building reads as a cut-away
+        });
+        floors[f].add(node);
+      }
+    } catch (e) { failed++; console.error('scan failed to load', s.file, e); }
+    arrived(s.key);
+  }
+}
+Promise.all([worker(), worker(), worker()]).then(() => {
+  $('loading').hidden = true;
+  $('more').hidden = true;
+  if (failed) { $('notice').hidden = false; $('notice').textContent = `${failed} part${failed > 1 ? 's' : ''} of the building did not load. Routes still work.`; }
+});
+
+// ---------------------------------------------------------------- frame loop
+const v = new THREE.Vector3();
+let last = performance.now();
+function tick(now) {
+  requestAnimationFrame(tick);
+  if (document.hidden || !sized) return;
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  chevTex.offset.x -= dt * 0.9;
+  if (thumbQueue.length) takeThumbs();
+  if (walk) stepWalk(dt); else controls.update();
+  renderer.render(scene, camera);
+  if (walk) return;
+  // place the labels; one that would cover an earlier one is left out
+  const taken = [];
+  for (const l of labels) {
+    if (l.el.hidden) continue;
+    v.copy(l.pos).project(camera);
+    let show = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && l.floors.some(floorVisible) && !(l.detail && floorMode === 0);
+    if (show) {
+      const x = (v.x + 1) / 2 * vw, y = (1 - v.y) / 2 * vh;
+      if (!l.w) { l.el.style.display = ''; l.w = l.el.offsetWidth; l.h = l.el.offsetHeight; }
+      const r = {x0: x - l.w / 2 - 2, x1: x + l.w / 2 + 2, y0: y - l.h * (l.pin ? 1.5 : 0.5) - 2, y1: y + l.h * (l.pin ? -0.5 : 0.5) + 2};
+      show = !taken.some(t => r.x0 < t.x1 && r.x1 > t.x0 && r.y0 < t.y1 && r.y1 > t.y0);
+      if (show) { taken.push(r); l.el.style.left = x.toFixed(1) + 'px'; l.el.style.top = y.toFixed(1) + 'px'; }
+    }
+    l.el.style.display = show ? '' : 'none';
+  }
+}
+requestAnimationFrame(tick);
+window.__indoor = {scene, camera, controls, setEnd, setFloor, ends, building: B, startWalk, stopWalk, mode, snapshot, viewOf, thumbUrl,
+  get walk() { return walk; }, get route() { return current; }, get thumbsPending() { return thumbQueue.length; }};
 </script>
 </body>
 </html>

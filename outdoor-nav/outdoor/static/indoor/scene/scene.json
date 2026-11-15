@@ -1,0 +1,304 @@
+{
+ "storey_height": 3.7,
+ "bytes": 18789812,
+ "scans": [
+  {
+   "key": "left1",
+   "title": "Left wing hallway",
+   "file": "left1.glb",
+   "bytes": 1387880,
+   "parts": [
+    {
+     "floor": 1,
+     "node": "left1_F1",
+     "triangles": 39158,
+     "min": [
+      -3.31,
+      -0.06,
+      -20.88
+     ],
+     "max": [
+      5.48,
+      2.84,
+      14.8
+     ]
+    }
+   ]
+  },
+  {
+   "key": "right1",
+   "title": "Right wing hallway",
+   "file": "right1.glb",
+   "bytes": 1688704,
+   "parts": [
+    {
+     "floor": 1,
+     "node": "right1_F1",
+     "triangles": 45909,
+     "min": [
+      53.02,
+      -0.28,
+      -22.74
+     ],
+     "max": [
+      62.34,
+      2.83,
+      15.0
+     ]
+    }
+   ]
+  },
+  {
+   "key": "entrance",
+   "title": "Entrance breezeway",
+   "file": "entrance.glb",
+   "bytes": 1337072,
+   "parts": [
+    {
+     "floor": 1,
+     "node": "entrance_F1",
+     "triangles": 27015,
+     "min": [
+      4.93,
+      -0.2,
+      3.73
+     ],
+     "max": [
+      9.98,
+      3.31,
+      18.95
+     ]
+    }
+   ]
+  },
+  {
+   "key": "outer1",
+   "title": "Right breezeway",
+   "file": "outer1.glb",
+   "bytes": 1235740,
+   "parts": [
+    {
+     "floor": 1,
+     "node": "outer1_F1",
+     "triangles": 23732,
+     "min": [
+      47.59,
+      -0.11,
+      7.51
+     ],
+     "max": [
+      53.38,
+      3.21,
+      17.77
+     ]
+    }
+   ]
+  },
+  {
+   "key": "left2",
+   "title": "Left wing hallway",
+   "file": "left2.glb",
+   "bytes": 1830452,
+   "parts": [
+    {
+     "floor": 2,
+     "node": "left2_F2",
+     "triangles": 58425,
+     "min": [
+      -4.04,
+      3.6,
+      -20.79
+     ],
+     "max": [
+      5.68,
+      6.44,
+      13.59
+     ]
+    }
+   ]
+  },
+  {
+   "key": "right2",
+   "title": "Right wing hallway",
+   "file": "right2.glb",
+   "bytes": 1539012,
+   "parts": [
+    {
+     "floor": 2,
+     "node": "right2_F2",
+     "triangles": 42237,
+     "min": [
+      53.65,
+      3.49,
+      -22.88
+     ],
+     "max": [
+      62.32,
+      6.44,
+      14.93
+     ]
+    }
+   ]
+  },
+  {
+   "key": "mid2a",
+   "title": "Middle hallway",
+   "file": "mid2a.glb",
+   "bytes": 1942288,
+   "parts": [
+    {
+     "floor": 2,
+     "node": "mid2a_F2",
+     "triangles": 45008,
+     "min": [
+      17.91,
+      3.58,
+      9.91
+     ],
+     "max": [
+      53.97,
+      7.11,
+      15.33
+     ]
+    }
+   ]
+  },
+  {
+   "key": "mid2b",
+   "title": "Middle hallway, left end",
+   "file": "mid2b.glb",
+   "bytes": 1611164,
+   "parts": [
+    {
+     "floor": 2,
+     "node": "mid2b_F2",
+     "triangles": 32413,
+     "min": [
+      5.46,
+      3.62,
+      10.46
+     ],
+     "max": [
+      18.27,
+      7.01,
+      14.89
+     ]
+    }
+   ]
+  },
+  {
+   "key": "mid_stair",
+   "title": "Middle stair",
+   "file": "mid_stair.glb",
+   "bytes": 1661848,
+   "parts": [
+    {
+     "floor": 1,
+     "node": "mid_stair_F1",
+     "triangles": 25668,
+     "min": [
+      9.73,
+      -0.08,
+      4.96
+     ],
+     "max": [
+      15.01,
+      3.49,
+      15.16
+     ]
+    },
+    {
+     "floor": 2,
+     "node": "mid_stair_F2",
+     "triangles": 13376,
+     "min": [
+      9.59,
+      3.08,
+      4.89
+     ],
+     "max": [
+      12.36,
+      7.15,
+      11.18
+     ]
+    }
+   ]
+  },
+  {
+   "key": "nw_stair",
+   "title": "Left wing stair",
+   "file": "nw_stair.glb",
+   "bytes": 2420380,
+   "parts": [
+    {
+     "floor": 1,
+     "node": "nw_stair_F1",
+     "triangles": 38585,
+     "min": [
+      -3.59,
+      -0.25,
+      -27.25
+     ],
+     "max": [
+      5.85,
+      3.54,
+      -20.64
+     ]
+    },
+    {
+     "floor": 2,
+     "node": "nw_stair_F2",
+     "triangles": 25260,
+     "min": [
+      -3.72,
+      3.1,
+      -27.4
+     ],
+     "max": [
+      5.57,
+      7.1,
+      -20.71
+     ]
+    }
+   ]
+  },
+  {
+   "key": "opp_stair",
+   "title": "Right wing stair",
+   "file": "opp_stair.glb",
+   "bytes": 2135272,
+   "parts": [
+    {
+     "floor": 1,
+     "node": "opp_stair_F1",
+     "triangles": 29817,
+     "min": [
+      53.0,
+      -0.16,
+      -28.98
+     ],
+     "max": [
+      62.27,
+      3.69,
+      -22.63
+     ]
+    },
+    {
+     "floor": 2,
+     "node": "opp_stair_F2",
+     "triangles": 22555,
+     "min": [
+      53.0,
+      2.82,
+      -29.14
+     ],
+     "max": [
+      61.82,
+      7.16,
+      -22.75
+     ]
+    }
+   ]
+  }
+ ]
+}
