@@ -105,9 +105,7 @@ test('static assets delegate to Cloudflare without exposing API data',async()=>{
   const req=request('/'),response=await worker.fetch(req,{ASSETS:{fetch(r){assert.equal(r,req);return new Response('static');}}});assert.equal(await response.text(),'static');
 });
 test('request-size and JSON syntax guards work before storage or routing',async()=>{
-  // Reports may carry one compressed photo (limit 450 KB); every other endpoint stays at 16 KB.
-  const oversized=new Request('https://example.test/api/closures',{method:'POST',body:'x'.repeat(460000)});assert.equal((await worker.fetch(oversized,{})).status,413);
-  const oversizedRoute=new Request('https://example.test/api/outdoor/route',{method:'POST',body:'x'.repeat(17000)});assert.equal((await worker.fetch(oversizedRoute,{})).status,413);
+  const oversized=new Request('https://example.test/api/closures',{method:'POST',body:'x'.repeat(17000)});assert.equal((await worker.fetch(oversized,{})).status,413);
   const bad=new Request('https://example.test/api/closures',{method:'POST',body:'{'});assert.equal((await worker.fetch(bad,{})).status,400);
 });
 test('compiled graph is up to date with its source JSON datasets',()=>{
