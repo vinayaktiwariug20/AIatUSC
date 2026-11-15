@@ -21,6 +21,7 @@ test('page sends driving mode, then switches to walking from the selected pedest
    fetch:async(path,options={})=>{if(options.body)calls.push(JSON.parse(options.body));return worker.fetch(new Request('https://app.test'+path,options),env);}};
   await vm.runInNewContext(script,sandbox);
   assert.equal(elements.repBtn.disabled,false);assert.equal(elements.driveOptions.hidden,false);
+  assert.doesNotMatch(html, /<a[^>]+id="indoorView"/);
   assert.equal(elements.indoorView.textContent,'Indoor View');assert.match(elements.indoorView.href,/^\/indoor\//);
   elements.parking.value='downey';await elements.goBtn.click();
   assert.equal(calls.at(-1).mode,'driving');assert.equal(elements.parkedBtn.hidden,false);assert.match(elements.result.innerHTML,/Downey/);

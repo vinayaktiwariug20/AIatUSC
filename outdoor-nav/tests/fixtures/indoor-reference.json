@@ -1,0 +1,68 @@
+{
+  "source": "Original indoor_demo/index.html and web.glb, supplied by project owner. These hashes and costs were captured before module extraction.",
+  "sampleSha256": "ea02a547df6a260829de9553d3667359d85f7c8cf2f3d2d4bf0f0f19221178a5",
+  "modelSha256": "d8439b2810de4a8c28b8b44e16070eaf296ade39c7aa8196aa59c2e05da8eb6e",
+  "navSha256": "a74c6170c002e8b312ac39056fe327120f851c41d62777b11b7cb136fe4cf57d",
+  "routes": [
+    {
+      "anchor": 0,
+      "destination": 0,
+      "cost": 919.2776249999994
+    },
+    {
+      "anchor": 0,
+      "destination": 1,
+      "cost": 1236.5807499999994
+    },
+    {
+      "anchor": 0,
+      "destination": 2,
+      "cost": 183.999125
+    },
+    {
+      "anchor": 1,
+      "destination": 0,
+      "cost": 870.1021249999998
+    },
+    {
+      "anchor": 1,
+      "destination": 1,
+      "cost": 553.6269999999998
+    },
+    {
+      "anchor": 1,
+      "destination": 2,
+      "cost": 1606.7516249999996
+    },
+    {
+      "anchor": 2,
+      "destination": 0,
+      "cost": 591.9128749999998
+    },
+    {
+      "anchor": 2,
+      "destination": 1,
+      "cost": 275.43774999999994
+    },
+    {
+      "anchor": 2,
+      "destination": 2,
+      "cost": 1328.5623749999997
+    },
+    {
+      "anchor": 3,
+      "destination": 0,
+      "cost": 588.0548749999998
+    },
+    {
+      "anchor": 3,
+      "destination": 1,
+      "cost": 905.3579999999996
+    },
+    {
+      "anchor": 3,
+      "destination": 2,
+      "cost": 181.1145
+    }
+  ]
+}
