@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "wrangler dev --config outdoor-nav/wrangler.jsonc",
     "deploy": "wrangler deploy --config outdoor-nav/wrangler.jsonc",
-    "check": "node --check outdoor-nav/cloudflare/router.mjs && node --check outdoor-nav/cloudflare/api.mjs && node --check outdoor-nav/cloudflare/worker.mjs && node --check outdoor-nav/cloudflare/mobility.mjs && node --check outdoor-nav/cloudflare/triage.mjs",
+    "check": "node --check outdoor-nav/cloudflare/router.mjs && node --check outdoor-nav/cloudflare/api.mjs && node --check outdoor-nav/cloudflare/worker.mjs && node --check outdoor-nav/cloudflare/mobility.mjs",
     "test": "node --test outdoor-nav/tests/*.test.mjs",
     "build:graph": "python3 outdoor-nav/tools/build_cloudflare_graph.py",
     "check:parity": "python3 outdoor-nav/tools/check_cloudflare_parity.py",
@@ -19,9 +19,7 @@
     "db:remote": "wrangler d1 migrations apply DB --remote --config outdoor-nav/wrangler.jsonc",
     "secret:admin": "wrangler secret put ADMIN_TOKEN --config outdoor-nav/wrangler.jsonc",
     "db:bind": "node outdoor-nav/tools/configure-d1.mjs",
-    "secret:routing": "wrangler secret put ORS_API_KEY --config outdoor-nav/wrangler.jsonc",
-    "secret:triage-url": "wrangler secret put TRIAGE_URL --config outdoor-nav/wrangler.jsonc",
-    "secret:triage-secret": "wrangler secret put TRIAGE_SECRET --config outdoor-nav/wrangler.jsonc"
+    "secret:routing": "wrangler secret put ORS_API_KEY --config outdoor-nav/wrangler.jsonc"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
