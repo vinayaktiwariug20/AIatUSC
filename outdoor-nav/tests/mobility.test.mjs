@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
 import {WalkRouter, haversine} from '../cloudflare/router.mjs';
 import {parseTime,campusISO,gateStatus,handleApi} from '../cloudflare/api.mjs';
-import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M} from '../cloudflare/mobility.mjs';
+import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M,walkingRuleClosures} from '../cloudflare/mobility.mjs';
 const json=name=>JSON.parse(readFileSync(new URL('../'+name,import.meta.url),'utf8'));
 const context={router:new WalkRouter(json('cloudflare/graph.json')),gateData:json('data/gates.json'),mobilityData:json('data/mobility.json'),footballData:json('data/football.json'),survey:json('data/surveyed.json'),time:{parseTime,campusISO,gateStatus}};
 class D1{constructor(){this.db=new DatabaseSync(':memory:');for(const f of ['0001_closures.sql','0002_mobility.sql'])this.db.exec(readFileSync(new URL('../migrations/'+f,import.meta.url),'utf8'));}prepare(sql){let params=[];const db=this.db;return{bind(...values){params=values;return this;},async first(column){const row=db.prepare(sql).get(...params);return row?column?row[column]:row:null;},async run(){return db.prepare(sql).run(...params);}};}}
@@ -172,4 +172,32 @@ test('a driving route may end on the nearest drivable road, up to 150 m from the
  assert.equal(mock.calls[0].body.radiuses.at(-1),150);
  const far=coords=>[...coords.slice(0,-1),[coords.at(-1)[0],coords.at(-1)[1]+0.0018]];     // ~200 m short
  assert.equal((await drivingRoute(context,body,monday,[],[],env(),provider(far).fn)).ok,false);
+});
+// Staff rules say who they close: cars (default, and all older rules), people on
+// foot, or both. On-foot rules reach the walking router; cars-only rules don't.
+test('rule modes: default cars; walking needs a surveyed gate pin; bad modes rejected',()=>{
+ const base={kind:'gate',gate:'mcclintock',starts:'2026-11-16T12:00',ends:'2026-11-16T13:00'};
+ assert.deepEqual(validateRule(base,context).modes,['driving']);
+ assert.deepEqual(validateRule({...base,modes:['walking','driving']},context).modes,['walking','driving']);
+ assert.throws(()=>validateRule({...base,modes:['flying']},context),/Closed to/);
+ assert.throws(()=>validateRule({...base,gate:'downey-way',modes:['walking']},context),/approximate/);
+});
+test('a walking-only gate closure leaves car access alone; a cars-only one leaves walking alone',()=>{
+ const when=parseTime('2026-11-16T12:30'),walk={...validateRule({kind:'gate',gate:'mcclintock',starts:'2026-11-16T12:00',ends:'2026-11-16T13:00',modes:['walking']},context)};
+ assert.equal(gateState(context,when,[walk]).find(g=>g.id==='mcclintock').vehicle.status!=='closed',true);
+ assert.equal(walkingRuleClosures(context,[walk],when).length,1);
+ const cars=validateRule({kind:'gate',gate:'mcclintock',starts:'2026-11-16T12:00',ends:'2026-11-16T13:00'},context);
+ assert.equal(walkingRuleClosures(context,[cars],when).length,0);
+});
+test('a walking-only AREA makes walking routes go round it, and is not a driving no-go area',async()=>{
+ const e=env(),at='2026-11-16T12:30:00',from={lat:34.02065,lon:-118.2872};
+ const plain=(await api(e,'/api/outdoor/route','POST',{from,to:'Doheny',at})).data;
+ const line=plain.features[0].geometry.coordinates,[x,y]=line[Math.floor(line.length/2)],d=0.00015;
+ const ring=[[x-d,y-d],[x+d,y-d],[x+d,y+d],[x-d,y+d],[x-d,y-d]];
+ const rule=(await api(e,'/api/mobility/rules','POST',{kind:'road',modes:['walking'],starts:'2026-11-16T12:00',ends:'2026-11-16T14:00',note:'Stage build',geometry:{type:'Polygon',coordinates:[ring]}},'staff')).data;
+ assert.deepEqual(rule.modes,['walking']);
+ const after=(await api(e,'/api/outdoor/route','POST',{from,to:'Doheny',at})).data;
+ assert.equal(after.ok,true);
+ assert.ok(after.summary.avoided.some(a=>a.closure==='rule:'+rule.id),JSON.stringify(after.summary.avoided));
+ assert.ok(!avoidance(context,parseTime(at),parseTime(at)+1800000,[rule]).some(a=>a.id===rule.id));
 });

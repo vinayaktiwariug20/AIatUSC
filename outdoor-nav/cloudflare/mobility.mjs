@@ -32,7 +32,7 @@ export function gateState(context,when,rules=[],credentials={}) {
   const {gateData,mobilityData,time}=context;
   return time.gateStatus(gateData,when).map(g=>{
     const location=mobilityData.gates.find(p=>p.id===g.id);
-    const overrides=rules.filter(r=>r.kind==='gate'&&r.gate===g.id&&r.starts_ms<=when&&when<r.ends_ms);
+    const overrides=rules.filter(r=>r.kind==='gate'&&r.gate===g.id&&forCars(r)&&r.starts_ms<=when&&when<r.ends_ms);
     // Only restrictive overrides exist. A staff action must never silently open a gate.
     const vehicle=overrides.length?{...g.vehicle,status:'closed',reason:overrides.map(r=>r.note||'Staff closure').join('; ')}:g.vehicle;
     return {...g,...location,vehicle,eligible:!!allowed(vehicle.status,credentials),schedule:gateData.gates.find(p=>p.id===g.id),
@@ -100,10 +100,10 @@ export function avoidance(context,when,end,rules,credentials={}) {
     if(!knownGate(gate)) continue;
     // Check both trip ends and all intervening staff restrictions, conservatively.
     const later=laterGates.find(g=>g.id===gate.id);
-    if(!gate.eligible||!later.eligible||rules.some(r=>r.kind==='gate'&&r.gate===gate.id&&overlaps(when,until,r.starts_ms,r.ends_ms)))
+    if(!gate.eligible||!later.eligible||rules.some(r=>r.kind==='gate'&&r.gate===gate.id&&forCars(r)&&overlaps(when,until,r.starts_ms,r.ends_ms)))
       areas.push({id:'gate:'+gate.id,name:gate.name,basis:gate.basis,geometry:circlePolygon(gate.lat,gate.lon,GATE_AVOID_RADIUS_M)});
   }
-  for(const rule of rules) if(rule.kind==='road'&&overlaps(when,until,rule.starts_ms,rule.ends_ms))
+  for(const rule of rules) if(rule.kind==='road'&&forCars(rule)&&overlaps(when,until,rule.starts_ms,rule.ends_ms))
     areas.push({id:rule.id,name:rule.note||'Staff road closure',basis:'staff_confirmed',geometry:rule.geometry});
   // Check every LA calendar date touched by the trip; an away game never activates this.
   const dates=new Set();for(let ms=when;ms<until;ms+=3600000)dates.add(localDate(ms));dates.add(localDate(until));
@@ -119,14 +119,26 @@ export function mobilityState(context,when,rules,credentials={}) {
     avoid:avoidance(context,when,when+1,rules,credentials),entrance_document:context.mobilityData.entrance_document,
     gate_locations_note:context.mobilityData.gate_locations_note};
 }
+// Who a staff rule closes: cars, people on foot, or both. Rules saved before this
+// field existed are car rules.
+export const ruleModes=r=>Array.isArray(r.modes)&&r.modes.length?r.modes:['driving'];
+export const forCars=r=>ruleModes(r).includes('driving');
+export const GATE_WALK_RADIUS_M=15;
 export function validateRule(body,context,now=Date.now()) {
   if(!['gate','road'].includes(body.kind))throw new MobilityError(400,'Choose gate or road.');
   const starts=context.time.parseTime(body.starts,now),ends=context.time.parseTime(body.ends,starts+3600000);
   if(ends<=starts||ends-starts>7*86400000)throw new MobilityError(400,'Use a closure interval of at most seven days.');
   const rule={id:crypto.randomUUID().replaceAll('-',''),kind:body.kind,starts_ms:starts,ends_ms:ends,created_ms:now,
     starts:context.time.campusISO(starts),ends:context.time.campusISO(ends),note:String(body.note||'Staff confirmed closure').slice(0,280),source:'staff_confirmed'};
+  const modes=body.modes===undefined?['driving']:body.modes;
+  if(!Array.isArray(modes)||!modes.length||modes.some(m=>!['walking','driving'].includes(m)))throw new MobilityError(400,'Closed to: choose cars, people on foot, or both.');
+  rule.modes=[...new Set(modes)];
   if(body.kind==='gate') {
     if(!context.gateData.gates.some(g=>g.id===body.gate))throw new MobilityError(400,'Unknown gate.');rule.gate=body.gate;
+    // On foot, a gate closure blocks paths near its pin -- only safe where the pin was surveyed.
+    const loc=context.mobilityData.gates.find(g=>g.id===body.gate);
+    if(rule.modes.includes('walking')&&!(loc&&loc.lat!==undefined&&loc.location_source!=='approximate_intersection'))
+      throw new MobilityError(400,"This gate's map position is approximate, so it can't be closed on foot. Draw an area closure at the gate instead.");
   } else {
     const ring=body.geometry?.coordinates?.[0];
     if(body.geometry?.type!=='Polygon'||body.geometry.coordinates.length!==1||!Array.isArray(ring)||ring.length<4||ring.length>65||ring.some(p=>!Array.isArray(p)||p.length!==2||!p.every(Number.isFinite)||p[0]<-118.32||p[0]>-118.25||p[1]<33.99||p[1]>34.05)||ring[0][0]!==ring.at(-1)[0]||ring[0][1]!==ring.at(-1)[1])
@@ -264,4 +276,17 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
       attribution:'© openrouteservice.org by HeiGIT | © OpenStreetMap contributors (ODbL)'};
   }
   return {ok:false,reason:'No route passed the gate and closure checks. Try another parking structure or wait for staff access updates.',provider_requests:attempts,checks,parking};
+}
+
+/** Staff rules that close paths ON FOOT, as walking closures for the router:
+ *  an area becomes a polygon closure, a (surveyed) gate a small circle. */
+export function walkingRuleClosures(context,rules,when) {
+  const out=[];
+  for(const r of rules){
+    if(!ruleModes(r).includes('walking')||!(r.starts_ms<=when&&when<r.ends_ms))continue;
+    const base={id:'rule:'+r.id,status:'approved',source:'official',modes:['walking'],note:r.note,ends:r.ends};
+    if(r.kind==='road'&&r.geometry)out.push({...base,polygon:r.geometry.coordinates[0]});
+    else if(r.kind==='gate'){const g=context.mobilityData.gates.find(x=>x.id===r.gate);if(g&&g.lat!==undefined)out.push({...base,lat:g.lat,lon:g.lon,radius_m:GATE_WALK_RADIUS_M});}
+  }
+  return out;
 }
