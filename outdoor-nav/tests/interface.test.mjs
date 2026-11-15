@@ -17,7 +17,7 @@ test('page sends driving mode, then switches to walking from the selected pedest
  const original=globalThis.fetch;globalThis.fetch=async(_url,options)=>{const c=JSON.parse(options.body).coordinates;return new Response(JSON.stringify({features:[{type:'Feature',geometry:{type:'LineString',coordinates:c},properties:{summary:{duration:240,distance:1200},segments:[]}}]}));};
  try{
   const sandbox={document:{getElementById:id=>elements[id]},location:{search:'?mode=driving&to=Doheny&at=34.027,-118.2871694'},URLSearchParams,URL,AbortController,Date,console,localStorage:{removeItem(){}},window:{addEventListener(){}},navigator:{geolocation:{clearWatch(){}}},setInterval(){},
-   L:{map(){return{setView(){return this;},on(){},fitBounds(){},distance(){return 20;},getContainer(){return {};}};},DomUtil:{create(){return {textContent:'',hidden:false};}},tileLayer:layer,layerGroup:layer,circleMarker:layer,circle:layer,polygon:layer,marker:layer,geoJSON:layer,featureGroup:layer},
+   L:{map(){return{setView(){return this;},on(){},fitBounds(){},distance(){return 20;},getContainer(){return {};}};},DomEvent:{disableClickPropagation(){},disableScrollPropagation(){}},DomUtil:{create(){return {textContent:'',hidden:false};}},tileLayer:layer,layerGroup:layer,circleMarker:layer,circle:layer,polygon:layer,marker:layer,geoJSON:layer,featureGroup:layer},
    fetch:async(path,options={})=>{if(options.body)calls.push(JSON.parse(options.body));return worker.fetch(new Request('https://app.test'+path,options),env);}};
   await vm.runInNewContext(script,sandbox);
   assert.equal(elements.repBtn.disabled,false);assert.equal(elements.driveOptions.hidden,false);
