@@ -117,3 +117,18 @@ test('a backlog of unverified public reports cannot disable walking routes',asyn
  const out=await api(e,'/api/outdoor/route','POST',{from:{lat:34.0187,lon:-118.2905},to:'Doheny',at:campusISO(monday)});assert.equal(out.data.ok,true);
  const reports=await api(e,'/api/closures?at='+encodeURIComponent(campusISO(monday)));assert.equal(reports.data.length,20);
 });
+// The user is usually standing off the road (a building, a park, a lot). A route
+// may start up to START_TO_ROAD_LIMIT_M away, drawn as a dotted connector; the END
+// must still reach the parking entrance. (Live bug: every route from a point 41 m
+// off the road was discarded by an old 30 m start check.)
+test('a driving route may start up to 300 m from the user, with a dotted connector',async()=>{
+ const off=coords=>[[coords[0][0],coords[0][1]+0.00108],...coords.slice(1)];      // ~120 m north of the user
+ const out=await drivingRoute(context,body,monday,[],[],env(),provider(off).fn);
+ assert.equal(out.ok,true);assert.ok(Math.abs(out.summary.start_to_road_m-120)<5,out.summary.start_to_road_m);
+ const c=out.features.find(f=>f.properties.kind==='to_road');assert.ok(c);assert.deepEqual(c.geometry.coordinates[0],[body.from.lon,body.from.lat]);
+});
+test('a driving route starting farther than the limit from the user is still rejected',async()=>{
+ const far=coords=>[[coords[0][0],coords[0][1]+0.0036],...coords.slice(1)];       // ~400 m away
+ const out=await drivingRoute(context,body,monday,[],[],env(),provider(far).fn);
+ assert.equal(out.ok,false);
+});

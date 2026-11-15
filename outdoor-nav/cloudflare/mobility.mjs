@@ -161,6 +161,10 @@ async function directions(coordinates,areas,key,fetcher,db) {
   return feature;
 }
 
+// A driver usually starts somewhere off the road (a building, a park, a lot), so
+// the route may begin up to this far away; the gap is drawn as a dotted line.
+// The END must still be within 30 m of the parking entrance.
+export const START_TO_ROAD_LIMIT_M=300;
 export async function drivingRoute(context,body,when,rules,closures,env,fetcher=fetch) {
   if(!env.ORS_API_KEY)throw new MobilityError(503,'Driving needs an openrouteservice API key. Staff: run npm run secret:routing, then npm run deploy.');
   if(!env.DB)throw new MobilityError(503,'Connect D1 before using driving routes and live gate restrictions.');
@@ -199,7 +203,8 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     const coords=feature.geometry.coordinates,duration=feature.properties.summary.duration,arrival=when+duration*1000;
     const actual=[...avoidance(context,when,arrival,rules,credentials),...reportAreas];
     if(actual.some(a=>intersectsPolygon(coords,a.geometry)))continue;
-    if(haversine([coords[0][1],coords[0][0]],ll(origin))>30||haversine([coords.at(-1)[1],coords.at(-1)[0]],ll(p.entrance))>30)continue;
+    const toRoad=haversine([coords[0][1],coords[0][0]],ll(origin));
+    if(toRoad>START_TO_ROAD_LIMIT_M||haversine([coords.at(-1)[1],coords.at(-1)[0]],ll(p.entrance))>30)continue;
     if(coordinates.length===3&&!coords.some(c=>haversine([c[1],c[0]],ll(via))<=35))continue;
     if(!parkingState(context,arrival,rules,credentials).find(row=>row.id===p.id)?.eligible)continue;
     // Check every mapped gate touched by the polyline at the approximate crossing
@@ -223,9 +228,10 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
       closures:walking.filter(c=>c.status==='approved'&&context.time.parseTime(c.starts)<=arrival&&arrival<context.time.parseTime(c.ends)),
       reports:walking.filter(c=>c.status==='unverified')});}
     catch(error){if(error instanceof Unreachable)continue;throw error;}
-    return {ok:true,type:'FeatureCollection',mode:'driving',features:[{...feature,properties:{...feature.properties,kind:'route',mode:'driving'}},
+    const connector=toRoad>10?[{type:'Feature',properties:{kind:'to_road',metres:Math.round(toRoad)},geometry:{type:'LineString',coordinates:[xy(origin),coords[0]]}}]:[];
+    return {ok:true,type:'FeatureCollection',mode:'driving',features:[...connector,{...feature,properties:{...feature.properties,kind:'route',mode:'driving'}},
       point(xy(via),{kind:'gate',name:gate.name}),point(xy(p.entrance),{kind:'parking',name:p.name})],
-      summary:{minutes:Math.round(duration/6)/10,metres:Math.round(feature.properties.summary.distance),walking_minutes:arrivalWalk.summary.minutes,
+      summary:{minutes:Math.round(duration/6)/10,metres:Math.round(feature.properties.summary.distance),start_to_road_m:Math.round(toRoad),walking_minutes:arrivalWalk.summary.minutes,
         building:building.id,building_name:building.name,parking:p,gate,arrival:context.time.campusISO(arrival),storage:'d1',
         avoided:actual.map(a=>({id:a.id,name:a.name,basis:a.basis})),provider:'openrouteservice',live_traffic:false,
         gate_locations_note:context.mobilityData.gate_locations_note,selection:'First valid candidate among at most two ranked parking options; not a guaranteed fastest route.',provider_requests:attempts},
