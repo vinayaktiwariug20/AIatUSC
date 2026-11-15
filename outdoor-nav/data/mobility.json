@@ -60,7 +60,10 @@
       "exit": "DOWNEY.ped.main",
       "game_access": "public",
       "address": "Downey Way / McClintock Ave",
-      "note": "Vehicle entrance on McClintock; walking begins at the surveyed pedestrian exit."
+      "note": "Vehicle entrance on McClintock; walking begins at the surveyed pedestrian exit.",
+      "campus_via": [
+        "ISECT.downey_mcclintock"
+      ]
     },
     {
       "id": "jefferson",

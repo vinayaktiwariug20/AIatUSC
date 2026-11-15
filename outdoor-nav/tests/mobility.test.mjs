@@ -45,27 +45,39 @@ test('segment crossing is detected even when neither vertex lies inside the poly
  assert.equal(intersectsPolygon([[-1,2],[2,2]],poly),false);
  assert.equal(intersectsPolygon([[-1,0],[2,0]],poly),true);
 });
-test('a valid driving route forces a gate, uses the vehicle entrance, and previews the surveyed walking exit',async()=>{
+test('a valid driving route drives to the open gate, then the campus leg to the structure, and previews the walk',async()=>{
  const e=env(),mock=provider(),out=await drivingRoute(context,body,monday,[],[],e,mock.fn);
  assert.equal(out.ok,true);assert.equal(out.mode,'driving');assert.equal(out.summary.parking.id,'downey');assert.equal(out.summary.live_traffic,false);
  assert.equal(out.handoff.exit,'DOWNEY.ped.main');assert.equal(out.walking_preview.summary.start_place.exit,'DOWNEY.ped.main');
- assert.equal(mock.calls.length,1);assert.equal(mock.calls[0].body.coordinates.length,3);
- assert.deepEqual(mock.calls[0].body.coordinates.at(-1),[-118.28997731807364,34.02077789075529]);
+ // the provider is asked to reach the GATE, never to drive campus roads
+ assert.equal(mock.calls.length,1);assert.equal(mock.calls[0].body.coordinates.length,2);
+ assert.deepEqual(mock.calls[0].body.coordinates.at(-1),[-118.2871694,34.0250085]);
+ // campus leg: gate -> surveyed McClintock/Downey Way intersection -> structure entrance
+ const leg=out.features.find(f=>f.properties.kind==='campus');assert.ok(leg);
+ assert.deepEqual(leg.geometry.coordinates.at(-1),[-118.28997731807364,34.02077789075529]);
+ assert.ok(out.summary.campus_m>500&&out.summary.campus_m<600,out.summary.campus_m);
+ assert.match(out.steps.at(-1).instruction,/Enter campus at McClintock/);
  assert.equal(mock.calls[0].headers.Authorization,'private-test-key');assert.equal(JSON.stringify(out).includes('private-test-key'),false);
  const walk=await api(e,'/api/outdoor/route','POST',{from:{place:out.handoff.parking,exit:out.handoff.exit},to:out.handoff.building,mode:'walking',at:'2026-11-16T12:05:00'});
  assert.equal(walk.data.ok,true);assert.equal(walk.data.summary.start_place.exit,'DOWNEY.ped.main');
 });
+
 test('a provider route passing a closed gate is discarded even if the provider ignored avoidance',async()=>{
  const mock=provider(coords=>[...coords.slice(0,-1),[-118.2889172,34.0184081],coords.at(-1)]);
  const out=await drivingRoute(context,body,saturday,[],[],env(),mock.fn);
  assert.equal(out.ok,false);assert.equal(mock.calls.length,1);
  assert.ok(mock.calls[0].body.options.avoid_polygons.coordinates.length);
 });
-test('a provider cannot skip the requested gate or snap to a different parking entrance',async()=>{
- for(const transform of [coords=>[coords[0],coords.at(-1)],coords=>[...coords.slice(0,-1),[-118.30,34.02]]]){
+// Live bug: asked to continue past the gate to the structure, the provider
+// touched the gate, turned back and parked on the nearest public street. The
+// route must END at the gate; anything that stops elsewhere is rejected.
+test('a provider route that does not end at the planned gate is rejected',async()=>{
+ for(const transform of [coords=>[...coords.slice(0,-1),[-118.30,34.02]],coords=>[...coords.slice(0,-1),[-118.2899,34.0221]]]){
   const out=await drivingRoute(context,body,monday,[],[],env(),provider(transform).fn);assert.equal(out.ok,false);
+  assert.ok(out.checks.some(c=>c.check==='route does not reach the gate'),JSON.stringify(out.checks));
  }
 });
+
 test('staff gate closures apply only during their exact interval',()=>{
  const rule=validateRule({kind:'gate',gate:'mcclintock',starts:'2026-11-16T12:00',ends:'2026-11-16T13:00'},context);
  assert.equal(gateState(context,monday-1,[rule]).find(g=>g.id==='mcclintock').eligible,true);
@@ -153,28 +165,14 @@ test('a failed driving search says which check rejected each candidate',async()=
  assert.equal(out.ok,false);assert.ok(out.checks.length>=1);assert.equal(out.checks[0].check,'provider returned no route');assert.equal(out.checks[0].status,404);
 });
 // Live: openrouteservice refused with "Could not find routable point within a radius
-// of 25.0 meters of specified coordinate 0" -- the off-road start. Each point now
-// gets its own search radius; the parking entrance stays strict.
-test('driving request gives the start a wide road-search radius and the entrance a strict one',async()=>{
+// of 25.0 meters of specified coordinate 0" -- the off-road start.
+test('driving request gives the start a wide road-search radius and the gate a tight one',async()=>{
  const mock=provider(),out=await drivingRoute(context,body,monday,[],[],env(),mock.fn);
  assert.equal(out.ok,true);
- const r=mock.calls[0].body.radiuses;assert.equal(r.length,mock.calls[0].body.coordinates.length);
- assert.equal(r[0],300);assert.equal(r.at(-1),150);
+ const r=mock.calls[0].body.radiuses;assert.deepEqual(r,[300,30]);           // McClintock pin is surveyed
 });
-// Live: "Could not find routable point within 25 m of coordinate 2" -- the parking
-// mouth is on a campus road the provider will not drive. The route may end up to
-// END_TO_ENTRANCE_LIMIT_M from the entrance, with a dotted connector.
-test('a driving route may end on the nearest drivable road, up to 150 m from the parking entrance',async()=>{
- const short=coords=>[...coords.slice(0,-1),[coords.at(-1)[0],coords.at(-1)[1]+0.0009]];   // ~100 m short
- const mock=provider(short),out=await drivingRoute(context,body,monday,[],[],env(),mock.fn);
- assert.equal(out.ok,true,JSON.stringify(out.checks));assert.ok(Math.abs(out.summary.end_to_entrance_m-100)<5);
- assert.ok(out.features.some(f=>f.properties.kind==='to_entrance'));
- assert.equal(mock.calls[0].body.radiuses.at(-1),150);
- const far=coords=>[...coords.slice(0,-1),[coords.at(-1)[0],coords.at(-1)[1]+0.0018]];     // ~200 m short
- assert.equal((await drivingRoute(context,body,monday,[],[],env(),provider(far).fn)).ok,false);
-});
-// Staff rules say who they close: cars (default, and all older rules), people on
-// foot, or both. On-foot rules reach the walking router; cars-only rules don't.
+
+
 test('rule modes: default cars; walking needs a surveyed gate pin; bad modes rejected',()=>{
  const base={kind:'gate',gate:'mcclintock',starts:'2026-11-16T12:00',ends:'2026-11-16T13:00'};
  assert.deepEqual(validateRule(base,context).modes,['driving']);
