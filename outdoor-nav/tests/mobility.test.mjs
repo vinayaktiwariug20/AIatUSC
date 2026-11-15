@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
-import {WalkRouter} from '../cloudflare/router.mjs';
+import {WalkRouter, haversine} from '../cloudflare/router.mjs';
 import {parseTime,campusISO,gateStatus,handleApi} from '../cloudflare/api.mjs';
-import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,validateRule,readRules,circlePolygon} from '../cloudflare/mobility.mjs';
+import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M} from '../cloudflare/mobility.mjs';
 const json=name=>JSON.parse(readFileSync(new URL('../'+name,import.meta.url),'utf8'));
 const context={router:new WalkRouter(json('cloudflare/graph.json')),gateData:json('data/gates.json'),mobilityData:json('data/mobility.json'),footballData:json('data/football.json'),survey:json('data/surveyed.json'),time:{parseTime,campusISO,gateStatus}};
 class D1{constructor(){this.db=new DatabaseSync(':memory:');for(const f of ['0001_closures.sql','0002_mobility.sql'])this.db.exec(readFileSync(new URL('../migrations/'+f,import.meta.url),'utf8'));}prepare(sql){let params=[];const db=this.db;return{bind(...values){params=values;return this;},async first(column){const row=db.prepare(sql).get(...params);return row?column?row[column]:row:null;},async run(){return db.prepare(sql).run(...params);}};}}
@@ -131,4 +131,24 @@ test('a driving route starting farther than the limit from the user is still rej
  const far=coords=>[[coords[0][0],coords[0][1]+0.0036],...coords.slice(1)];       // ~400 m away
  const out=await drivingRoute(context,body,monday,[],[],env(),provider(far).fn);
  assert.equal(out.ok,false);
+});
+// Live bug: on evenings/weekends no driving route survived, because closed gates
+// with APPROXIMATE pins (middle of public intersections) became 35 m no-go
+// circles that closed the public streets around campus.
+test('closed gates with approximate pins do not close public streets; surveyed gates get a small circle',async()=>{
+ const sat=parseTime('2026-11-14T20:00:00'),areas=avoidance(context,sat,sat+1800000,[],{});
+ const ids=areas.map(a=>a.id);
+ assert.ok(ids.includes('gate:watt'),ids);                                  // surveyed, closed on weekends
+ for(const approx of ['gate:downey-way','gate:pardee','gate:royal'])assert.ok(!ids.includes(approx),approx);
+ const watt=areas.find(a=>a.id==='gate:watt').geometry.coordinates[0][0];   // a ring point
+ const r=haversine([watt[1],watt[0]],[34.0184081,-118.2889172]);assert.ok(r<=GATE_AVOID_RADIUS_M+1,r);
+});
+test('driving past a closed gate with an approximate pin (Vermont / 36th Pl) is not a rejection',async()=>{
+ const past=coords=>[coords[0],[-118.29145,34.02149],...coords.slice(1)];  // via the downey-way pin
+ const out=await drivingRoute(context,body,parseTime('2026-11-14T20:00:00'),[],[],env(),provider(past).fn);
+ assert.equal(out.ok,true,JSON.stringify(out.checks));
+});
+test('a failed driving search says which check rejected each candidate',async()=>{
+ const out=await drivingRoute(context,body,monday,[],[],env(),provider(c=>c,404).fn);
+ assert.equal(out.ok,false);assert.ok(out.checks.length>=1);assert.equal(out.checks[0].check,'provider returned no route');assert.equal(out.checks[0].status,404);
 });
