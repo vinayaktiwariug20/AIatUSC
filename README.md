@@ -1,24 +1,21 @@
-# AIatUSC: event wayfinding
+# AIatUSC · Campus Access
 
-Scan an event's QR code, get walked to the building, then guided to the room inside.
+Campus walking routes and gate-aware driving to surveyed USC parking entrances, deployed with Cloudflare Workers and D1. Node.js 24 LTS is recommended.
 
-| folder | what |
-|---|---|
-| [`outdoor-nav/`](outdoor-nav/) | far from the venue: campus walking routes around live closures, gate hours, incident reports; hands off at the building door |
-
-Paths and buildings are from OpenStreetMap (ODbL), see `outdoor-nav/README.md`.
-
-## Cloudflare deployment / VS Code
-
-See [CLOUDFLARE_KO.md](CLOUDFLARE_KO.md) for Korean setup instructions.
-The root package.json runs the new Cloudflare JavaScript adapter. The original Python server remains available.
+Read [UPDATE_EN.md](UPDATE_EN.md) to update an existing deployment (`git pull`, then the new D1 migration). A full setup guide is in [CLOUDFLARE_EN.md](CLOUDFLARE_EN.md).
 
 ```bash
 npm install
+npm run db:local
 npm run dev
 ```
 
-Deploy from this repository root with `npm run cf:login` and `npm run deploy`.
-Without D1, the deployment is explicitly read-only. Vehicle gate schedules exist,
-but driving routes and a driving/walking selector are not implemented yet.
-The current route engine is walking-only.
+Driving requires a private `ORS_API_KEY` and D1. Walking uses the included graph. Public reports remain unverified until staff approval. Vehicle gate hours do not close pedestrian paths.
+
+The app offers driving/walking selection, parking entrance guidance, an explicit parked-to-walking transition, gate schedules, staff gate/road restrictions, and conservative home-game-date avoidance. Football dates are a checked 2026 snapshot. The official traffic map is linked; the app's precautionary corridors are approximate and do not encode the map's egress arrows. No live traffic, occupancy feed, voice guidance, or photo-based indoor navigation is provided.
+
+```bash
+npm run check
+npm test
+npm run check:parity
+```

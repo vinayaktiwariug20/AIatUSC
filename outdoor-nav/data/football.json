@@ -1,0 +1,116 @@
+{
+  "season": 2026,
+  "checked": "2026-11-14",
+  "schedule_source": "https://usctrojans.com/sports/football/schedule/2026",
+  "traffic_source": "https://gameday.usc.edu/getting-here/post-game-traffic-flow/",
+  "parking_source": "https://transnet.usc.edu/index.php/gameday/",
+  "traffic_source_note": "The current official page links a map asset under a 2023 path and still mentions Fall 2025. A 2026 revision is not verified. The corridors below are an app precaution based on the four named roads, not digitized official closure boundaries or a transcription of egress arrows.",
+  "policy": "On a registered home-game date, conservatively avoid the campus-area portions of these four roads all day. Display as precautionary avoidance, never as confirmed closure. Staff can add exact confirmed geometry and start/end times. Do not predict the end of Q3 from kickoff.",
+  "home_games": [
+    {
+      "id": "2026-08-29",
+      "date": "2026-08-29",
+      "opponent": "San José State",
+      "kickoff": "2026-08-29T12:00:00-07:00"
+    },
+    {
+      "id": "2026-09-04",
+      "date": "2026-09-04",
+      "opponent": "Fresno State",
+      "kickoff": "2026-09-04T18:00:00-07:00"
+    },
+    {
+      "id": "2026-09-12",
+      "date": "2026-09-12",
+      "opponent": "Louisiana",
+      "kickoff": "2026-09-12T20:00:00-07:00"
+    },
+    {
+      "id": "2026-09-26",
+      "date": "2026-09-26",
+      "opponent": "Oregon",
+      "kickoff": "2026-09-26T16:30:00-07:00"
+    },
+    {
+      "id": "2026-10-03",
+      "date": "2026-10-03",
+      "opponent": "Washington",
+      "kickoff": "2026-10-03T16:30:00-07:00"
+    },
+    {
+      "id": "2026-10-31",
+      "date": "2026-10-31",
+      "opponent": "Ohio State",
+      "kickoff": "2026-10-31T16:30:00-07:00"
+    },
+    {
+      "id": "2026-11-21",
+      "date": "2026-11-21",
+      "opponent": "Maryland",
+      "kickoff": "2026-11-21T15:15:00-08:00"
+    }
+  ],
+  "precaution_corridors": [
+    {
+      "id": "expo",
+      "name": "Exposition Blvd · campus frontage",
+      "width_m": 24,
+      "line": [
+        [
+          -118.29155,
+          34.0184
+        ],
+        [
+          -118.28,
+          34.01845
+        ]
+      ]
+    },
+    {
+      "id": "figueroa",
+      "name": "Figueroa St · Exposition to MLK",
+      "width_m": 28,
+      "line": [
+        [
+          -118.28205,
+          34.01845
+        ],
+        [
+          -118.28225,
+          34.01035
+        ]
+      ]
+    },
+    {
+      "id": "flower",
+      "name": "Flower St · Exposition to MLK",
+      "width_m": 24,
+      "line": [
+        [
+          -118.2804,
+          34.01845
+        ],
+        [
+          -118.2805,
+          34.01035
+        ]
+      ]
+    },
+    {
+      "id": "mlk",
+      "name": "Martin Luther King Jr. Blvd · park frontage",
+      "width_m": 28,
+      "line": [
+        [
+          -118.29155,
+          34.01035
+        ],
+        [
+          -118.27985,
+          34.01035
+        ]
+      ]
+    }
+  ],
+  "traffic_map_image": "https://bpb-us-w1.wpmucdn.com/sites.usc.edu/dist/0/639/files/2023/08/image.png"
+}
