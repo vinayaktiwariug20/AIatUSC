@@ -76,15 +76,17 @@ test('event-link selections take precedence, survive reload, and remain in the r
 });
 
 test('unchanged Outdoor arrival link automatically resolves the confirmed door and Demo Room',async()=>{
-  const response=await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.0215019,lon:-118.2840557},to:'JMC'})}),{});
+  const event=new URL('https://example.test/?to=JMC&room=258');
+  const response=await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.0215019,lon:-118.2840557},to:event.searchParams.get('to')})}),{});
   const result=await response.json();assert.equal(result.ok,true);assert.equal(result.handoff.indoor_node,'entrance');
   const html=read('../outdoor/static/index.html');const card=html.slice(html.indexOf('function indoorHref('),html.indexOf('function updateIndoorView('));
   const esc=html.split('\n').find(line=>line.startsWith('const esc='));
-  const sandbox=vm.createContext({URLSearchParams,qs:new URLSearchParams({room:'demo_room_01'}),summary:result.summary,handoff:result.handoff});
+  const sandbox=vm.createContext({URLSearchParams,qs:event.searchParams,summary:result.summary,handoff:result.handoff});
   const href=vm.runInContext(esc+'\n'+card+'\nindoorHref(summary,handoff)',sandbox);
   const context=readContext(new URL(href,'http://test').search,venue);
-  assert.equal(context.raw.entrance,'jmc-main');assert.equal(context.raw.anchor,'entrance');assert.equal(context.destination.id,'demo_room_01');assert.equal(context.start.id,venue.anchors[0].id);
+  assert.equal(context.raw.entrance,'jmc-main');assert.equal(context.raw.anchor,'entrance');assert.equal(context.destination.id,'258');assert.equal(context.start.id,venue.anchors[0].id);
   const selected=resolveSelection(context,{},venue,routing);
+  assert.equal(selected.destination.name,'Room 258');assert.equal(selected.raw.room,'258');
   assert.equal(selected.startSource,'handoff');assert.equal(selected.destinationSource,'event-link');
   const route=routing.findRoute(selected.startNodeId,selected.destinationNodeId);
   assert.ok(route.length>100&&route.length<150);assert.equal(selected.destinationNodeId,23822);assert.equal(selected.destination.floor,2);assert.equal(selected.destination.isRealRoom,false);assert.equal(selected.sample,true);
@@ -94,14 +96,17 @@ test('unchanged Outdoor arrival link automatically resolves the confirmed door a
   assert.ok(Math.abs(route.length-oracle.solve(selected.startNodeId,selected.destinationNodeId).distance)<1e-8);
 });
 
-test('prominent indoor View sits below the Outdoor heading and its URL never invents an entrance',()=>{
+test('Indoor View floats at the map top-right without changing its handoff URL',()=>{
   const html=read('../outdoor/static/index.html');
-  assert.match(html,/<\/header>\s*<a id="indoorView" class="btnlink indoor-view" href="\/indoor\/">indoor View<\/a>/);
-  assert.match(html,/\.indoor-view\{min-height:54px;font-size:18px/);
+  assert.match(html,/<div id="map"[^>]*>\s*<a id="indoorView" class="btnlink indoor-view" href="\/indoor\/">Indoor View<\/a>\s*<\/div>/);
+  assert.match(html,/\.indoor-view\{position:absolute;top:max\(12px,env\(safe-area-inset-top\)\);right:max\(12px,env\(safe-area-inset-right\)\)/);
+  assert.match(html,/@media\(max-width:480px\)\{\.indoor-view\{min-height:48px/);
+  assert.match(html,/#map \.maphint\{top:max\(78px/);
+  assert.match(html,/L\.DomEvent\.disableClickPropagation\(\$\('indoorView'\)\)/);
   const helper=html.slice(html.indexOf('function indoorHref('),html.indexOf('function updateIndoorView('));
-  const sandbox=vm.createContext({URLSearchParams,qs:new URLSearchParams({room:'demo_room_01'})});
+  const sandbox=vm.createContext({URLSearchParams,qs:new URLSearchParams({room:'258'})});
   const url=new URL(vm.runInContext(helper+"\nindoorHref({building:'JMC'})",sandbox),'http://test');
-  assert.equal(url.searchParams.get('room'),'demo_room_01');assert.equal(url.searchParams.get('building'),'JMC');
+  assert.equal(url.searchParams.get('room'),'258');assert.equal(url.searchParams.get('building'),'JMC');
   assert.equal(url.searchParams.has('anchor'),false);assert.equal(url.searchParams.has('entrance'),false);
 });
 

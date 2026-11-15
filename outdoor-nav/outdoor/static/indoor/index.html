@@ -22,10 +22,8 @@
   <section id="panel">
     <header><div><div class="dim">DOORSTEP · JMC INSIDE</div><h1>Indoor directions</h1></div><a id="back" href="/">← Outdoor map</a></header>
     <p id="status" role="status" aria-live="polite">Reading your navigation details…</p>
-    <p id="context-notice" class="notice" hidden></p>
     <div id="selection" class="card" hidden>
       <h2>Choose your location</h2>
-      <p class="dim">Sample hallway locations come from the original model. They are not verified room destinations.</p>
       <div class="fields">
         <label for="start-select">Start<select id="start-select"><option value="">Choose your current location</option></select></label>
         <label for="dest-select">Destination<select id="dest-select"><option value="">Choose a destination</option></select></label>
@@ -38,7 +36,6 @@
       <div class="row wrap"><button type="button" id="btn-play" class="primary">Play</button><label class="sr" for="pos">Position along the route</label><input type="range" id="pos" min="0" max="1000" value="0"><output id="pos-out" for="pos"></output></div>
       <div class="row wrap"><div class="modes" role="group" aria-label="View"><button type="button" id="btn-walk" aria-pressed="true">Walk view</button><button type="button" id="btn-map" aria-pressed="false">Map view</button></div><button type="button" id="btn-change">Review locations</button></div>
     </section>
-    <details id="handoff"><summary>Navigation details</summary><dl id="params"></dl></details>
     <p id="sample-link" class="dim" hidden><a href="/indoor/">Open Sample test locations</a> (starts a separate test; your event link is unchanged).</p>
   </section>
 </main>

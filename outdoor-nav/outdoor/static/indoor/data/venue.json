@@ -103,8 +103,8 @@
       "source": "Original Sample NAV.dests[2] ? hallway test location, not a surveyed room"
     },
     {
-      "id": "demo_room_01",
-      "name": "Demo Room 01 (test location)",
+      "id": "258",
+      "name": "Room 258",
       "kind": "demo",
       "isRealRoom": false,
       "floor": 2,

@@ -40,24 +40,26 @@ async function page(search,check,{modelFailure=false,venueData=venue}={}) {
 }
 
 test('page automatically routes the confirmed handoff to the explicit Demo Room and wires controls',async()=>{
-  await page('?building=JMC&entrance=jmc-main&anchor=entrance&room=demo_room_01',({elements:e,calls,floors})=>{
+  await page('?building=JMC&entrance=jmc-main&anchor=entrance&room=258',({elements:e,calls,floors})=>{
     assert.equal(e.selection.hidden,true);assert.equal(e.route.hidden,false);assert.equal(e.loading.hidden,true);
     assert.equal(e['start-select'].disabled,true);assert.equal(e['dest-select'].disabled,true);
+    assert.equal(e['dest-select'].value,'258');
+    assert.ok(e['dest-select'].children.some(option=>option.value==='258'&&option.textContent==='Room 258'));
     assert.equal(calls.route.startNodeId,19150);assert.equal(calls.route.destinationNodeId,23822);
     assert.equal(calls.route.nodePoints.at(-1)[1],3.7);
     assert.ok(calls.route.steps.some(step=>step.text.includes('stairs up')));
-    assert.match(e.status.textContent,/not a real room/);assert.match(e['route-title'].textContent,/Demo Room 01/);
-    assert.ok(e.steps.children.length);assert.match(e.back.href,/room=demo_room_01/);
+    assert.match(e.status.textContent,/not a real room/);assert.match(e['route-title'].textContent,/Room 258/);
+    assert.ok(e.steps.children.length);assert.match(e.back.href,/room=258/);
     e.pos.value='500';e.pos.fire('input');assert.equal(calls.progress,0.5);
     e['btn-map'].fire('click');assert.equal(calls.view,'map');assert.equal(e.floors.hidden,false);
     floors[0].fire('click');assert.equal(calls.floor,1);
     e['btn-play'].fire('click');assert.equal(calls.playing,true);
-    e['btn-change'].fire('click');assert.equal(e.selection.hidden,false);assert.equal(e['dest-select'].value,'demo_room_01');
+    e['btn-change'].fire('click');assert.equal(e.selection.hidden,false);assert.equal(e['dest-select'].value,'258');
   });
 });
 
 test('page requires manual selection when parameters are missing and keeps the event destination locked',async()=>{
-  await page('?building=JMC&room=demo_room_01',({elements:e,calls})=>{
+  await page('?building=JMC&room=258',({elements:e,calls})=>{
     assert.equal(calls.route,null);assert.equal(e['start-route'].disabled,true);assert.equal(e['dest-select'].disabled,true);
     e['start-select'].value=venue.anchors[1].id;e['start-select'].fire('change');assert.equal(e['start-route'].disabled,false);
     e['start-route'].fire('click');assert.ok(calls.route);assert.equal(calls.route.destinationNodeId,23822);
@@ -68,12 +70,12 @@ test('unknown rooms stop before viewer startup and retain the incoming event roo
   await page('?building=JMC&entrance=jmc-main&anchor=entrance&room=room_205',({elements:e,calls})=>{
     assert.equal(calls.loaded,0);assert.equal(calls.route,null);assert.equal(e.selection.hidden,true);
     assert.match(e.status.textContent,/no verified indoor mapping/);assert.match(e.back.href,/room=room_205/);
-    assert.equal(e['sample-link'].hidden,false);assert.ok(e.params.children.some(element=>element.textContent==='room_205'));
+    assert.equal(e['sample-link'].hidden,false);assert.match(e.status.textContent,/room_205/);
   });
 });
 
 test('model failures leave navigation disabled and show a recoverable error',async()=>{
-  await page('?building=JMC&entrance=jmc-main&anchor=entrance&room=demo_room_01',({elements:e,calls})=>{
+  await page('?building=JMC&entrance=jmc-main&anchor=entrance&room=258',({elements:e,calls})=>{
     assert.equal(calls.route,null);assert.equal(calls.disposed,1);assert.equal(e['start-route'].disabled,true);
     assert.equal(e.loading.hidden,false);assert.match(e.status.textContent,/Model load failed/);
   },{modelFailure:true});

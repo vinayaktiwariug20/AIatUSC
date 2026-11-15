@@ -17,18 +17,18 @@ node outdoor-nav/tools/dev-indoor.mjs
 
 Event QR 可编码以下链接（`at` 是演示用的固定起点，不代表实时定位）：
 
-<http://127.0.0.1:8000/?to=JMC&room=demo_room_01&at=34.02065,-118.28720>
+<http://127.0.0.1:8000/?to=JMC&room=258&at=34.02065,-118.28720>
 
 1. Outdoor 计算到 JMC 的路线。
 2. 在演示中点击 **I'm at the building**；真实使用也可由靠近入口的 GPS 触发。
 3. 查看入口照片，点击 **Continue inside →**。
-4. Indoor 读取 `building`、`entrance=jmc-main`、`anchor=entrance`、`room=demo_room_01`。
-5. 自动计算从一楼 Entrance lobby 经楼梯到二楼 Demo Room 01 的路线并进入 Walk View，显示约 126 米及 **Take the stairs up to floor 2**。
+4. Indoor 读取 `building`、`entrance=jmc-main`、`anchor=entrance`、`room=258`。
+5. 自动计算从一楼 Entrance lobby 经楼梯到二楼 Room 258 的路线并进入 Walk View，显示约 126 米及 **Take the stairs up to floor 2**。
 6. 检查 Play／Pause／Replay、进度条、Map View、楼层切换及返回 Outdoor。将进度拖到终点，确认 Walk View 位于二楼；切换 Map View，应选中 Floor 2。
 
 也可直接验证 Indoor：
 
-<http://127.0.0.1:8000/indoor/?building=JMC&entrance=jmc-main&anchor=entrance&room=demo_room_01>
+<http://127.0.0.1:8000/indoor/?building=JMC&entrance=jmc-main&anchor=entrance&room=258>
 
 无参数的 <http://127.0.0.1:8000/indoor/> 保留手动选择，用于参考 Sample 的同层／跨层测试。缺少起点或目的地时不会悄悄使用默认值。
 
@@ -41,12 +41,12 @@ Event QR 可编码以下链接（`at` 是演示用的固定起点，不代表实
 | 建筑 | 项目所有者确认 Outdoor 与 Indoor Sample 均为 JMC |
 | 真实入口 | 项目所有者明确确认 `jmc-main` 与原 Sample `NAV.anchors[0]` Entrance lobby 为同一入口 |
 | 起点 | `anchor=entrance` → `sample-entrance-lobby` → NAV 节点 `19150` |
-| 临时目的地 | `demo_room_01` → 原 NAV `dests[0]` 的二楼中部走廊位置 → 节点 `23822` |
+| 临时目的地 | `258` → 原 NAV `dests[0]` 的二楼中部走廊位置 → 节点 `23822` |
 | Demo 坐标／楼层 | 节点世界坐标约 `[16.975, 3.700, 1.025]`，Floor 2 |
 | 距离 | 节点 `19150` → `23822` 的 NAV 图三维最短距离为 **126.0326307089743 米**（显示约 126 米） |
 | 楼梯验证 | 路线包含 26 个高度处于 0.3～3.4 米的中间节点，楼梯段约位于 X=46.675～48.475、Z=−39.475～−37.825，生成上二楼指令 |
 
-`demo_room_01` 的 `kind` 为 `demo`，`isRealRoom` 为 `false`。它是用户授权的临时测试位置，**不是已测绘的真实房间**；页面会显示同样的说明。
+`258` 的 `kind` 为 `demo`，`isRealRoom` 为 `false`。它是用户授权的临时测试位置，**不是已测绘的真实房间**；页面会显示同样的说明。
 
 真实房间映射目前为空。传入 `room_205` 等未知 ID 时，页面显示缺少映射，不会自动改为 Demo Room 或其他 Sample 目的地。返回 Outdoor 的链接保留原 `room`。
 

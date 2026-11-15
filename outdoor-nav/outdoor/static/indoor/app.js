@@ -7,11 +7,6 @@ export async function startApp({loadViewer = () => import('./viewer.js')} = {}) 
   const json = async path => { const response = await fetch(path); if (!response.ok) throw new Error('Could not load indoor navigation data.'); return response.json(); };
   const [venue, graph] = await Promise.all([json('./data/venue.json'), json('./data/graph.json')]);
   $('back').href = outdoorLink(location.search, venue);
-  const incoming = new URLSearchParams(location.search);
-  for (const [key, label] of [['building','Building'],['entrance','Outdoor door'],['anchor','Incoming start'],['room','Requested room']]) {
-    const dt=document.createElement('dt'), dd=document.createElement('dd');
-    dt.textContent=label;dd.textContent=incoming.get(key)||'(not supplied)';$('params').append(dt,dd);
-  }
   let context;
   try { context=readContext(location.search,venue); }
   catch(error) {
@@ -20,10 +15,8 @@ export async function startApp({loadViewer = () => import('./viewer.js')} = {}) 
     return;
   }
   const routing=createRouting(graph);
-  $('context-notice').textContent=context.warnings.join(' ');
-  $('context-notice').hidden=!context.warnings.length;
   for(const [id,items] of [['start-select',venue.anchors],['dest-select',venue.destinations]]) {
-    for(const item of items) { const option=document.createElement('option');option.value=item.id;option.textContent=item.name+(item.kind==='sample'?' · Sample':'');$(id).append(option); }
+    for(const item of items) { const option=document.createElement('option');option.value=item.id;option.textContent=item.name;$(id).append(option); }
   }
   if(context.start){$('start-select').value=context.start.id;$('start-select').disabled=true;}
   if(context.destination){$('dest-select').value=context.destination.id;$('dest-select').disabled=true;}
@@ -58,7 +51,7 @@ export async function startApp({loadViewer = () => import('./viewer.js')} = {}) 
       $('route-title').textContent='To '+selected.destination.name;
       $('route-sub').textContent='From '+selected.start.name+' · '+Math.round(route.length)+' m';
       $('status').classList.remove('error');
-      $('status').textContent=selected.destination.kind==='demo'?'Demo route · Demo Room 01 is a temporary test location, not a real room.':selected.sample?'Sample route · follow the model locations; this is not a verified room route.':'Your indoor route is ready.';
+      $('status').textContent=selected.destination.kind==='demo'?'Demo route · Room 258 is a temporary test location, not a real room.':selected.sample?'Sample route · follow the model locations; this is not a verified room route.':'Your indoor route is ready.';
       routeStatus=$('status').textContent;
       $('selection').hidden=true;$('route').hidden=false;viewer.setRoute(route);
     } catch(error) {$('status').textContent=error.message;$('status').classList.add('error');}
