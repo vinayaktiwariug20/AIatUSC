@@ -18,6 +18,20 @@ header{display:flex;justify-content:space-between;align-items:center;gap:8px;mar
 .card{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:13px}.notice{padding:9px 11px;background:#fff4d8;border-radius:9px;color:var(--warn);font-size:13px;margin:8px 0}.error{color:var(--stop)}.success{color:var(--ok)}.big{font-size:23px;font-weight:700}.pill{font-size:11px;border-radius:20px;background:#edf0f2;padding:4px 8px;white-space:nowrap}.gate{padding:9px 0;border-bottom:1px solid var(--line)}.gate:last-child{border:0}.closed{color:var(--stop)}.restricted{color:var(--warn)}
 label.check{display:flex;align-items:center;gap:5px;font-size:13px}input[type=checkbox]{min-height:16px;flex:none}details{margin-top:12px}summary{cursor:pointer;font-weight:600}.stack{display:grid;gap:8px;margin-top:10px}.hidden,[hidden]{display:none!important}#parkedBtn{width:100%;background:var(--ok);color:#fff;border:0;margin-top:12px;font-weight:700}#routeSteps{padding-left:24px;font-size:13px}.rep{display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--line);padding:7px 0}.rep span{flex:1}.legend{font-size:11px;color:var(--dim);margin-top:7px}.fieldLabel{display:grid;gap:4px;color:var(--dim);font-size:12px}.fieldLabel input{font-size:14px;width:100%}
 @media(min-width:850px){body{flex-direction:row-reverse}#panel{width:440px;max-height:100vh;border-top:0;border-right:1px solid var(--line);flex-shrink:0}#map{height:100vh}header{margin-bottom:18px}}
+
+/* 60-30-10 colour: 60 warm neutral (background), 30 cardinal + cream (header band,
+   cards), 10 gold (active tab, title accent). Route colours stay functional:
+   green walking, blue driving. Colours only -- no logos or wordmarks. */
+:root{--bg:#f5f1ea;--line:#e5ddd0;--cardinal:#7a1424;--cardinal-2:#5a0e1a;--gold:#f2c14e;--gold-ink:#3b2a00;--cream:#fbf6ec}
+#panel>header{background:linear-gradient(135deg,var(--cardinal),var(--cardinal-2));color:#fff;margin:-16px -18px 14px;padding:16px 18px 18px;border-radius:0 0 16px 16px;box-shadow:0 2px 10px #5a0e1a33}
+#panel>header small{color:#f3d9a4;letter-spacing:.08em}
+#panel>header h1 span{color:var(--gold)!important}
+#panel>header .pill{background:#ffffff26;color:#fff}
+.modes{background:#efe6d8}
+.modes button.active{background:var(--gold);color:var(--gold-ink);box-shadow:0 1px 4px #0002}
+.card,#askBox{background:var(--cream);border-color:var(--line)}
+button.primary{background:var(--cardinal);border-color:var(--cardinal)}
+details>summary{color:var(--cardinal-2)}
 </style>
 </head>
 <body>
