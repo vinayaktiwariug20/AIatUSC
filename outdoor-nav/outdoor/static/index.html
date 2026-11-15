@@ -262,7 +262,10 @@ function indoorHref(s={},ho={}){
 
   if(building)p.set('building',building);
   if(ho.entrance_id)p.set('entrance',ho.entrance_id);
-  if(ho.indoor_node)p.set('anchor',ho.indoor_node);
+  // Where indoor directions start: the event link may name an indoor place (anchor=...),
+  // e.g. the stair the organizers send people to; otherwise it is the door the route ended at.
+  const anchor=(qs.get('anchor')||'').trim().slice(0,60)||ho.indoor_node;
+  if(anchor)p.set('anchor',anchor);
   if(qs.get('room'))p.set('room',qs.get('room'));
 
   const query=p.toString();   // not p.size: Safari before 17 has no URLSearchParams.size and the link lost its parameters

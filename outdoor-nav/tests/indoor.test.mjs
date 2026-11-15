@@ -27,6 +27,22 @@ test('the event link reaches the indoor viewer with a door and a room it knows, 
   assert.ok(r);assert.equal(r.points.at(-1).floor,2);
 });
 
+test('the event link can name where indoor directions start (anchor=), instead of the door',async()=>{
+  const event=new URL('https://example.test/?to=JMC&room=258&anchor=left-stair-1');
+  const response=await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.0215019,lon:-118.2840557},to:event.searchParams.get('to')})}),{});
+  const result=await response.json();assert.equal(result.handoff.indoor_node,'entrance');
+  const sandbox=vm.createContext({URLSearchParams,qs:event.searchParams,summary:result.summary,handoff:result.handoff});
+  const link=new URL(vm.runInContext(indoorHref+'\nindoorHref(summary,handoff)',sandbox),'http://test');
+  assert.equal(link.searchParams.get('anchor'),'left-stair-1');assert.equal(link.searchParams.get('room'),'258');
+  assert.equal(link.searchParams.get('building'),B.id);assert.equal(link.searchParams.get('entrance'),'jmc-main');   // the door is still reported
+  const from=findPlace(B,link.searchParams.get('anchor')),to=findPlace(B,link.searchParams.get('room'));
+  assert.equal(from.id,'left-stair-1');assert.equal(to.id,'258');
+  const r=route(B.nav,placeEnd(B,from),placeEnd(B,to));assert.ok(r);assert.equal(r.points.at(-1).floor,2);
+  // The Indoor View button carries it too, before any route exists.
+  const early=new URL(vm.runInContext(indoorHref+"\nindoorHref({building:'JMC'})",vm.createContext({URLSearchParams,qs:event.searchParams})),'http://test');
+  assert.equal(early.searchParams.get('anchor'),'left-stair-1');
+});
+
 test('Indoor View floats at the map top-right without changing its handoff URL',()=>{
   assert.match(html,/<div id="map"[^>]*>\s*<a id="indoorView" class="btnlink indoor-view" href="\/indoor\/">Indoor View<\/a>\s*<\/div>/);
   const css=html.slice(html.indexOf('<style>'),html.indexOf('</style>')).replace(/\s+/g,''); // the rules, however they are wrapped
