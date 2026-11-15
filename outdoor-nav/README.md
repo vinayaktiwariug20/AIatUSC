@@ -1,9 +1,3 @@
-# Cloudflare mobility release
-
-The current web UI uses the Cloudflare JavaScript API, including driving/parking selection, explicit parked-to-walking continuation, staff vehicle restrictions, and public reports. Start it with `npm run dev` from the repository root. See [UPDATE_EN.md](../UPDATE_EN.md) for setup and limitations.
-
-The Python implementation and API described below are the original walking engine. Its server does not implement the new mobility endpoints.
-
 # outdoor-nav
 
 **Cloudflare / VS Code:** see [../CLOUDFLARE_KO.md](../CLOUDFLARE_KO.md).
