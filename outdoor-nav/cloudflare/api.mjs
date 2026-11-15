@@ -176,7 +176,11 @@ export async function handleApi(request, env, context) {
       if (ends <= starts || ends - starts > 7 * 86400000) fail(400,'Closure end must follow start, within seven days.');
       const modes=body.modes??['walking'];
       if(!Array.isArray(modes)||!modes.length||modes.some(m=>!['walking','driving'].includes(m)))fail(400,'Choose walking and/or driving report modes.');
-      if(!official)await reserveReportQuota(db);
+      if(!official){
+        // The report counter lives in migration 0002. Say so plainly instead of "storage unavailable".
+        try{await reserveReportQuota(db);}
+        catch(e){if(/no such table/i.test(String(e?.message)))fail(503,'Reports are paused: the database needs an update (migration 0002). Staff: run npm run db:remote.');throw e;}
+      }
       const c = {id: crypto.randomUUID().replaceAll('-','').slice(0,16),kind:String(body.kind || 'blockage').slice(0,50),modes:[...new Set(modes)],
         lat,lon,radius_m:radius,note:String(body.note || '').slice(0,280),source:official?'official':'public',status:official?'approved':'unverified',
         starts:campusISO(starts),ends:campusISO(ends),created:campusISO(now)};
