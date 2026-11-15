@@ -238,15 +238,24 @@ $('chatLog').onclick=safe(async e=>{const b=e.target.closest('button[data-goto]'
 async function checkMyQuestions(){const left=[];for(const id of myQs()){try{const q=await api('/api/questions/'+id);if(q.status==='answered')addMsg('<b>Organizer answer</b> to “'+esc(q.question)+'”: '+esc(q.answer),'bot');else left.push(id);}catch{}}setQs(left);}
 setInterval(()=>checkMyQuestions(),20000);checkMyQuestions();
 // Staff: questions waiting for an answer.
+// The queue refreshes every 20 s. Redraw only when the questions change, and keep
+// whatever an organizer is typing (and the cursor) across a redraw.
+let qFingerprint='';
 async function loadQuestions(){
- if(!$('token').value.trim()){$('askQueue').innerHTML='';return;}
+ if(!$('token').value.trim()){$('askQueue').innerHTML='';qFingerprint='';return;}
  let rows;try{rows=await api('/api/questions');}catch(e){$('askQueue').innerHTML='<div class="dim">'+esc(e.message)+'</div>';return;}
+ const fp=JSON.stringify(rows.map(q=>[q.id,q.status,q.answer||'']));if(fp===qFingerprint)return;qFingerprint=fp;
+ const box=$('askQueue'),drafts={},act=document.activeElement;let focus=null;
+ for(const t of box.querySelectorAll?.('textarea')||[])if(t.value)drafts[t.id]=t.value;
+ if(act&&act.tagName==='TEXTAREA'&&box.contains?.(act))focus={id:act.id,a:act.selectionStart,b:act.selectionEnd};
  const open=rows.filter(q=>q.status==='open'),done=rows.filter(q=>q.status==='answered').slice(0,8);
  $('askQueue').innerHTML='<h2 style="margin-top:14px">Questions for organizers ('+open.length+')</h2>'
   +(open.map(q=>'<div class="qitem"><div>'+esc(q.question)+'</div><small class="dim">'+esc(q.asked||'')+'</small>'
    +'<textarea id="qa-'+q.id+'" maxlength="600" placeholder="Your answer. Everyone who asks something similar will get it."></textarea>'
    +'<button class="small primary" data-qa="'+q.id+'">Answer</button> <button class="small" data-qd="'+q.id+'">Dismiss</button></div>').join('')||'<div class="dim">No open questions.</div>')
   +(done.length?'<details><summary class="dim">Answered ('+done.length+')</summary>'+done.map(q=>'<div class="qitem"><small>'+esc(q.question)+'</small><br>'+esc(q.answer)+'</div>').join('')+'</details>':'');
+ for(const [id,v] of Object.entries(drafts)){const t=document.getElementById(id);if(t)t.value=v;}
+ if(focus){const t=document.getElementById(focus.id);if(t){t.focus();t.setSelectionRange?.(focus.a,focus.b);}}
 }
 $('askQueue').onclick=safe(async e=>{
  const a=e.target.closest('button[data-qa]'),d=e.target.closest('button[data-qd]');
