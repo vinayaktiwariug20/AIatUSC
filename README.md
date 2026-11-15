@@ -1,4 +1,6 @@
-# AIatUSC · Campus Access
+# Doorstep
+
+USC event wayfinding: to the right door, then to the room. (Repository: AIatUSC.)
 
 Campus walking routes and gate-aware driving to surveyed USC parking entrances, deployed with Cloudflare Workers and D1. Node.js 24 LTS is recommended.
 

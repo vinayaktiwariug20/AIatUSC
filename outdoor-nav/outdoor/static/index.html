@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Campus Access · USC</title>
+<title>Doorstep · USC</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
@@ -23,7 +23,7 @@ label.check{display:flex;align-items:center;gap:5px;font-size:13px}input[type=ch
 <body>
 <div id="map" aria-label="USC route map"></div>
 <main id="panel">
-<header><div><small>UNIVERSITY PARK CAMPUS</small><h1>Campus Access <span style="color:var(--brand)">USC</span></h1></div><span class="pill" id="statusPill">Connecting</span></header>
+<header><div><small>UNIVERSITY PARK CAMPUS</small><h1>Doorstep <span style="color:var(--brand)">USC</span></h1></div><span class="pill" id="statusPill">Connecting</span></header>
 <div class="modes" role="group" aria-label="Travel mode"><button id="walkMode" class="active" aria-pressed="true">Walking</button><button id="driveMode" aria-pressed="false">Drive + park</button></div>
 <div class="row"><input class="grow" id="to" list="blds" placeholder="Event building / destination" autocomplete="off" aria-label="Destination"><datalist id="blds"></datalist><button id="goBtn" class="primary">Find route</button></div>
 <div class="row wrap" style="margin-top:9px"><button id="locBtn" class="small">Use my location</button><label class="check"><input type="checkbox" id="stepFree">Avoid stairs</label><button id="repBtn" class="small" aria-pressed="false">Report blockage</button></div>
