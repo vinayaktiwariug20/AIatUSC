@@ -1,3 +1,7 @@
 # Copy to .dev.vars for local testing only. Never commit this file with a real token.
 # ADMIN_TOKEN=choose-a-long-random-value
 # Production: npm run secret:admin (from the project root)
+
+# Vehicle routing (optional for walking). Keep the real API key private.
+# ORS_API_KEY=paste-your-openrouteservice-key-here
+# Production: npm run secret:routing, then npm run deploy

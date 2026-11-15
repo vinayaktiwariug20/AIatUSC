@@ -1,4 +1,5 @@
 import {Unreachable} from './router.mjs';
+import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota} from './mobility.mjs';
 
 class ApiError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -63,19 +64,22 @@ export function gateStatus(data, when) {
       vehicle, pedestrian: g.pedestrian || {status: 'not_stated'}};
   });
 }
-async function active(db, when) {
+async function active(db, when, until = when + 1) {
   if (!db) return [];
-  const raw = await db.prepare("SELECT COALESCE(json_group_array(json(payload)), '[]') AS data FROM (SELECT payload FROM closures WHERE starts_ms<=? AND ends_ms>? AND status!='rejected' ORDER BY created_ms,id LIMIT 101)").bind(when, when).first('data');
+  const raw = await db.prepare("SELECT COALESCE(json_group_array(json(payload)), '[]') AS data FROM (SELECT payload FROM closures WHERE starts_ms<? AND ends_ms>? AND status!='rejected' ORDER BY CASE status WHEN 'approved' THEN 0 ELSE 1 END,created_ms DESC,id LIMIT 121)").bind(until, when).first('data');
   const rows = JSON.parse(raw);
-  if (rows.length > 100) fail(503, 'Too many active reports. Staff must review and reduce them.');
-  return rows;
+  const approved=rows.filter(c=>c.status==='approved');
+  if (approved.length > 100) fail(503, 'Too many approved closures. Staff must review and reduce them.');
+  return [...approved,...rows.filter(c=>c.status==='unverified').slice(0,20)];
 }
 function reply(data, status = 200, head = false, extra = {}) {
   return new Response(head ? null : JSON.stringify(data), {status,
     headers: {'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...extra}});
 }
 
-export async function handleApi(request, env, {router, gateData}) {
+export async function handleApi(request, env, context) {
+  const {router,gateData}=context;
+  context={...context,time:{parseTime,campusISO,gateStatus}};
   const url = new URL(request.url), method = request.method === 'HEAD' ? 'GET' : request.method;
   const head = request.method === 'HEAD';
   if (method === 'OPTIONS') return new Response(null, {status: 204, headers: {Allow: 'GET, HEAD, POST, DELETE, OPTIONS'}});
@@ -92,9 +96,11 @@ export async function handleApi(request, env, {router, gateData}) {
     const path = url.pathname, db = env.DB, data = router.data;
     if (method === 'GET' && path === '/api/health') {
       if (db && await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='closures'").first('name') !== 'closures') return reply({ok: false, database: 'migration_required'}, 503, head);
+      const mobilityReady=!db||await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mobility_rules'").first('name')==='mobility_rules';
       return reply({ok: true, app: 'AIatUSC', runtime: 'cloudflare-javascript',
         database: db ? 'connected' : 'not_configured', storage: db ? 'd1' : 'read_only_preview',
-        timezone: 'America/Los_Angeles', walking_routes: true, driving_routes: false, turn_by_turn: false,
+        timezone: 'America/Los_Angeles', walking_routes: true, driving_routes: Boolean(db && env.ORS_API_KEY && mobilityReady), turn_by_turn: false,
+        parking_handoff:true,mobility_migration:mobilityReady?'ready':'required',driving_provider:'openrouteservice',live_traffic:false,unverified_report_display_limit:20,
         public_reports: Boolean(db) && env.PUBLIC_REPORTS_ENABLED === 'true'}, 200, head);
     }
     if (method === 'GET' && path === '/api/buildings') {
@@ -105,24 +111,55 @@ export async function handleApi(request, env, {router, gateData}) {
       return reply(rows, 200, head);
     }
     if (method === 'GET' && path === '/api/places') return reply(Object.values(data.places).sort((a,b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0).map(p => ({id:p.id,name:p.name,kind:p.kind})), 200, head);
-    if (method === 'GET' && path === '/api/gates') return reply({source: gateData.source || '', scope: 'vehicle hours; pedestrian access is not stated by the source', timezone: 'America/Los_Angeles', gates: gateStatus(gateData, parseTime(url.searchParams.get('at')))}, 200, head);
+    if (method === 'GET' && ['/api/gates','/api/mobility'].includes(path)) {
+      const when=parseTime(url.searchParams.get('at')),rules=await readRules(db,when),credentials={usc_id:url.searchParams.get('usc_id')==='true',parking_pass:url.searchParams.get('parking_pass')==='true'};
+      if(path==='/api/mobility')return reply(mobilityState(context,when,rules,credentials),200,head);
+      return reply({source:gateData.source||'',scope:'vehicle hours; pedestrian access is not stated by the source',timezone:'America/Los_Angeles',gates:gateState(context,when,rules,credentials)},200,head);
+    }
+    if (path === '/api/mobility/rules' && method === 'GET') {
+      if(!isAdmin(request.headers,env))fail(403,'admin token required');
+      const when=parseTime(url.searchParams.get('at'));
+      return reply(await readRules(db,when,when+7*86400000),200,head);
+    }
+    if (path === '/api/mobility/rules' && method === 'POST') {
+      if(!isAdmin(request.headers,env))fail(403,'admin token required');
+      if(!db)fail(503,'Connect D1 before posting gate or road closures.');
+      const rule=validateRule(body,context);
+      await db.prepare('INSERT INTO mobility_rules(id,kind,starts_ms,ends_ms,created_ms,payload) VALUES(?,?,?,?,?,?)').bind(rule.id,rule.kind,rule.starts_ms,rule.ends_ms,rule.created_ms,JSON.stringify(rule)).run();
+      return reply(rule,201);
+    }
+    const mobilityRule=/^\/api\/mobility\/rules\/([0-9a-f]+)$/.exec(path);
+    if(mobilityRule&&method==='DELETE') {
+      if(!isAdmin(request.headers,env))fail(403,'admin token required');if(!db)fail(503,'D1 is not connected.');
+      const deleted=await db.prepare('DELETE FROM mobility_rules WHERE id=? RETURNING id').bind(mobilityRule[1]).first('id');
+      return deleted?reply({deleted}):reply({error:'not found'},404);
+    }
     const building = /^\/api\/buildings\/([^/]+)$/.exec(path);
     if (method === 'GET' && building) return Object.hasOwn(data.buildings,building[1]) ? reply(data.buildings[building[1]], 200, head) : reply({error:'no such building'},404,head);
     if (method === 'GET' && path === '/api/closures') return reply(await active(db, parseTime(url.searchParams.get('at'))),200,head);
     if (method === 'POST' && path === '/api/outdoor/route') {
-      if ((body.mode || 'walking') !== 'walking') fail(501, 'Vehicle routing is not implemented in this repository yet.');
+      const mode=body.mode||'walking';
+      if(!['walking','driving'].includes(mode))fail(400,'Mode must be walking or driving.');
       const from = body.from;
       if (!from || typeof from !== 'object' || Array.isArray(from) || typeof body.to !== 'string' || body.to.length > 200) fail(400,'Need from:{lat,lon} or from:{place}, and to.');
       const place = from.place || null;
       if (place !== null && typeof place !== 'string') fail(400,'Invalid start place.');
       const [lat, lon] = place ? [null, null] : ll(from.lat, from.lon);
+      const when = parseTime(body.at);
+      if(mode==='driving') {
+        const rules=await readRules(db,when,when+6*3600000),rows=await active(db,when,when+6*3600000);
+        try{return reply(await drivingRoute(context,body,when,rules,rows,env));}
+        catch(error){if(error instanceof Unreachable)return reply({ok:false,reason:error.message,blocked_by:error.blockedBy,choices:error.choices});throw error;}
+      }
       if (!place && !router.containsStart(lat,lon)) return reply({ok:false,reason:'Start is outside the campus walking map. Choose a campus gate or parking exit.',blocked_by:[]});
-      const when = parseTime(body.at), rows = await active(db,when);
+      const rows = forMode(await active(db,when),'walking');
+      if(from.exit!==undefined&&(typeof from.exit!=='string'||!place))fail(400,'A parking place is required for a surveyed exit.');
       try {
-        const out = router.route({lat,lon,place,building:body.to,stepFree:Boolean(body.step_free),
+        const out = router.route({lat,lon,place,exit:from.exit??null,building:body.to,stepFree:Boolean(body.step_free),
           closures: rows.filter(c => c.status === 'approved'), reports: rows.filter(c => c.status === 'unverified')});
         if (out.summary.start_place) out.summary.vehicle_access = gateStatus(gateData,when).filter(g => g.place === out.summary.start_place.id);
         out.summary.storage = db ? 'd1' : 'read_only_preview';
+        out.mode='walking';
         return reply({ok:true,...out});
       } catch (error) {
         if (error instanceof Unreachable) return reply({ok:false,reason:error.message,blocked_by:error.blockedBy,choices:error.choices});
@@ -137,7 +174,10 @@ export async function handleApi(request, env, {router, gateData}) {
       if (!router.containsStart(lat,lon) || typeof radius !== 'number' || !Number.isFinite(radius) || radius <= 0 || radius > 200) fail(400,'Invalid campus location or radius.');
       const now = Date.now(), starts = parseTime(body.starts,now), ends = parseTime(body.ends,starts + 4 * 3600000);
       if (ends <= starts || ends - starts > 7 * 86400000) fail(400,'Closure end must follow start, within seven days.');
-      const c = {id: crypto.randomUUID().replaceAll('-','').slice(0,16),kind:String(body.kind || 'blockage').slice(0,50),
+      const modes=body.modes??['walking'];
+      if(!Array.isArray(modes)||!modes.length||modes.some(m=>!['walking','driving'].includes(m)))fail(400,'Choose walking and/or driving report modes.');
+      if(!official)await reserveReportQuota(db);
+      const c = {id: crypto.randomUUID().replaceAll('-','').slice(0,16),kind:String(body.kind || 'blockage').slice(0,50),modes:[...new Set(modes)],
         lat,lon,radius_m:radius,note:String(body.note || '').slice(0,280),source:official?'official':'public',status:official?'approved':'unverified',
         starts:campusISO(starts),ends:campusISO(ends),created:campusISO(now)};
       await db.prepare('INSERT INTO closures(id,status,starts_ms,ends_ms,created_ms,payload) VALUES(?,?,?,?,?,?)')
@@ -161,6 +201,7 @@ export async function handleApi(request, env, {router, gateData}) {
     }
     return reply({error:'not found'},404,head);
   } catch (error) {
-    return reply({ok:false,error:error instanceof ApiError ? error.message : 'Closure storage or routing is unavailable. Please retry.'},error instanceof ApiError ? error.status : 503,head);
+    const known=error instanceof ApiError||error instanceof MobilityError;
+    return reply({ok:false,error:known?error.message:'Closure storage or routing is unavailable. Please retry.'},known?error.status:503,head);
   }
 }

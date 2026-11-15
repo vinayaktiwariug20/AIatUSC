@@ -1,9 +1,12 @@
 import graph from './graph.json' with { type: 'json' };
 import gateData from '../data/gates.json' with { type: 'json' };
+import mobilityData from '../data/mobility.json' with { type: 'json' };
+import footballData from '../data/football.json' with { type: 'json' };
+import survey from '../data/surveyed.json' with { type: 'json' };
 import {WalkRouter} from './router.mjs';
 import {handleApi} from './api.mjs';
 
-const context = {router: new WalkRouter(graph), gateData};
+const context = {router: new WalkRouter(graph), gateData, mobilityData, footballData, survey};
 export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
