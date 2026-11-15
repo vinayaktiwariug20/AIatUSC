@@ -1,5 +1,7 @@
 # Cloudflare mobility release
 
+**AI:** see [AI_SERVICE.md](AI_SERVICE.md). *Ask Doorstep* answers questions only from verified, cited facts and sends the rest to organizers; photo triage suggests what a reported blockage is. Staff approve anything that changes a route.
+
 The current web UI uses the Cloudflare JavaScript API, including driving/parking selection, explicit parked-to-walking continuation, staff vehicle restrictions, and public reports. Start it with `npm run dev` from the repository root. See [UPDATE_EN.md](../UPDATE_EN.md) for setup and limitations.
 
 The Python implementation and API described below are the original walking engine. Its server does not implement the new mobility endpoints.
