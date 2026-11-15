@@ -174,6 +174,12 @@ async function directions(coordinates,areas,key,fetcher,db,radiuses=coordinates.
 // the route may begin up to this far away; the gap is drawn as a dotted line.
 // The END must still be within 30 m of the parking entrance.
 export const START_TO_ROAD_LIMIT_M=300;
+// Parking mouths sit on campus service roads tagged private in OSM, which the
+// provider will not drive (live: "Could not find routable point within 25 m of
+// coordinate 2"). The route may end on the nearest drivable road up to this far
+// from the entrance; the rest is drawn dotted. Different structures' entrances
+// are >= 176 m apart, so this cannot land at the wrong structure.
+export const END_TO_ENTRANCE_LIMIT_M=150;
 export async function drivingRoute(context,body,when,rules,closures,env,fetcher=fetch) {
   if(!env.ORS_API_KEY)throw new MobilityError(503,'Driving needs an openrouteservice API key. Staff: run npm run secret:routing, then npm run deploy.');
   if(!env.DB)throw new MobilityError(503,'Connect D1 before using driving routes and live gate restrictions.');
@@ -206,7 +212,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     // approximate gate pins sit in intersections, the parking entrance must be exact.
     const viaRadius=knownGate(gate)?30:60,radiuses=[START_TO_ROAD_LIMIT_M];
     if(haversine(ll(origin),ll(via))>30&&haversine(ll(via),ll(p.entrance))>30){coordinates.push(xy(via));radiuses.push(viaRadius);}
-    coordinates.push(xy(p.entrance));radiuses.push(25);
+    coordinates.push(xy(p.entrance));radiuses.push(END_TO_ENTRANCE_LIMIT_M);
     // Start with a conservative horizon; recheck the exact resulting arrival.
     const horizon=when+Math.max(1800000,haversine(ll(origin),ll(p.entrance))/5*1000);
     const areas=[...avoidance(context,when,horizon,rules,credentials),...reportAreas];
@@ -220,7 +226,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     const toRoad=haversine([coords[0][1],coords[0][0]],ll(origin));
     const endGap=haversine([coords.at(-1)[1],coords.at(-1)[0]],ll(p.entrance));
     if(toRoad>START_TO_ROAD_LIMIT_M){reject(p,'route starts too far from you',{metres:Math.round(toRoad)});continue;}
-    if(endGap>30){reject(p,'route does not reach the parking entrance',{metres:Math.round(endGap)});continue;}
+    if(endGap>END_TO_ENTRANCE_LIMIT_M){reject(p,'route does not reach the parking entrance',{metres:Math.round(endGap)});continue;}
     if(coordinates.length===3&&!coords.some(c=>haversine([c[1],c[0]],ll(via))<=viaRadius+5)){reject(p,'route skips the planned gate',{gate:gate.id});continue;}
     if(!parkingState(context,arrival,rules,credentials).find(row=>row.id===p.id)?.eligible){reject(p,'parking not available at arrival time');continue;}
     // Check every mapped gate touched by the polyline at the approximate crossing
@@ -245,9 +251,10 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
       reports:walking.filter(c=>c.status==='unverified')});}
     catch(error){if(error instanceof Unreachable){reject(p,'no walking route from the parking exit');continue;}throw error;}
     const connector=toRoad>10?[{type:'Feature',properties:{kind:'to_road',metres:Math.round(toRoad)},geometry:{type:'LineString',coordinates:[xy(origin),coords[0]]}}]:[];
+    if(endGap>10)connector.push({type:'Feature',properties:{kind:'to_entrance',metres:Math.round(endGap)},geometry:{type:'LineString',coordinates:[coords.at(-1),xy(p.entrance)]}});
     return {ok:true,type:'FeatureCollection',mode:'driving',features:[...connector,{...feature,properties:{...feature.properties,kind:'route',mode:'driving'}},
       point(xy(via),{kind:'gate',name:gate.name}),point(xy(p.entrance),{kind:'parking',name:p.name})],
-      summary:{minutes:Math.round(duration/6)/10,metres:Math.round(feature.properties.summary.distance),start_to_road_m:Math.round(toRoad),walking_minutes:arrivalWalk.summary.minutes,
+      summary:{minutes:Math.round(duration/6)/10,metres:Math.round(feature.properties.summary.distance),start_to_road_m:Math.round(toRoad),end_to_entrance_m:Math.round(endGap),walking_minutes:arrivalWalk.summary.minutes,
         building:building.id,building_name:building.name,parking:p,gate,arrival:context.time.campusISO(arrival),storage:'d1',
         avoided:actual.map(a=>({id:a.id,name:a.name,basis:a.basis})),provider:'openrouteservice',live_traffic:false,
         gate_locations_note:context.mobilityData.gate_locations_note,selection:'First valid candidate among at most two ranked parking options; not a guaranteed fastest route.',provider_requests:attempts},

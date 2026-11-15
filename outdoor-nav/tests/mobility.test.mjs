@@ -159,5 +159,17 @@ test('driving request gives the start a wide road-search radius and the entrance
  const mock=provider(),out=await drivingRoute(context,body,monday,[],[],env(),mock.fn);
  assert.equal(out.ok,true);
  const r=mock.calls[0].body.radiuses;assert.equal(r.length,mock.calls[0].body.coordinates.length);
- assert.equal(r[0],300);assert.equal(r.at(-1),25);
+ assert.equal(r[0],300);assert.equal(r.at(-1),150);
+});
+// Live: "Could not find routable point within 25 m of coordinate 2" -- the parking
+// mouth is on a campus road the provider will not drive. The route may end up to
+// END_TO_ENTRANCE_LIMIT_M from the entrance, with a dotted connector.
+test('a driving route may end on the nearest drivable road, up to 150 m from the parking entrance',async()=>{
+ const short=coords=>[...coords.slice(0,-1),[coords.at(-1)[0],coords.at(-1)[1]+0.0009]];   // ~100 m short
+ const mock=provider(short),out=await drivingRoute(context,body,monday,[],[],env(),mock.fn);
+ assert.equal(out.ok,true,JSON.stringify(out.checks));assert.ok(Math.abs(out.summary.end_to_entrance_m-100)<5);
+ assert.ok(out.features.some(f=>f.properties.kind==='to_entrance'));
+ assert.equal(mock.calls[0].body.radiuses.at(-1),150);
+ const far=coords=>[...coords.slice(0,-1),[coords.at(-1)[0],coords.at(-1)[1]+0.0018]];     // ~200 m short
+ assert.equal((await drivingRoute(context,body,monday,[],[],env(),provider(far).fn)).ok,false);
 });
