@@ -226,7 +226,15 @@ for (const p of B.places) p.name = RENAME.places[p.id] || p.name;
 for (const n of Object.values(NAV.nodes)) n.area = RENAME.areas[n.area] || n.area;
 for (const l of B.labels) l.text = RENAME.labels[l.text] || l.text;
 B.labels.push({text: 'Right entrance', x: 50.8, y: 0.3, z: 19.6, floors: [1, 2]});
-if (qs.get('building')) $('back').href = '/?to=' + encodeURIComponent(qs.get('building'));
+if (qs.get('building')) {                                          // back to the same event: keep the room from the link
+  const back = new URLSearchParams({to: qs.get('building')});
+  if (qs.get('room')) back.set('room', qs.get('room'));
+  $('back').href = '/?' + back;
+}
+// The outdoor map links here for whatever building is the destination, and this is the only one mapped so far.
+// A link for another building gets the map with a notice, not a route that looks as if it were for that building.
+const sameName = (a, b) => String(a).toLowerCase().replace(/[^a-z0-9]+/g, '') === String(b).toLowerCase().replace(/[^a-z0-9]+/g, '');
+const otherBuilding = !!qs.get('building') && ![B.id, B.name, ...(B.aliases || [])].some(n => n && sameName(n, qs.get('building')));
 
 // ---------------------------------------------------------------- renderer, camera
 const stage = $('stage'), canvas = $('view');
@@ -750,10 +758,11 @@ canvas.addEventListener('pointerup', e => {
 
 // ---------------------------------------------------------------- the link from the outdoor map
 // anchor: the door the outdoor map brought you to, so the route starts there without asking. room: where the event is.
-const anchor = qs.get('anchor') && findPlace(B, qs.get('anchor'));
+const anchor = !otherBuilding && qs.get('anchor') && findPlace(B, qs.get('anchor'));
 if (anchor) ends.from = {id: anchor.id, name: anchor.name || anchor.id, end: placeEnd(B, anchor)};
 const room = qs.get('room');
-if (room) {
+if (otherBuilding) { $('notice').hidden = false; $('notice').textContent = `Indoor directions are not set up for that building yet. This is the map of ${B.name}.`; }
+else if (room) {
   const place = findPlace(B, room);
   if (place) ends.to = {id: place.id, name: place.name || place.id, end: placeEnd(B, place)};
   else { $('notice').hidden = false; $('notice').textContent = `Room “${room}” is not on this map yet. Pick the place you are going instead.`; }

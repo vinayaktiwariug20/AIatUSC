@@ -48,7 +48,7 @@
   touch-action:manipulation;
 }
 #map .indoor-view{color:#fff;text-decoration:none}
-#map .maphint{top:max(78px,calc(env(safe-area-inset-top) + 78px))}
+#map .maphint{top:max(78px,calc(env(safe-area-inset-top) + 78px));max-width:calc(100% - 24px)}
 @media(max-width:480px){
   .indoor-view{min-height:48px;min-width:120px;font-size:16px;padding:10px 14px}
 }
@@ -170,7 +170,7 @@ async function route(fit=true){
   const r=await api('/api/outdoor/route',{method:'POST',signal:controller.signal,body:JSON.stringify({from:start,to:buildingId(),mode,at:$('departAt').value||undefined,parking:$('parking').value,usc_id:$('uscId').checked,parking_pass:$('parkingPass').checked,permit:$('permit').value||undefined,step_free:$('stepFree').checked})});
   if(id!==routeVersion)return;lastRouted=Date.now();
   if(!r.ok){const choices=(r.choices||[]).map(c=>'<button class="small" data-pick="'+esc(c.id)+'">'+esc(c.name)+'</button>').join(' ');$('result').innerHTML='<div class="card error">'+esc(r.reason||r.error)+(choices?'<div class="row wrap" style="margin-top:8px">'+choices+'</div>':'')+'</div>';info('Choose another start or parking structure.');return;}
-  plan=r;drawPlan(r,fit);const s=r.summary;updateIndoorView(s,mode==='walking'?r.handoff||{}:{});
+  plan=r;drawPlan(r,fit);const s=r.summary;updateIndoorView(s,mode==='walking'?r.handoff||{}:{},!!(mode==='walking'?r.handoff:r.walking_preview?.handoff)?.indoor_node);
   if(mode==='driving'){
    $('result').innerHTML='<section class="card"><div class="dim">DRIVE → PARK → WALK</div><div class="big">About '+esc(s.minutes)+' min drive + '+esc(s.walking_minutes)+' min walk</div>'+(r.walking_preview?.summary?.step_free?'<div class="success">Walk after parking is step-free: no mapped stairs.</div><div class="dim">Stairs come from OpenStreetMap. Curbs, slopes and doors are not checked.</div>':'')+'<h2 style="margin-top:8px">'+esc(s.parking.name)+'</h2><div>Via '+esc(s.gate.name)+'</div>'+(s.start_to_road_m>10?'<div class="dim">Starts at the nearest road, '+esc(s.start_to_road_m)+' m from you (dotted line).</div>':'')+(s.campus_m>10?'<div class="dim">Enter at '+esc(s.gate.name)+', then about '+esc(s.campus_m)+' m on campus roads to the structure (dashed).</div>':'')+'<div class="dim">'+esc(s.parking.address)+' · Space availability unknown</div><div class="notice">'+(s.gate.location_source==='approximate_intersection'?'The gate pin is approximate. Follow posted signs. ':'')+'Estimated time does not include live traffic.</div><div class="dim">Routes crossing closed gate areas or registered closures are excluded. Auto selection tries up to two candidates and does not guarantee the fastest route.</div>'+(r.steps.length?'<details><summary>Driving directions</summary><ol id="routeSteps">'+r.steps.map(step=>'<li>'+esc(step.instruction)+' <small>'+Math.round(step.distance||0)+' m</small></li>').join('')+'</ol></details>':'')+'</section>';
    $('parkedBtn').hidden=false;info('Blue: driving · dotted green: walking after parking. Select the parking button after you have parked.');
@@ -185,8 +185,8 @@ async function route(fit=true){
    for(const w of s.warnings)h+='<div class="notice">Unverified report: '+esc(w.note)+'</div>';
    // Arrival: near the door (GPS) or the user says so. This is the hand-off to indoor.
    arrival=arrivalCard(s,r.handoff||{});h+=s.near_venue?arrival:'<button class="small" data-arrived="1" style="margin-top:8px">I&#39;m at the building</button>';
-   if(s.near_venue)info('You have arrived. Select Indoor View at the top right of the map for directions to the room.');
-   $('result').innerHTML=h+'</section>';info('Follow the green route to your destination.');
+   $('result').innerHTML=h+'</section>';
+   info(!s.near_venue?'Follow the green route to your destination.':r.handoff?.indoor_node?'You have arrived. Select Indoor View at the top right of the map for directions to the room.':'You have arrived.');
   }
  }catch(error){if(id===routeVersion&&error.name!=='AbortError')showError(error);}finally{if(id===routeVersion){busy=false;$('goBtn').disabled=false;}}
 }
@@ -265,11 +265,14 @@ function indoorHref(s={},ho={}){
   if(ho.indoor_node)p.set('anchor',ho.indoor_node);
   if(qs.get('room'))p.set('room',qs.get('room'));
 
-  return '/indoor/'+(p.size?'?'+p.toString():'');
+  const query=p.toString();   // not p.size: Safari before 17 has no URLSearchParams.size and the link lost its parameters
+  return '/indoor/'+(query?'?'+query:'');
 }
 
-function updateIndoorView(s={},ho={}){
+// mapped: false once a route shows the destination has no indoor map, so the button never opens another building.
+function updateIndoorView(s={},ho={},mapped=true){
   $('indoorView').href=indoorHref(s,ho);
+  $('indoorView').hidden=!mapped;
 }
 
 function arrivalCard(s,ho){

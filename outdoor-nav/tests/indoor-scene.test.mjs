@@ -73,10 +73,37 @@ test('steps read as start, legs, arrive', () => {
   assert.match(steps[steps.length - 1], /^Arrive at Elevator/);
 });
 
+test('room 258 is on the second-floor left wing, and the entrance route to it climbs one stair', () => {
+  const room = findPlace(B, '258');
+  assert.equal(room.type, 'room');
+  assert.equal(findPlace(B, 'Room 258').id, '258');
+  const at = placeEnd(B, room);
+  assert.equal(at.floor, 2);
+  assert.equal(at.area, 'the left wing hallway');
+  assert.ok(at.dist < 2, String(at.dist));                 // the door is on the hallway wall
+  const r = route(NAV, end('entrance'), at);
+  assert.equal(r.legs.filter(l => l.kind === 'stairs').length, 1);
+  assert.equal(r.points[r.points.length - 1].floor, 2);
+  const steps = describe(r, 'Entrance', room.name);
+  assert.equal(steps[steps.length - 1], 'Arrive at Room 258.');
+  assert.ok(B.labels.some(l => l.text === 'Room 258' && l.floors.includes(2)));
+});
+
 test('places are found by id or name; an unmapped room is not', () => {
   assert.equal(findPlace(B, 'ENTRANCE').id, 'entrance');
   assert.equal(findPlace(B, 'Elevator, floor 2').id, 'elevator-2');
   assert.equal(findPlace(B, 'room_205'), null);
+});
+
+test('the building carries the outdoor map\'s id and names for it, and the door anchor the map sends exists', () => {
+  // index.html compares ?building= with these, so a link for another building is not shown as this one.
+  const doors = JSON.parse(readFileSync(join(dir, '..', '..', '..', 'data', 'entrances.override.json'), 'utf8')).filter(e => e.indoor_node);
+  assert.ok(doors.length);
+  for (const d of doors) {
+    assert.equal(d.building, B.id);
+    for (const a of d.aliases) assert.ok(B.aliases.includes(a), a);
+    assert.ok(findPlace(B, d.indoor_node), d.indoor_node);
+  }
 });
 
 test('scene files exist and fit the 25 MiB per-file asset limit', () => {

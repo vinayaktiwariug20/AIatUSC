@@ -37,14 +37,26 @@ that door** (the "reference view" that confirms the right side), and
 
 | parameter  | meaning | indoor should |
 |------------|---------|---------------|
-| `building` | which building | load that building's scene |
+| `building` | which building | show its map; for a building that is not mapped, say so |
 | `entrance` | which outdoor door they came in by | (informational) |
 | `anchor`   | **your** start anchor at that door | start the route here, without asking |
 | `room`     | destination room from the event link | route to it; ask if missing |
 
-Missing parameters are simply absent. The viewer lives at
-`outdoor-nav/outdoor/static/indoor/index.html` (currently a placeholder that
-prints the parameters) and is deployed with the rest of the site.
+Missing parameters are simply absent. The map's **Indoor View** button opens the
+same link (with whatever is known so far), and is hidden once a route shows the
+destination has no indoor map.
+
+The viewer is `outdoor-nav/outdoor/static/indoor/` (`index.html`, `nav.mjs`,
+`building.json`, `scene/`) and is deployed with the rest of the site. You pick
+where you are from pictures of the building, then get steps and a walk preview.
+
+Rooms live in `building.json` under `rooms`: an `id` (what `room=` carries), a
+`name`, and either a graph `node` or `floor`, `x`, `z` for the door. Add a
+`labels` entry to show the room on the map. Room `258` is there now, at a door
+on the second-floor left wing picked from the scan.
+
+`building.json` carries the map's building `id` and `aliases`, so `/indoor/`
+can tell a link for another building apart; keep them equal to the entry in §4.
 **Use the compressed web scenes** (3–7 MB `.glb`), not the raw 13–22 MB scans.
 
 ## 4. The one entry that connects the two halves

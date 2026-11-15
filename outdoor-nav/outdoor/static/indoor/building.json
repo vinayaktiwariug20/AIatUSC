@@ -1,5 +1,14 @@
 {
  "name": "3518 Trousdale Pkwy",
+ "id": "dr-joseph-medicine-crow-center-for-international-and-public-affairs",
+ "aliases": [
+  "Dr. Joseph Medicine Crow Center for International and Public Affairs",
+  "Joseph Medicine Crow Center",
+  "Medicine Crow",
+  "JMC",
+  "Joseph Crow Medicine Building",
+  "DMC"
+ ],
  "storey_height": 3.7,
  "frame": "x: left wing to right wing, y: up, z: courtyard to front (true north). Metres.",
  "floors": [
@@ -417,6 +426,15 @@
    "x": 31.0,
    "y": 3.7,
    "z": 13.6,
+   "floors": [
+    2
+   ]
+  },
+  {
+   "text": "Room 258",
+   "x": 0.4,
+   "y": 3.7,
+   "z": 3.2,
    "floors": [
     2
    ]
@@ -1341,5 +1359,14 @@
    "kind": "stairs"
   }
  ],
- "rooms": []
+ "rooms": [
+  {
+   "id": "258",
+   "name": "Room 258",
+   "floor": 2,
+   "x": -1.05,
+   "z": 3.2,
+   "note": "A door on the inner wall of the left wing hallway, floor 2, picked from the scan. The room number at that door has not been confirmed on site."
+  }
+ ]
 }
