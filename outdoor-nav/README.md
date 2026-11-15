@@ -1,6 +1,6 @@
 # Cloudflare mobility release
 
-**AI triage of reports:** see [TRIAGE.md](TRIAGE.md). A vision model suggests what a reported blockage is; staff approve.
+**AI:** see [AI_SERVICE.md](AI_SERVICE.md). *Ask Doorstep* answers questions only from verified, cited facts and sends the rest to organizers; photo triage suggests what a reported blockage is. Staff approve anything that changes a route.
 
 The current web UI uses the Cloudflare JavaScript API, including driving/parking selection, explicit parked-to-walking continuation, staff vehicle restrictions, and public reports. Start it with `npm run dev` from the repository root. See [UPDATE_EN.md](../UPDATE_EN.md) for setup and limitations.
 

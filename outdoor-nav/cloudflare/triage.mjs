@@ -5,9 +5,11 @@
 // a staff approval (optionally "as suggested") makes it a closure.
 //
 // The model runs in a separate service (deployed on Replit, using Replit AI
-// Integrations), called with a shared secret. Contract: see TRIAGE.md.
+// Integrations), called with a shared secret. Contract: see AI_SERVICE.md.
 // If that service is not configured, slow, down or returns nonsense, reporting
 // still works -- the report just has no suggestion.
+
+import {aiConfigured, callAi} from './ai.mjs';
 
 export const CATEGORIES = ['construction', 'event_setup', 'crowd', 'spill_or_flooding',
   'vehicle_blocking', 'other_blockage', 'not_a_blockage', 'unclear'];
@@ -23,7 +25,7 @@ export function checkPhoto(photo) {
   return {photo};
 }
 
-export const configured = env => Boolean(env.TRIAGE_URL && env.TRIAGE_SECRET);
+export const configured = aiConfigured;
 
 const num = (v, lo, hi) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : null);
 
@@ -46,18 +48,6 @@ export function clean(raw, nearbyIds = []) {
 /** Ask the triage service. Returns null if not configured, else an `ai` object. */
 export async function triage(env, input) {
   if (!configured(env)) return null;
-  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const r = await fetch(String(env.TRIAGE_URL).replace(/\/+$/, '') + '/triage', {
-      method: 'POST', signal: controller.signal,
-      headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + env.TRIAGE_SECRET},
-      body: JSON.stringify(input),
-    });
-    if (!r.ok) return {status: 'unavailable'};
-    return clean(await r.json(), (input.nearby || []).map(n => n.id));
-  } catch {
-    return {status: 'unavailable'};
-  } finally {
-    clearTimeout(timer);
-  }
+  const raw = await callAi(env, '/triage', input, TIMEOUT_MS);
+  return raw ? clean(raw, (input.nearby || []).map(n => n.id)) : {status: 'unavailable'};
 }

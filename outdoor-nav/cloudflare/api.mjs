@@ -1,5 +1,7 @@
 import {Unreachable, haversine} from './router.mjs';
 import {triage, checkPhoto, configured as triageConfigured} from './triage.mjs';
+import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
+const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
 import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota} from './mobility.mjs';
 
 class ApiError extends Error {
@@ -103,7 +105,7 @@ export async function handleApi(request, env, context) {
       return reply({ok: true, app: 'AIatUSC', runtime: 'cloudflare-javascript',
         database: db ? 'connected' : 'not_configured', storage: db ? 'd1' : 'read_only_preview',
         timezone: 'America/Los_Angeles', walking_routes: true, driving_routes: Boolean(db && env.ORS_API_KEY && mobilityReady), turn_by_turn: false,
-        parking_handoff:true,mobility_migration:mobilityReady?'ready':'required',ai_triage:triageConfigured(env),driving_provider:'openrouteservice',live_traffic:false,unverified_report_display_limit:20,
+        parking_handoff:true,mobility_migration:mobilityReady?'ready':'required',ai_service:triageConfigured(env),questions_migration:!db||await questionsReady(db)?'ready':'required',driving_provider:'openrouteservice',live_traffic:false,unverified_report_display_limit:20,
         public_reports: Boolean(db) && env.PUBLIC_REPORTS_ENABLED === 'true'}, 200, head);
     }
     if (method === 'GET' && path === '/api/buildings') {
@@ -224,6 +226,56 @@ export async function handleApi(request, env, context) {
         const status = action === 'approve' ? 'approved' : 'rejected';
         const row = await db.prepare("UPDATE closures SET status=?,payload=json_set(payload,'$.status',?) WHERE id=? RETURNING payload").bind(status,status,id).first('payload');
         return row ? reply(JSON.parse(row)) : reply({error:'not found'},404);
+      }
+    }
+    // ---- Ask Doorstep ------------------------------------------------------
+    if (method === 'POST' && path === '/api/ask') {
+      const question = String(body.question ?? '').trim().replace(/\s+/g, ' ');
+      if (!question || question.length > QUESTION_MAX) fail(400, 'Ask a question of up to ' + QUESTION_MAX + ' characters.');
+      const now = Date.now();
+      if (db && !(await questionsReady(db))) fail(503, 'Questions are paused: the database needs an update (migration 0003). Staff: run npm run db:remote.');
+      if (db && !(await reserveAskQuota(db, now))) fail(429, 'Lots of questions right now. Please try again in a minute.');
+      const [closures, answers, rules] = db ? await Promise.all([active(db, now), recentAnswers(db), readRules(db, now)]) : [[], [], []];
+      const facts = collectFacts(context, now, {closures, answers, rules});
+      const raw = await askModel(env, question, facts, campusISO(now));
+      const out = cleanAnswer(raw, facts.map(f => f.id));
+      const b = out.destination ? router.findBuilding(out.destination) : null, destination = b ? {id: b.id, name: b.name} : null;
+      if (out.answered) return reply({ok: true, answered: true, answer: out.answer, destination,
+        sources: out.citations.map(id => { const f = facts.find(x => x.id === id); return {id, source: f.source, text: f.text}; })});
+      if (!db) return reply({ok: true, answered: false, message: "I couldn't answer that from verified information, and the organizer inbox isn't connected."});
+      const q = await storeQuestion(db, question, now, campusISO, {ai_available: Boolean(raw)});
+      return reply({ok: true, answered: false, question_id: q.id, destination,
+        message: raw ? "I don't have verified information on that, so I've sent your question to the organizers. Their answer will appear here."
+                     : "The assistant is unavailable right now, so I've sent your question to the organizers. Their answer will appear here."}, 201);
+    }
+    const qMatch = /^\/api\/questions\/([0-9a-f]{16})(?:\/(answer|dismiss))?$/.exec(path);
+    if (method === 'GET' && qMatch && !qMatch[2]) {
+      if (!db) fail(503, 'D1 is not connected.');
+      const q = await getQuestion(db, qMatch[1]);
+      if (!q || q.status === 'dismissed') return reply({error: 'not found'}, 404, head);
+      return reply({id: q.id, status: q.status, question: q.question, answer: q.answer ?? null, answered: q.answered ?? null}, 200, head);
+    }
+    if (path === '/api/questions' || (qMatch && qMatch[2])) {
+      if (!isAdmin(request.headers, env)) fail(403, 'admin token required');
+      if (!db) fail(503, 'D1 is not connected.');
+      if (!(await questionsReady(db))) fail(503, 'The database needs an update (migration 0003). Run npm run db:remote.');
+      const now = Date.now(), text = v => String(v ?? '').trim();
+      if (method === 'GET' && path === '/api/questions') return reply(await staffList(db), 200, head);
+      if (method === 'POST' && path === '/api/questions') {          // organizer FAQ, answered up front
+        const question = text(body.question), answer = text(body.answer);
+        if (!question || question.length > QUESTION_MAX || !answer || answer.length > ANSWER_MAX) fail(400, 'Give a question and an answer.');
+        const q = await storeQuestion(db, question, now, campusISO, {status: 'answered', answer, answered: campusISO(now), faq: true});
+        return reply(q, 201);
+      }
+      if (method === 'POST' && qMatch[2] === 'answer') {
+        const answer = text(body.answer);
+        if (!answer || answer.length > ANSWER_MAX) fail(400, 'Answer must be 1-' + ANSWER_MAX + ' characters.');
+        const q = await setAnswer(db, qMatch[1], answer, now, campusISO);
+        return q ? reply(q) : reply({error: 'not found'}, 404);
+      }
+      if (method === 'POST' && qMatch[2] === 'dismiss') {
+        const q = await dismiss(db, qMatch[1]);
+        return q ? reply(q) : reply({error: 'not found'}, 404);
       }
     }
     return reply({error:'not found'},404,head);

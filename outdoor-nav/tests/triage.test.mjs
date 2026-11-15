@@ -22,7 +22,7 @@ class D1 {
 }
 const PHOTO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==';
 const env = (extra = {}) => ({DB: new D1(), ADMIN_TOKEN: 'staff', PUBLIC_REPORTS_ENABLED: 'true',
-  TRIAGE_URL: 'https://triage.example.test/', TRIAGE_SECRET: 's3cret', ...extra});
+  AI_URL: 'https://ai.example.test/', AI_SECRET: 's3cret', ...extra});
 async function call(e, path, method = 'GET', body, token) {
   const r = await worker.fetch(new Request('https://x.test' + path, {method,
     headers: {...(body !== undefined ? {'Content-Type': 'application/json'} : {}), ...(token ? {'X-Admin-Token': token} : {})},
@@ -47,7 +47,7 @@ test('a suggestion is stored with the report but never approves it; the photo is
   assert.equal(r.data.status, 'unverified');
   assert.equal(r.data.ai.category, 'construction');
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, 'https://triage.example.test/triage');
+  assert.equal(calls[0].url, 'https://ai.example.test/triage');
   assert.equal(calls[0].init.headers.Authorization, 'Bearer s3cret');
   assert.equal(calls[0].body.photo, PHOTO);
   const listed = (await call(e, '/api/closures')).data;
@@ -65,12 +65,12 @@ test('if the triage service fails, the report still goes in, without a suggestio
 
 test('not configured: no call is made and no ai field appears', async t => {
   const calls = fakeTriage(t, () => json({}));
-  const r = await call(env({TRIAGE_URL: '', TRIAGE_SECRET: ''}), '/api/closures', 'POST', report);
+  const r = await call(env({AI_URL: '', AI_SECRET: ''}), '/api/closures', 'POST', report);
   assert.equal(r.status, 201);
   assert.equal(calls.length, 0);
   assert.equal('ai' in r.data, false);
-  assert.equal((await call(env({TRIAGE_URL: ''}), '/api/health')).data.ai_triage, false);
-  assert.equal((await call(env(), '/api/health')).data.ai_triage, true);
+  assert.equal((await call(env({AI_URL: ''}), '/api/health')).data.ai_service, false);
+  assert.equal((await call(env(), '/api/health')).data.ai_service, true);
 });
 
 test('staff reports skip triage', async t => {
