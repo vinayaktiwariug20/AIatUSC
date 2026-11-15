@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Doorstep · Inside</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#202329;--dim:#59616e;--line:#dcdedc;--brand:#8b1e2c;--ok:#08734d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:24px 18px}
+main{max-width:560px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px}
+.dim{color:var(--dim);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:16px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
+dt{color:var(--dim)}dd{margin:0;font-family:ui-monospace,Consolas,monospace;word-break:break-all}
+a{color:var(--brand)}
+</style>
+</head>
+<body>
+<main>
+  <div class="dim">DOORSTEP · INSIDE</div>
+  <h1>Indoor directions</h1>
+  <p class="dim">Placeholder. The indoor team's 3D viewer replaces this page. The outdoor app sends people here when they arrive, with these details:</p>
+  <div class="card"><dl id="params"></dl></div>
+  <p class="dim">Contract: <code>outdoor-nav/INDOOR_HANDOFF.md</code>. <a href="/" id="back">← Back to the map</a></p>
+</main>
+<script>
+// The viewer should read the same four parameters.
+const q = new URLSearchParams(location.search), dl = document.getElementById('params');
+for (const [k, label] of [['building', 'Building'], ['entrance', 'Entrance used'], ['anchor', 'Start anchor (indoor)'], ['room', 'Destination room']]) {
+  const dt = document.createElement('dt'), dd = document.createElement('dd');
+  dt.textContent = label; dd.textContent = q.get(k) || '(not given)';
+  dl.append(dt, dd);
+}
+if (q.get('building')) document.getElementById('back').href = '/?to=' + encodeURIComponent(q.get('building'));
+</script>
+</body>
+</html>
