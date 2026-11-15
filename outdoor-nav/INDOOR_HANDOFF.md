@@ -14,6 +14,9 @@ https://aiatusc-outdoor-nav.doorstepusc.workers.dev/?to=<building>&room=<room id
   or simply `JMC`.
 - `room`: the indoor team's room id (e.g. `room_205`). The map doesn't use it.
   It's passed straight through to indoor.
+- `anchor` (optional): an indoor place id where indoor directions should start,
+  e.g. `left-stair-1`. Without it they start at the door the outdoor route ends
+  at. Example: `/?to=JMC&room=258&anchor=left-stair-1`.
 
 ## 2. Arrival
 
