@@ -87,14 +87,21 @@ export function intersectsPolygon(coords,polygon) {
     return ring.slice(1).some((d,j)=>crosses(a,b,ring[j],d));
   });
 }
+// Closed gates become no-go areas only where we know where the gate is.
+// Approximate pins sit in the middle of public intersections (Exposition/Pardee,
+// Vermont/36th Pl...): a 35 m circle there closed the PUBLIC street, so on
+// evenings and weekends no driving route survived. A closed campus gate must stop
+// you entering campus through it, not driving past it.
+export const GATE_AVOID_RADIUS_M=12;
+const knownGate=g=>g.lat!==undefined&&g.location_source!=='approximate_intersection';
 export function avoidance(context,when,end,rules,credentials={}) {
   const until=Math.max(when+1,end),gates=gateState(context,when,rules,credentials),laterGates=gateState(context,until,rules,credentials),areas=[];
   for(const gate of gates) {
-    if(gate.lat===undefined) continue;
+    if(!knownGate(gate)) continue;
     // Check both trip ends and all intervening staff restrictions, conservatively.
     const later=laterGates.find(g=>g.id===gate.id);
     if(!gate.eligible||!later.eligible||rules.some(r=>r.kind==='gate'&&r.gate===gate.id&&overlaps(when,until,r.starts_ms,r.ends_ms)))
-      areas.push({id:'gate:'+gate.id,name:gate.name,basis:gate.basis,geometry:circlePolygon(gate.lat,gate.lon,35)});
+      areas.push({id:'gate:'+gate.id,name:gate.name,basis:gate.basis,geometry:circlePolygon(gate.lat,gate.lon,GATE_AVOID_RADIUS_M)});
   }
   for(const rule of rules) if(rule.kind==='road'&&overlaps(when,until,rule.starts_ms,rule.ends_ms))
     areas.push({id:rule.id,name:rule.note||'Staff road closure',basis:'staff_confirmed',geometry:rule.geometry});
@@ -153,7 +160,9 @@ async function directions(coordinates,areas,key,fetcher,db) {
   catch {throw new MobilityError(502,'Driving provider is unavailable. Retry later.');}
   if(response.status===429)throw new MobilityError(429,'Driving API quota reached. Wait before retrying.');
   if(response.status===401||response.status===403)throw new MobilityError(503,'Driving API key is missing or not authorized. Staff should check ORS_API_KEY.');
-  if(!response.ok) { if(response.status>=500)throw new MobilityError(502,'Driving provider is unavailable.'); return null; }
+  if(!response.ok) { if(response.status>=500)throw new MobilityError(502,'Driving provider is unavailable.');
+    let detail='';try{const e=await response.json();detail=String(e?.error?.message||e?.error||'').slice(0,200);}catch{}
+    return {failed:response.status,detail}; }
   let data;try{data=await response.json();}catch{throw new MobilityError(502,'Invalid driving provider response.');}
   const feature=data?.features?.[0],coords=feature?.geometry?.coordinates,summary=feature?.properties?.summary;
   if(feature?.geometry?.type!=='LineString'||!Array.isArray(coords)||coords.length<2||coords.length>30000||coords.some(p=>!Array.isArray(p)||p.length<2||!p.slice(0,2).every(Number.isFinite))||!Number.isFinite(summary?.duration)||summary.duration<0||summary.duration>21600||!Number.isFinite(summary.distance)||summary.distance<0)
@@ -185,7 +194,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
   candidates.sort((a,b)=>a.score-b.score);
   if(!candidates.length)return {ok:false,reason:'No eligible parking route. Check gate hours, access requirements, or choose another structure.',parking};
   const reportAreas=driving.map(c=>({id:c.id,name:c.note||'Approved blockage',basis:'staff_confirmed',geometry:circlePolygon(c.lat,c.lon,c.radius_m||15)}));
-  let attempts=0;
+  let attempts=0;const checks=[];const reject=(p,check,extra={})=>checks.push({parking:p.id,check,...extra});
   // A bounded number of requests protects the free-tier quota; choose a specific
   // structure to try one outside this shortlist. This is not global optimization.
   for(const {p} of candidates.slice(0,2)) {
@@ -197,37 +206,40 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     // Start with a conservative horizon; recheck the exact resulting arrival.
     const horizon=when+Math.max(1800000,haversine(ll(origin),ll(p.entrance))/5*1000);
     const areas=[...avoidance(context,when,horizon,rules,credentials),...reportAreas];
-    if(areas.some(a=>intersectsPolygon([xy(origin)],a.geometry)||intersectsPolygon([xy(p.entrance)],a.geometry)))continue;
+    if(areas.some(a=>intersectsPolygon([xy(origin)],a.geometry)||intersectsPolygon([xy(p.entrance)],a.geometry))){reject(p,'start or entrance inside an avoided area');continue;}
     attempts++;
-    const feature=await directions(coordinates,areas,env.ORS_API_KEY,fetcher,env.DB);if(!feature)continue;
+    const feature=await directions(coordinates,areas,env.ORS_API_KEY,fetcher,env.DB);
+    if(!feature||feature.failed){reject(p,'provider returned no route',feature?{status:feature.failed,detail:feature.detail}:{});continue;}
     const coords=feature.geometry.coordinates,duration=feature.properties.summary.duration,arrival=when+duration*1000;
     const actual=[...avoidance(context,when,arrival,rules,credentials),...reportAreas];
-    if(actual.some(a=>intersectsPolygon(coords,a.geometry)))continue;
+    const crossed=actual.filter(a=>intersectsPolygon(coords,a.geometry));if(crossed.length){reject(p,'route crosses an avoided area',{areas:crossed.map(a=>a.name||a.id)});continue;}
     const toRoad=haversine([coords[0][1],coords[0][0]],ll(origin));
-    if(toRoad>START_TO_ROAD_LIMIT_M||haversine([coords.at(-1)[1],coords.at(-1)[0]],ll(p.entrance))>30)continue;
-    if(coordinates.length===3&&!coords.some(c=>haversine([c[1],c[0]],ll(via))<=35))continue;
-    if(!parkingState(context,arrival,rules,credentials).find(row=>row.id===p.id)?.eligible)continue;
+    const endGap=haversine([coords.at(-1)[1],coords.at(-1)[0]],ll(p.entrance));
+    if(toRoad>START_TO_ROAD_LIMIT_M){reject(p,'route starts too far from you',{metres:Math.round(toRoad)});continue;}
+    if(endGap>30){reject(p,'route does not reach the parking entrance',{metres:Math.round(endGap)});continue;}
+    if(coordinates.length===3&&!coords.some(c=>haversine([c[1],c[0]],ll(via))<=35)){reject(p,'route skips the planned gate',{gate:gate.id});continue;}
+    if(!parkingState(context,arrival,rules,credentials).find(row=>row.id===p.id)?.eligible){reject(p,'parking not available at arrival time');continue;}
     // Check every mapped gate touched by the polyline at the approximate crossing
     // time, as well as departure/arrival. A route is discarded on any violation.
     let cumulative=0;const distances=coords.slice(1).map((c,i)=>haversine([coords[i][1],coords[i][0]],[c[1],c[0]])),total=distances.reduce((a,b)=>a+b,0)||1;
     let invalid=false;
-    const mappedGates=gateState(context,when,rules,credentials).filter(g=>g.lat!==undefined);
+    const mappedGates=gateState(context,when,rules,credentials).filter(knownGate);
     for(let i=1;i<coords.length;i++) {
       for(const g of mappedGates) {
-        if(pointSegment(ll(g),[coords[i-1][1],coords[i-1][0]],[coords[i][1],coords[i][0]])<=25) {
+        if(pointSegment(ll(g),[coords[i-1][1],coords[i-1][0]],[coords[i][1],coords[i][0]])<=GATE_AVOID_RADIUS_M) {
           for(const fraction of [cumulative/total,(cumulative+distances[i-1])/total])
-            if(!gateState(context,when+duration*1000*fraction,rules,credentials).find(row=>row.id===g.id)?.eligible)invalid=true;
+            if(!gateState(context,when+duration*1000*fraction,rules,credentials).find(row=>row.id===g.id)?.eligible)invalid=g.id;
         }
       }
       cumulative+=distances[i-1];
     }
-    if(invalid)continue;
+    if(invalid){reject(p,'route passes a closed gate',{gate:invalid});continue;}
     // Revalidate the walking continuation at arrival, not at departure.
     let arrivalWalk;
     try{arrivalWalk=context.router.route({building:building.id,place:p.id,exit:p.exit,stepFree:body.step_free===true,
       closures:walking.filter(c=>c.status==='approved'&&context.time.parseTime(c.starts)<=arrival&&arrival<context.time.parseTime(c.ends)),
       reports:walking.filter(c=>c.status==='unverified')});}
-    catch(error){if(error instanceof Unreachable)continue;throw error;}
+    catch(error){if(error instanceof Unreachable){reject(p,'no walking route from the parking exit');continue;}throw error;}
     const connector=toRoad>10?[{type:'Feature',properties:{kind:'to_road',metres:Math.round(toRoad)},geometry:{type:'LineString',coordinates:[xy(origin),coords[0]]}}]:[];
     return {ok:true,type:'FeatureCollection',mode:'driving',features:[...connector,{...feature,properties:{...feature.properties,kind:'route',mode:'driving'}},
       point(xy(via),{kind:'gate',name:gate.name}),point(xy(p.entrance),{kind:'parking',name:p.name})],
@@ -240,5 +252,5 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
         lon:p.exit?context.survey.nodes.find(n=>n.id===p.exit).lon:null,building:building.id},
       attribution:'© openrouteservice.org by HeiGIT | © OpenStreetMap contributors (ODbL)'};
   }
-  return {ok:false,reason:'No route passed the gate and closure checks. Try another parking structure or wait for staff access updates.',provider_requests:attempts,parking};
+  return {ok:false,reason:'No route passed the gate and closure checks. Try another parking structure or wait for staff access updates.',provider_requests:attempts,checks,parking};
 }
