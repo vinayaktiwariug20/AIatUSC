@@ -9,7 +9,7 @@ import {campusISO,parseTime} from '../cloudflare/api.mjs';
 class D1 {
   constructor(migrate=true) {
     this.db=new DatabaseSync(':memory:');
-    if(migrate)for(const name of ['0001_closures.sql','0002_mobility.sql'])this.db.exec(readFileSync(new URL('../migrations/'+name,import.meta.url),'utf8'));
+    if(migrate)this.db.exec(readFileSync(new URL('../migrations/0001_closures.sql',import.meta.url),'utf8'));
   }
   prepare(sql) {
     let params=[]; const self=this;
@@ -70,7 +70,7 @@ test('staff reports are approved immediately and expire without reopening',async
   const e=env(),c=(await call(e,'/api/closures','POST',report,'test-secret')).data;assert.equal(c.status,'approved');
   assert.deepEqual((await call(e,'/api/closures?at=2026-11-14T15:00:00')).data,[]);
 });
-test('a missing reporting variable keeps writes off; staff still have access',async()=>{
+test('public reports default off; staff still have access',async()=>{
   const e={DB:new D1(),ADMIN_TOKEN:'test-secret'};assert.equal((await call(e,'/api/closures','POST',report)).status,403);assert.equal((await call(e,'/api/closures','POST',report,'test-secret')).status,201);
   assert.equal((await call({DB:new D1()},'/api/closures/abc/approve','POST',{})).status,403);
 });
@@ -86,7 +86,7 @@ test('invalid JSON shapes, coordinates, intervals and dates are rejected',async(
 test('far-away start is refused before graph exploration',async()=>{
   const out=await call({},'/api/outdoor/route','POST',{...route,from:{lat:0,lon:0}});assert.equal(out.data.ok,false);assert.match(out.data.reason,/outside/);
 });
-test('driving without a configured key is never silently answered with a walking route',async()=>{assert.equal((await call({},'/api/outdoor/route','POST',{...route,mode:'driving'})).status,503);});
+test('driving requests are never silently answered with walking routes',async()=>{assert.equal((await call({},'/api/outdoor/route','POST',{...route,mode:'driving'})).status,501);});
 test('Los Angeles timestamps and gate schedules handle UTC offsets',async()=>{
   assert.equal(parseTime('2026-11-16T22:00:00'),parseTime('2026-11-17T06:00:00Z'));
   assert.equal(campusISO(parseTime('2026-11-17T06:00:00Z')),'2026-11-16T22:00:00-08:00');
