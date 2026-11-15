@@ -1,5 +1,7 @@
 # Cloudflare mobility release
 
+**AI triage of reports:** see [TRIAGE.md](TRIAGE.md). A vision model suggests what a reported blockage is; staff approve.
+
 The current web UI uses the Cloudflare JavaScript API, including driving/parking selection, explicit parked-to-walking continuation, staff vehicle restrictions, and public reports. Start it with `npm run dev` from the repository root. See [UPDATE_EN.md](../UPDATE_EN.md) for setup and limitations.
 
 The Python implementation and API described below are the original walking engine. Its server does not implement the new mobility endpoints.
