@@ -117,7 +117,7 @@ export async function handleApi(request, env, context) {
     }
     if (method === 'GET' && path === '/api/places') return reply(Object.values(data.places).sort((a,b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0).map(p => ({id:p.id,name:p.name,kind:p.kind})), 200, head);
     if (method === 'GET' && ['/api/gates','/api/mobility'].includes(path)) {
-      const when=parseTime(url.searchParams.get('at')),rules=await readRules(db,when),credentials={usc_id:url.searchParams.get('usc_id')==='true',parking_pass:url.searchParams.get('parking_pass')==='true'};
+      const when=parseTime(url.searchParams.get('at')),rules=await readRules(db,when),credentials={usc_id:url.searchParams.get('usc_id')==='true',parking_pass:url.searchParams.get('parking_pass')==='true',permit:url.searchParams.get('permit')||null};
       if(path==='/api/mobility')return reply(mobilityState(context,when,rules,credentials),200,head);
       return reply({source:gateData.source||'',scope:'vehicle hours; pedestrian access is not stated by the source',timezone:'America/Los_Angeles',gates:gateState(context,when,rules,credentials)},200,head);
     }

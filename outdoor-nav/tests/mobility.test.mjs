@@ -199,3 +199,56 @@ test('a walking-only AREA makes walking routes go round it, and is not a driving
  assert.ok(after.summary.avoided.some(a=>a.closure==='rule:'+rule.id),JSON.stringify(after.summary.avoided));
  assert.ok(!avoidance(context,parseTime(at),parseTime(at)+1800000,[rule]).some(a=>a.id===rule.id));
 });
+// Permits, as described by people who park at USC: a permit always lets its holder park in
+// its own structure; on weekends a permit for any structure is valid at every structure.
+// A permit never overrides a closure that staff confirmed.
+test('a parking permit opens its own structure when the public cannot use it',()=>{
+ const night=parseTime('2026-11-16T22:00:00');   // Monday: the Royal gate's public hours end at 20:00
+ const royal=c=>parkingState(context,night,[],c).find(p=>p.id==='royal');
+ assert.equal(royal({}).eligible,false);
+ const mine=royal({permit:'royal'});assert.equal(mine.eligible,true);assert.equal(mine.permit_access,true);
+ assert.equal(gateState(context,night,[],{permit:'royal'}).find(g=>g.id==='royal').permit_access,true);
+ // A weekday permit for another structure does not help, and an unknown value is ignored.
+ assert.equal(royal({permit:'downey'}).eligible,false);assert.equal(royal({permit:'nope'}).eligible,false);
+ // It only opens the gate of the structure it covers.
+ assert.equal(gateState(context,night,[],{permit:'royal'}).find(g=>g.id==='watt').eligible,false);
+});
+test('on weekends a permit for any structure is valid at every structure; not on weekdays',()=>{
+ const sat=parseTime('2026-11-14T20:00:00');     // Saturday evening: Jefferson and Royal gates are closed to the public
+ const state=c=>Object.fromEntries(parkingState(context,sat,[],c).map(p=>[p.id,p.eligible]));
+ assert.equal(state({}).jefferson,false);assert.equal(state({}).royal,false);
+ const withPermit=state({permit:'downey'});
+ for(const id of ['downey','jefferson','royal','mccarthy','figueroa'])assert.equal(withPermit[id],true,id);
+ const weekday=parseTime('2026-11-16T22:00:00');
+ assert.equal(parkingState(context,weekday,[],{permit:'downey'}).find(p=>p.id==='royal').eligible,false);
+});
+test('a permit also covers game-day restrictions, but never a staff-confirmed gate closure',()=>{
+ const game=parseTime('2026-11-21T10:00:00');    // home game (a Saturday)
+ assert.equal(parkingState(context,game,[],{}).find(p=>p.id==='royal').eligible,false);
+ assert.equal(parkingState(context,game,[],{permit:'royal'}).find(p=>p.id==='royal').eligible,true);
+ const rule={id:'r1',kind:'gate',gate:'royal',modes:['driving'],starts_ms:game-3600000,ends_ms:game+3600000,note:'Closed for the game'};
+ const shut=parkingState(context,game,[rule],{permit:'royal'}).find(p=>p.id==='royal');
+ assert.equal(shut.eligible,false);assert.match(shut.reason,/staff/i);
+ assert.equal(gateState(context,game,[rule],{permit:'royal'}).find(g=>g.id==='royal').eligible,false);
+});
+test('a driving route uses the permit, and an unknown permit is rejected',async()=>{
+ const sat=parseTime('2026-11-14T20:00:00'),request={...body,parking:'jefferson'};
+ assert.equal((await drivingRoute(context,request,sat,[],[],env(),provider().fn)).ok,false);
+ const out=await drivingRoute(context,{...request,permit:'downey'},sat,[],[],env(),provider().fn);
+ assert.equal(out.ok,true,JSON.stringify(out.checks));assert.equal(out.summary.parking.id,'jefferson');assert.equal(out.summary.parking.permit_access,true);
+ await assert.rejects(()=>drivingRoute(context,{...request,permit:'nope'},sat,[],[],env(),provider().fn),e=>e.status===400);
+ const state=await api(env(),'/api/mobility?at=2026-11-14T20:00&permit=downey');
+ assert.equal(state.data.parking.find(p=>p.id==='jefferson').eligible,true);
+});
+// Official three-letter building codes (USC FPM base map), so "JFF" or "HOH" finds the building.
+test('official USC building codes find their buildings',()=>{
+ const find=t=>context.router.findBuilding(t)?.name;
+ assert.equal(find('JFF'),'Jill & Frank Fertitta Hall');assert.equal(find('jff'),'Jill & Frank Fertitta Hall');
+ assert.equal(find('HOH'),'Hoffman Hall');assert.equal(find('DML'),'Edward L Doheny Junior Memorial Library');
+ assert.equal(find('DMC'),'Dr. Joseph Medicine Crow Center for International and Public Affairs');
+ assert.equal(find('JMC'),'Dr. Joseph Medicine Crow Center for International and Public Affairs');   // the name used for the demo venue
+ assert.equal(find('TCC'),'Ronald Tutor Campus Center');
+ // No code may point at two buildings.
+ const seen=new Map();
+ for(const b of Object.values(context.router.data.buildings))for(const a of b.aliases||[])if(/^[A-Z]{2,4}$/.test(a)){assert.ok(!seen.has(a)||seen.get(a)===b.id,a+' is used twice');seen.set(a,b.id);}
+});
