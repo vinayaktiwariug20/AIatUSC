@@ -17,6 +17,26 @@ export function pointSegment(p, a, b) {
   const t = length === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / length));
   return Math.hypot(ax + t * dx, ay + t * dy);
 }
+// Foot of the perpendicular from p onto segment a-b: [metres, t along a->b, [lat, lon]].
+// Same arithmetic as outdoor/geo.py project().
+export function project(p, a, b) {
+  const k = Math.cos(p[0] * RAD);
+  const ax = (a[1] - p[1]) * k * 111320, ay = (a[0] - p[0]) * 110540;
+  const bx = (b[1] - p[1]) * k * 111320, by = (b[0] - p[0]) * 110540;
+  const dx = bx - ax, dy = by - ay, length = dx * dx + dy * dy;
+  const t = length === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / length));
+  return [Math.hypot(ax + t * dx, ay + t * dy), t, [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]];
+}
+// Python's float `//` (CPython float_floor_div). Math.floor(a / b) can land in
+// the neighbouring cell at a boundary, and the segment grid is keyed by Python.
+export function floorDiv(vx, wx) {
+  let mod = vx % wx, div = (vx - mod) / wx;
+  if (mod && ((wx < 0) !== (mod < 0))) { mod += wx; div -= 1; }
+  if (!div) return 0;
+  let fd = Math.floor(div);
+  if (div - fd > 0.5) fd += 1;
+  return fd;
+}
 export class Unreachable extends Error {
   constructor(reason, blockedBy = [], choices = []) {
     super(reason); this.blockedBy = blockedBy; this.choices = choices;
@@ -86,7 +106,27 @@ export class WalkRouter {
     }
     return [best, distance];
   }
-  blockedEdges(closures, origin, virtual) {
+  // Nearest point on a real path SEGMENT (not node). Mirrors router.py _snap_edge.
+  snapEdge(lat, lon, radius = 150) {
+    const ci = floorDiv(lat, CELL), cj = floorDiv(lon, CELL), segs = this.data.segCells;
+    let r = Math.max(1, Math.trunc(radius / (CELL * 92000)) + 1), best = null;
+    for (let grow = 0; grow < 6; grow++) {
+      best = null; const seen = new Set();
+      for (let i = ci - r; i <= ci + r; i++) for (let j = cj - r; j <= cj + r; j++) {
+        for (const ei of segs[`${i},${j}`] || []) {
+          if (seen.has(ei)) continue;
+          seen.add(ei);
+          const [u, v] = this.data.edges[ei];
+          const [d, t, foot] = project([lat, lon], this.data.nodes[u], this.data.nodes[v]);
+          if (best === null || d < best[1]) best = [ei, d, t, foot];
+        }
+      }
+      if (best !== null && best[1] <= r * CELL * 92000) return best;
+      r *= 2;
+    }
+    return best;
+  }
+  blockedEdges(closures, coord, virtual) {
     const blocked = new Map(), count = this.data.edges.length;
     for (const c of closures) {
       const radius = c.radius_m ?? 15, dy = radius / 110540, dx = radius / (111320 * Math.cos(c.lat * RAD));
@@ -99,13 +139,12 @@ export class WalkRouter {
       for (const index of candidates) {
         if (blocked.has(index)) continue;
         const [u, v] = index < count ? this.data.edges[index] : virtual[index - count];
-        const a = u === 'O:start' ? origin : this.data.nodes[u];
-        if (pointSegment([c.lat, c.lon], a, this.data.nodes[v]) <= radius) blocked.set(index, c.id);
+        if (pointSegment([c.lat, c.lon], coord(u), coord(v)) <= radius) blocked.set(index, c.id);
       }
     }
     return blocked;
   }
-  search(targets, blocked, stepFree, virtual) {
+  search(targets, blocked, stepFree, virtual, vout) {
     const wanted = new Set(targets), best = new Map([['O:start', 0]]), prev = new Map(), heap = new Heap(), hit = new Set();
     const count = this.data.edges.length; heap.push([0, 'O:start']);
     while (heap.data.length) {
@@ -116,7 +155,8 @@ export class WalkRouter {
         while (cur !== 'O:start') { const [parent, index] = prev.get(cur); edges.push(index); path.push(parent); cur = parent; }
         return {cost, path: path.reverse(), edges: edges.reverse(), hit};
       }
-      const out = node === 'O:start' ? virtual.map((_, i) => count + i) : this.data.out[node] || [];
+      const real = this.data.out[node] || [], extra = vout.get(node);
+      const out = extra ? real.concat(extra) : real;
       for (const index of out) {
         const [, v, seconds, , steps] = index < count ? this.data.edges[index] : virtual[index - count];
         if (blocked.has(index)) { hit.add(blocked.get(index)); continue; }
@@ -138,32 +178,50 @@ export class WalkRouter {
     }
     const targets = this.data.targets[b.id] || [];
     if (!targets.length) throw new Unreachable(`${b.name} has no entrance within 60m of a mapped path`);
-    let links, snapMetres;
+    // Virtual nodes and edges for this request only (the compiled graph is
+    // shared and immutable). Same order as router.py's _link(..., live=True).
+    const vnodes = new Map(), virtual = [], vout = new Map(), count = this.data.edges.length;
+    const link = (u, v, s, m, steps = false, name = '') => {
+      for (const [a, b] of [[u, v], [v, u]]) {
+        virtual.push([a, b, s, m, steps, name]);
+        if (!vout.has(a)) vout.set(a, []);
+        vout.get(a).push(count + virtual.length - 1);
+      }
+    };
+    let snapMetres;
     if (startPlace) {
       if (exit !== null && !startPlace.nodes.includes('S:' + exit)) throw new Unreachable('That exit does not belong to this parking structure.');
-      links = (exit === null ? startPlace.nodes : ['S:' + exit]).map(n => [n, 0, 0]);
-      [lat, lon] = this.data.nodes[startPlace.nodes[0]]; snapMetres = 0;
+      [lat, lon] = this.data.nodes[startPlace.nodes[0]];
+      vnodes.set('O:start', [lat, lon]);
+      for (const n of (exit === null ? startPlace.nodes : ['S:' + exit])) link('O:start', n, 0, 0);
+      snapMetres = 0;
     } else {
-      const [node, d] = this.nearest(lat, lon); snapMetres = d;
-      links = [[node, d / 1.35, d]];
+      const snap = this.snapEdge(lat, lon, 150);
+      if (!snap) throw new Unreachable('no mapped path anywhere near the start point');
+      const [ei, d, t, foot] = snap, [u, v, sec, m, steps, name] = this.data.edges[ei], P = 'P:O:start';
+      vnodes.set('O:start', [lat, lon]); vnodes.set(P, foot);
+      link('O:start', P, d / 1.35, d);
+      link(P, u, sec * t, m * t, steps, name);
+      link(P, v, sec * (1 - t), m * (1 - t), steps, name);
+      snapMetres = d;
     }
-    const origin = [lat, lon], virtual = links.map(([n, s, m]) => ['O:start', n, s, m, false, '']);
-    const blocked = this.blockedEdges(closures, origin, virtual);
-    const found = this.search(targets, blocked, stepFree, virtual);
+    const coord = n => vnodes.get(n) ?? this.data.nodes[n];
+    const blocked = this.blockedEdges(closures, coord, virtual);
+    const found = this.search(targets, blocked, stepFree, virtual, vout);
     if (found.cost === null) {
       const named = [...found.hit].filter(n => n !== 'steps').sort();
       throw new Unreachable(`${b.name}: ${named.length ? 'every way in is closed' : found.hit.has('steps') ? 'stairs on every way in' : 'no path in the map'}`, named);
     }
     let base = null, baseClosures = [];
     if (blocked.size) {
-      base = this.search(targets, new Map(), stepFree, virtual);
+      base = this.search(targets, new Map(), stepFree, virtual, vout);
       if (base.cost !== null) baseClosures = [...new Set(base.edges.filter(i => blocked.has(i)).map(i => blocked.get(i)))].sort();
     }
     const edge = i => i < this.data.edges.length ? this.data.edges[i] : virtual[i - this.data.edges.length];
     const metres = found.edges.reduce((sum, i) => sum + edge(i)[3], 0);
     const path = startPlace ? found.path.slice(1) : found.path;
     if (startPlace) [lat, lon] = this.data.nodes[path[0]];
-    const coordinates = path.map(n => n === 'O:start' ? origin : this.data.nodes[n]);
+    const coordinates = path.map(coord);
     const entranceId = path.at(-1).slice(2), entrance = (b.entrances || []).find(e => e.id === entranceId);
     const entranceLL = this.data.nodes[path.at(-1)], toDoor = haversine([lat, lon], entranceLL);
     const warnings = reports.filter(r => coordinates.slice(1).some((q, i) => pointSegment([r.lat, r.lon], coordinates[i], q) <= 30 + (r.radius_m || 0)));

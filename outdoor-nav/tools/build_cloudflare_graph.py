@@ -12,7 +12,10 @@ sys.path.insert(0, str(ROOT))
 def main():
     from outdoor.router import WalkGraph
     g = WalkGraph()
-    cells = {"%d,%d" % key: value for key, value in g._cells.items()}
+    cells = {"%d,%d" % key: value for key, value in (g._cells or g._grid()).items()}
+    # The real path segments only, as router.py indexed them before wiring
+    # doors: what a start point may snap onto.
+    seg_cells = {"%d,%d" % key: value for key, value in (g._segs or g._seg_grid()).items()}
     edge_cells = {}
     for index, (u, v, *_rest) in enumerate(g.edges):
         a, b = g.nodes[u], g.nodes[v]
@@ -21,11 +24,13 @@ def main():
                 edge_cells.setdefault("%d,%d" % (i, j), []).append(index)
     latitudes, longitudes = zip(*g.nodes.values())
     data_files = sorted((ROOT / "data").glob("*.json"))
-    sources = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+    # Hash with line endings normalised: git checks these files out as CRLF on
+    # Windows (core.autocrlf) and LF on Linux CI, and the data is the same.
+    sources = {path.name: hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
                for path in data_files if path.name != "closures.json"}
     graph = {"attribution": g.attribution, "nodes": g.nodes, "edges": g.edges,
              "buildings": g.buildings, "places": g.places, "targets": g.targets,
-             "out": g.out, "cells": cells, "edgeCells": edge_cells,
+             "out": g.out, "cells": cells, "edgeCells": edge_cells, "segCells": seg_cells,
              "bounds": [min(latitudes), min(longitudes), max(latitudes), max(longitudes)],
              "source_sha256": sources}
     output = ROOT / "cloudflare/graph.json"
