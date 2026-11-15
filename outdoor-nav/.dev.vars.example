@@ -5,3 +5,8 @@
 # Vehicle routing (optional for walking). Keep the real API key private.
 # ORS_API_KEY=paste-your-openrouteservice-key-here
 # Production: npm run secret:routing, then npm run deploy
+
+# AI service for report triage and Ask Doorstep (optional; see AI_SERVICE.md). Unset = reports work without AI suggestions.
+# AI_URL=https://doorstep-ai.<you>.replit.app
+# AI_SECRET=same-long-random-value-as-the-Replit-secret
+# Production: npm run secret:ai-url and npm run secret:ai-secret

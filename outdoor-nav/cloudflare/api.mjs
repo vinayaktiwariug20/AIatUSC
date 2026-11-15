@@ -1,5 +1,8 @@
-import {Unreachable} from './router.mjs';
-import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota} from './mobility.mjs';
+import {Unreachable, haversine} from './router.mjs';
+import {triage, checkPhoto, configured as triageConfigured} from './triage.mjs';
+import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
+const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
+import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures} from './mobility.mjs';
 
 class ApiError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -87,9 +90,11 @@ export async function handleApi(request, env, context) {
   let body = {};
   try {
     if (method === 'POST' || method === 'DELETE') {
-      if (Number(request.headers.get('Content-Length') || 0) > 16384) fail(413, 'Request too large.');
+      // Reports may carry one compressed photo for AI triage; everything else stays small.
+      const limit = method === 'POST' && url.pathname === '/api/closures' ? 450000 : 16384;
+      if (Number(request.headers.get('Content-Length') || 0) > limit) fail(413, 'Request too large.');
       const text = await request.text();
-      if (new TextEncoder().encode(text).length > 16384) fail(413, 'Request too large.');
+      if (new TextEncoder().encode(text).length > limit) fail(413, 'Request too large.');
       try { body = text ? JSON.parse(text) : {}; } catch { fail(400, 'Invalid JSON.'); }
       if (!body || typeof body !== 'object' || Array.isArray(body)) fail(400, 'JSON body must be an object.');
     }
@@ -100,7 +105,7 @@ export async function handleApi(request, env, context) {
       return reply({ok: true, app: 'AIatUSC', runtime: 'cloudflare-javascript',
         database: db ? 'connected' : 'not_configured', storage: db ? 'd1' : 'read_only_preview',
         timezone: 'America/Los_Angeles', walking_routes: true, driving_routes: Boolean(db && env.ORS_API_KEY && mobilityReady), turn_by_turn: false,
-        parking_handoff:true,mobility_migration:mobilityReady?'ready':'required',driving_provider:'openrouteservice',live_traffic:false,unverified_report_display_limit:20,
+        parking_handoff:true,mobility_migration:mobilityReady?'ready':'required',ai_service:triageConfigured(env),questions_migration:!db||await questionsReady(db)?'ready':'required',driving_provider:'openrouteservice',live_traffic:false,unverified_report_display_limit:20,
         public_reports: Boolean(db) && env.PUBLIC_REPORTS_ENABLED === 'true'}, 200, head);
     }
     if (method === 'GET' && path === '/api/buildings') {
@@ -112,7 +117,7 @@ export async function handleApi(request, env, context) {
     }
     if (method === 'GET' && path === '/api/places') return reply(Object.values(data.places).sort((a,b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0).map(p => ({id:p.id,name:p.name,kind:p.kind})), 200, head);
     if (method === 'GET' && ['/api/gates','/api/mobility'].includes(path)) {
-      const when=parseTime(url.searchParams.get('at')),rules=await readRules(db,when),credentials={usc_id:url.searchParams.get('usc_id')==='true',parking_pass:url.searchParams.get('parking_pass')==='true'};
+      const when=parseTime(url.searchParams.get('at')),rules=await readRules(db,when),credentials={usc_id:url.searchParams.get('usc_id')==='true',parking_pass:url.searchParams.get('parking_pass')==='true',permit:url.searchParams.get('permit')||null};
       if(path==='/api/mobility')return reply(mobilityState(context,when,rules,credentials),200,head);
       return reply({source:gateData.source||'',scope:'vehicle hours; pedestrian access is not stated by the source',timezone:'America/Los_Angeles',gates:gateState(context,when,rules,credentials)},200,head);
     }
@@ -153,6 +158,8 @@ export async function handleApi(request, env, context) {
       }
       if (!place && !router.containsStart(lat,lon)) return reply({ok:false,reason:'Start is outside the campus walking map. Choose a campus gate or parking exit.',blocked_by:[]});
       const rows = forMode(await active(db,when),'walking');
+      // Staff rules closed on foot (areas, surveyed gates) apply to walking too.
+      rows.push(...walkingRuleClosures(context, await readRules(db, when), when));
       if(from.exit!==undefined&&(typeof from.exit!=='string'||!place))fail(400,'A parking place is required for a surveyed exit.');
       try {
         const out = router.route({lat,lon,place,exit:from.exit??null,building:body.to,stepFree:Boolean(body.step_free),
@@ -184,6 +191,16 @@ export async function handleApi(request, env, context) {
       const c = {id: crypto.randomUUID().replaceAll('-','').slice(0,16),kind:String(body.kind || 'blockage').slice(0,50),modes:[...new Set(modes)],
         lat,lon,radius_m:radius,note:String(body.note || '').slice(0,280),source:official?'official':'public',status:official?'approved':'unverified',
         starts:campusISO(starts),ends:campusISO(ends),created:campusISO(now)};
+      const photo = checkPhoto(body.photo);
+      if (photo && photo.error) fail(400, photo.error);
+      if (!official && (photo || c.note)) {
+        // Up to 10 open reports within 60 m, so the model can spot a duplicate.
+        const nearby = (await active(db, now)).filter(o => o.status === 'unverified' && haversine([lat, lon], [o.lat, o.lon]) <= 60)
+          .slice(0, 10).map(o => ({id: o.id, note: o.note || '', category: o.ai?.category ?? null,
+            distance_m: Math.round(haversine([lat, lon], [o.lat, o.lon]))}));
+        const ai = await triage(env, {note: c.note, photo: photo ? photo.photo : null, lat, lon, reported_at: c.created, nearby});
+        if (ai) c.ai = ai;           // a suggestion only; status stays 'unverified'
+      }
       await db.prepare('INSERT INTO closures(id,status,starts_ms,ends_ms,created_ms,payload) VALUES(?,?,?,?,?,?)')
         .bind(c.id,c.status,starts,ends,now,JSON.stringify(c)).run();
       return reply(c,201);
@@ -197,10 +214,70 @@ export async function handleApi(request, env, context) {
         const deleted = await db.prepare('DELETE FROM closures WHERE id=? RETURNING id').bind(id).first('id');
         return deleted ? reply({deleted:id}) : reply({error:'not found'},404);
       }
+      if (method === 'POST' && action === 'approve' && body.apply_ai === true) {
+        const row = await db.prepare('SELECT starts_ms,created_ms,payload FROM closures WHERE id=?').bind(id).first();
+        if (!row) return reply({error:'not found'},404);
+        const ai = JSON.parse(row.payload).ai;
+        if (!ai || ai.status !== 'ok') fail(409, 'This report has no AI suggestion to apply.');
+        const ends = Math.max(row.starts_ms + 1800000, row.created_ms + Math.round((ai.suggested_hours ?? 4) * 3600000));
+        const out = await db.prepare("UPDATE closures SET status='approved',ends_ms=?,payload=json_set(payload,'$.status','approved','$.radius_m',?,'$.ends',?,'$.ai.applied',json('true')) WHERE id=? RETURNING payload")
+          .bind(ends, ai.suggested_radius_m, campusISO(ends), id).first('payload');
+        return reply(JSON.parse(out));
+      }
       if (method === 'POST' && action) {
         const status = action === 'approve' ? 'approved' : 'rejected';
         const row = await db.prepare("UPDATE closures SET status=?,payload=json_set(payload,'$.status',?) WHERE id=? RETURNING payload").bind(status,status,id).first('payload');
         return row ? reply(JSON.parse(row)) : reply({error:'not found'},404);
+      }
+    }
+    // ---- Ask Doorstep ------------------------------------------------------
+    if (method === 'POST' && path === '/api/ask') {
+      const question = String(body.question ?? '').trim().replace(/\s+/g, ' ');
+      if (!question || question.length > QUESTION_MAX) fail(400, 'Ask a question of up to ' + QUESTION_MAX + ' characters.');
+      const now = Date.now();
+      if (db && !(await questionsReady(db))) fail(503, 'Questions are paused: the database needs an update (migration 0003). Staff: run npm run db:remote.');
+      if (db && !(await reserveAskQuota(db, now))) fail(429, 'Lots of questions right now. Please try again in a minute.');
+      const [closures, answers, rules] = db ? await Promise.all([active(db, now), recentAnswers(db), readRules(db, now)]) : [[], [], []];
+      const facts = collectFacts(context, now, {closures, answers, rules});
+      const raw = await askModel(env, question, facts, campusISO(now));
+      const out = cleanAnswer(raw, facts.map(f => f.id));
+      const b = out.destination ? router.findBuilding(out.destination) : null, destination = b ? {id: b.id, name: b.name} : null;
+      if (out.answered) return reply({ok: true, answered: true, answer: out.answer, destination,
+        sources: out.citations.map(id => { const f = facts.find(x => x.id === id); return {id, source: f.source, text: f.text}; })});
+      if (!db) return reply({ok: true, answered: false, message: "I couldn't answer that from verified information, and the organizer inbox isn't connected."});
+      const q = await storeQuestion(db, question, now, campusISO, {ai_available: Boolean(raw)});
+      return reply({ok: true, answered: false, question_id: q.id, destination,
+        message: raw ? "I don't have verified information on that, so I've sent your question to the organizers. Their answer will appear here."
+                     : "The assistant is unavailable right now, so I've sent your question to the organizers. Their answer will appear here."}, 201);
+    }
+    const qMatch = /^\/api\/questions\/([0-9a-f]{16})(?:\/(answer|dismiss))?$/.exec(path);
+    if (method === 'GET' && qMatch && !qMatch[2]) {
+      if (!db) fail(503, 'D1 is not connected.');
+      const q = await getQuestion(db, qMatch[1]);
+      if (!q || q.status === 'dismissed') return reply({error: 'not found'}, 404, head);
+      return reply({id: q.id, status: q.status, question: q.question, answer: q.answer ?? null, answered: q.answered ?? null}, 200, head);
+    }
+    if (path === '/api/questions' || (qMatch && qMatch[2])) {
+      if (!isAdmin(request.headers, env)) fail(403, 'admin token required');
+      if (!db) fail(503, 'D1 is not connected.');
+      if (!(await questionsReady(db))) fail(503, 'The database needs an update (migration 0003). Run npm run db:remote.');
+      const now = Date.now(), text = v => String(v ?? '').trim();
+      if (method === 'GET' && path === '/api/questions') return reply(await staffList(db), 200, head);
+      if (method === 'POST' && path === '/api/questions') {          // organizer FAQ, answered up front
+        const question = text(body.question), answer = text(body.answer);
+        if (!question || question.length > QUESTION_MAX || !answer || answer.length > ANSWER_MAX) fail(400, 'Give a question and an answer.');
+        const q = await storeQuestion(db, question, now, campusISO, {status: 'answered', answer, answered: campusISO(now), faq: true});
+        return reply(q, 201);
+      }
+      if (method === 'POST' && qMatch[2] === 'answer') {
+        const answer = text(body.answer);
+        if (!answer || answer.length > ANSWER_MAX) fail(400, 'Answer must be 1-' + ANSWER_MAX + ' characters.');
+        const q = await setAnswer(db, qMatch[1], answer, now, campusISO);
+        return q ? reply(q) : reply({error: 'not found'}, 404);
+      }
+      if (method === 'POST' && qMatch[2] === 'dismiss') {
+        const q = await dismiss(db, qMatch[1]);
+        return q ? reply(q) : reply({error: 'not found'}, 404);
       }
     }
     return reply({error:'not found'},404,head);

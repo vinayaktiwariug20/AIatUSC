@@ -1,0 +1,1345 @@
+{
+ "name": "3518 Trousdale Pkwy",
+ "storey_height": 3.7,
+ "frame": "x: left wing to right wing, y: up, z: courtyard to front (true north). Metres.",
+ "floors": [
+  {
+   "id": 1,
+   "y": 0.0,
+   "name": "Floor 1"
+  },
+  {
+   "id": 2,
+   "y": 3.7,
+   "name": "Floor 2"
+  }
+ ],
+ "plates": [
+  {
+   "floor": 1,
+   "name": "left wing",
+   "x0": -3.65,
+   "z0": -20.75,
+   "x1": -1.05,
+   "z1": 14.95,
+   "surface": "hall"
+  },
+  {
+   "floor": 1,
+   "name": "left leg",
+   "x0": -1.05,
+   "z0": 11.05,
+   "x1": 5.45,
+   "z1": 13.65,
+   "surface": "hall"
+  },
+  {
+   "floor": 1,
+   "name": "entrance breezeway",
+   "x0": 5.45,
+   "z0": 6.4,
+   "x1": 9.75,
+   "z1": 18.6,
+   "surface": "paving"
+  },
+  {
+   "floor": 1,
+   "name": "stair room",
+   "x0": 9.75,
+   "z0": 10.9,
+   "x1": 14.85,
+   "z1": 15.0,
+   "surface": "hall"
+  },
+  {
+   "floor": 1,
+   "name": "middle stairwell",
+   "x0": 9.75,
+   "z0": 5.15,
+   "x1": 12.45,
+   "z1": 10.9,
+   "surface": "hall"
+  },
+  {
+   "floor": 1,
+   "name": "right breezeway",
+   "x0": 48.65,
+   "z0": 6.4,
+   "x1": 53.0,
+   "z1": 18.6,
+   "surface": "paving"
+  },
+  {
+   "floor": 1,
+   "name": "right leg",
+   "x0": 53.0,
+   "z0": 11.05,
+   "x1": 59.35,
+   "z1": 13.65,
+   "surface": "hall"
+  },
+  {
+   "floor": 1,
+   "name": "right wing",
+   "x0": 59.35,
+   "z0": -22.8,
+   "x1": 61.95,
+   "z1": 14.95,
+   "surface": "hall"
+  },
+  {
+   "floor": 1,
+   "name": "left wing stair hall",
+   "x0": -3.65,
+   "z0": -27.25,
+   "x1": 5.3,
+   "z1": -20.75,
+   "surface": "stairhall"
+  },
+  {
+   "floor": 1,
+   "name": "right wing stair hall",
+   "x0": 53.0,
+   "z0": -28.75,
+   "x1": 61.95,
+   "z1": -22.8,
+   "surface": "stairhall"
+  },
+  {
+   "floor": 2,
+   "name": "left wing",
+   "x0": -3.65,
+   "z0": -20.75,
+   "x1": -1.05,
+   "z1": 13.65,
+   "surface": "hall"
+  },
+  {
+   "floor": 2,
+   "name": "left leg",
+   "x0": -1.05,
+   "z0": 11.05,
+   "x1": 5.55,
+   "z1": 13.65,
+   "surface": "hall"
+  },
+  {
+   "floor": 2,
+   "name": "left bridge",
+   "x0": 5.55,
+   "z0": 10.3,
+   "x1": 9.75,
+   "z1": 14.3,
+   "surface": "tile"
+  },
+  {
+   "floor": 2,
+   "name": "middle left end",
+   "x0": 9.75,
+   "z0": 11.0,
+   "x1": 17.1,
+   "z1": 14.9,
+   "surface": "hall"
+  },
+  {
+   "floor": 2,
+   "name": "middle",
+   "x0": 17.1,
+   "z0": 12.25,
+   "x1": 46.7,
+   "z1": 14.9,
+   "surface": "hall"
+  },
+  {
+   "floor": 2,
+   "name": "middle right end",
+   "x0": 46.7,
+   "z0": 11.0,
+   "x1": 48.7,
+   "z1": 14.9,
+   "surface": "hall"
+  },
+  {
+   "floor": 2,
+   "name": "right bridge",
+   "x0": 48.7,
+   "z0": 10.3,
+   "x1": 52.9,
+   "z1": 14.3,
+   "surface": "tile"
+  },
+  {
+   "floor": 2,
+   "name": "right leg",
+   "x0": 52.9,
+   "z0": 11.05,
+   "x1": 59.35,
+   "z1": 13.65,
+   "surface": "hall"
+  },
+  {
+   "floor": 2,
+   "name": "right wing",
+   "x0": 59.35,
+   "z0": -22.8,
+   "x1": 61.95,
+   "z1": 14.95,
+   "surface": "hall"
+  },
+  {
+   "floor": 2,
+   "name": "left wing stair landing",
+   "x0": -3.1,
+   "z0": -24.0,
+   "x1": 3.7,
+   "z1": -20.75,
+   "surface": "stairhall"
+  },
+  {
+   "floor": 2,
+   "name": "left wing stair landing b",
+   "x0": 0.9,
+   "z0": -27.0,
+   "x1": 3.7,
+   "z1": -24.0,
+   "surface": "stairhall"
+  },
+  {
+   "floor": 2,
+   "name": "right wing stair landing",
+   "x0": 54.6,
+   "z0": -25.85,
+   "x1": 61.6,
+   "z1": -22.8,
+   "surface": "stairhall"
+  },
+  {
+   "floor": 2,
+   "name": "right wing stair landing b",
+   "x0": 54.6,
+   "z0": -28.85,
+   "x1": 57.6,
+   "z1": -25.85,
+   "surface": "stairhall"
+  }
+ ],
+ "walkable_extra": [
+  {
+   "floor": 2,
+   "name": "middle stair landing",
+   "x0": 9.9,
+   "z0": 9.9,
+   "x1": 12.3,
+   "z1": 11.0
+  }
+ ],
+ "solids": [
+  {
+   "name": "Blocked middle (floor 1)",
+   "kind": "blocked",
+   "floor": 1,
+   "x0": 14.85,
+   "z0": 10.9,
+   "x1": 48.65,
+   "z1": 15.0,
+   "y0": -0.16,
+   "y1": 3.3
+  },
+  {
+   "name": "Blocked middle (floor 1)",
+   "kind": "blocked",
+   "floor": 1,
+   "x0": 12.45,
+   "z0": 5.45,
+   "x1": 45.95,
+   "z1": 10.9,
+   "y0": -0.16,
+   "y1": 3.3
+  },
+  {
+   "name": "Right middle stair (not scanned)",
+   "kind": "unscanned",
+   "floor": 1,
+   "x0": 45.95,
+   "z0": 5.45,
+   "x1": 48.65,
+   "z1": 10.9,
+   "y0": -0.16,
+   "y1": 3.3
+  },
+  {
+   "name": "Right middle stair (not scanned)",
+   "kind": "unscanned",
+   "floor": 2,
+   "x0": 45.95,
+   "z0": 5.45,
+   "x1": 48.65,
+   "z1": 10.9,
+   "y0": 3.32,
+   "y1": 6.4
+  },
+  {
+   "name": "Elevator (not scanned)",
+   "kind": "unscanned",
+   "floor": 2,
+   "x0": 15.4,
+   "z0": 8.7,
+   "x1": 17.1,
+   "z1": 10.9,
+   "y0": 3.33,
+   "y1": 6.4
+  }
+ ],
+ "outline": [
+  {
+   "name": "left wing",
+   "x0": -8.7,
+   "z0": -27.6,
+   "x1": 5.45,
+   "z1": 19.3
+  },
+  {
+   "name": "right wing",
+   "x0": 52.95,
+   "z0": -29.0,
+   "x1": 69.45,
+   "z1": 18.7
+  },
+  {
+   "name": "middle section",
+   "x0": 9.75,
+   "z0": 5.3,
+   "x1": 48.65,
+   "z1": 15.05
+  }
+ ],
+ "labels": [
+  {
+   "text": "Entrance",
+   "x": 7.6,
+   "y": 0.3,
+   "z": 19.6,
+   "floors": [
+    1,
+    2
+   ]
+  },
+  {
+   "text": "Left wing",
+   "x": -2.35,
+   "y": 0,
+   "z": -4.0,
+   "floors": [
+    1,
+    2
+   ]
+  },
+  {
+   "text": "Right wing",
+   "x": 60.65,
+   "y": 0,
+   "z": -4.0,
+   "floors": [
+    1,
+    2
+   ]
+  },
+  {
+   "text": "Middle stair",
+   "x": 11.1,
+   "y": 0,
+   "z": 7.6,
+   "floors": [
+    1,
+    2
+   ]
+  },
+  {
+   "text": "Left wing stair",
+   "x": 0.8,
+   "y": 0,
+   "z": -24.5,
+   "floors": [
+    1,
+    2
+   ]
+  },
+  {
+   "text": "Right wing stair",
+   "x": 57.5,
+   "y": 0,
+   "z": -26.0,
+   "floors": [
+    1,
+    2
+   ]
+  },
+  {
+   "text": "Blocked on floor 1",
+   "x": 30.0,
+   "y": 3.3,
+   "z": 8.2,
+   "floors": [
+    1
+   ]
+  },
+  {
+   "text": "Elevator",
+   "x": 16.25,
+   "y": 6.4,
+   "z": 9.8,
+   "floors": [
+    2
+   ]
+  },
+  {
+   "text": "Bridge",
+   "x": 7.65,
+   "y": 3.7,
+   "z": 12.35,
+   "floors": [
+    2
+   ],
+   "detail": true
+  },
+  {
+   "text": "Bridge",
+   "x": 50.8,
+   "y": 3.7,
+   "z": 12.35,
+   "floors": [
+    2
+   ],
+   "detail": true
+  },
+  {
+   "text": "Middle hallway",
+   "x": 31.0,
+   "y": 3.7,
+   "z": 13.6,
+   "floors": [
+    2
+   ]
+  }
+ ],
+ "nav": {
+  "nodes": {
+   "l1_stairdoor": {
+    "x": -2.35,
+    "y": 0.0,
+    "z": -20.75,
+    "floor": 1,
+    "area": "the left wing hallway"
+   },
+   "l1_corner": {
+    "x": -2.35,
+    "y": 0.0,
+    "z": 12.35,
+    "floor": 1,
+    "area": "the left wing hallway"
+   },
+   "l1_legdoor": {
+    "x": 5.45,
+    "y": 0.0,
+    "z": 12.35,
+    "floor": 1,
+    "area": "the left wing hallway"
+   },
+   "ent_mid": {
+    "x": 7.6,
+    "y": 0.0,
+    "z": 12.4,
+    "floor": 1,
+    "area": "the entrance breezeway"
+   },
+   "ent_front": {
+    "x": 7.6,
+    "y": 0.0,
+    "z": 17.4,
+    "floor": 1,
+    "area": "the entrance breezeway"
+   },
+   "ent_court": {
+    "x": 7.6,
+    "y": 0.0,
+    "z": 8.6,
+    "floor": 1,
+    "area": "the entrance breezeway"
+   },
+   "ms1_door": {
+    "x": 9.75,
+    "y": 0.0,
+    "z": 12.5,
+    "floor": 1,
+    "area": "the middle stair lobby"
+   },
+   "ms1_room": {
+    "x": 10.6,
+    "y": 0.0,
+    "z": 12.5,
+    "floor": 1,
+    "area": "the middle stair lobby"
+   },
+   "ms1_foot": {
+    "x": 10.5,
+    "y": 0.0,
+    "z": 10.9,
+    "floor": 1,
+    "area": "the middle stair lobby"
+   },
+   "rb_mid": {
+    "x": 50.8,
+    "y": 0.0,
+    "z": 12.4,
+    "floor": 1,
+    "area": "the right breezeway"
+   },
+   "rb_front": {
+    "x": 50.8,
+    "y": 0.0,
+    "z": 17.2,
+    "floor": 1,
+    "area": "the right breezeway"
+   },
+   "rb_court": {
+    "x": 50.8,
+    "y": 0.0,
+    "z": 8.6,
+    "floor": 1,
+    "area": "the right breezeway"
+   },
+   "r1_legdoor": {
+    "x": 52.95,
+    "y": 0.0,
+    "z": 12.35,
+    "floor": 1,
+    "area": "the right wing hallway"
+   },
+   "r1_corner": {
+    "x": 60.65,
+    "y": 0.0,
+    "z": 12.35,
+    "floor": 1,
+    "area": "the right wing hallway"
+   },
+   "r1_stairdoor": {
+    "x": 60.65,
+    "y": 0.0,
+    "z": -22.8,
+    "floor": 1,
+    "area": "the right wing hallway"
+   },
+   "ls1_a": {
+    "x": -2.35,
+    "y": 0.0,
+    "z": -23.1,
+    "floor": 1,
+    "area": "the left wing stair hall"
+   },
+   "ls1_b": {
+    "x": 2.4,
+    "y": 0.0,
+    "z": -23.3,
+    "floor": 1,
+    "area": "the left wing stair hall"
+   },
+   "ls1_c": {
+    "x": 2.4,
+    "y": 0.0,
+    "z": -26.05,
+    "floor": 1,
+    "area": "the left wing stair hall"
+   },
+   "rs1_a": {
+    "x": 60.65,
+    "y": 0.0,
+    "z": -25.0,
+    "floor": 1,
+    "area": "the right wing stair hall"
+   },
+   "rs1_b": {
+    "x": 56.5,
+    "y": 0.0,
+    "z": -25.0,
+    "floor": 1,
+    "area": "the right wing stair hall"
+   },
+   "rs1_c": {
+    "x": 56.5,
+    "y": 0.0,
+    "z": -27.95,
+    "floor": 1,
+    "area": "the right wing stair hall"
+   },
+   "ms_s0": {
+    "x": 10.5,
+    "y": 0,
+    "z": 9.7,
+    "floor": 1,
+    "area": "the middle stair"
+   },
+   "ms_s1": {
+    "x": 10.55,
+    "y": 1.8,
+    "z": 7.2,
+    "floor": 1,
+    "area": "the middle stair"
+   },
+   "ms_s2": {
+    "x": 10.55,
+    "y": 1.89,
+    "z": 6.5,
+    "floor": 2,
+    "area": "the middle stair"
+   },
+   "ms_s3": {
+    "x": 11.75,
+    "y": 1.89,
+    "z": 6.5,
+    "floor": 2,
+    "area": "the middle stair"
+   },
+   "ms_s4": {
+    "x": 11.75,
+    "y": 1.98,
+    "z": 7.2,
+    "floor": 2,
+    "area": "the middle stair"
+   },
+   "ms_s5": {
+    "x": 11.78,
+    "y": 3.7,
+    "z": 9.75,
+    "floor": 2,
+    "area": "the middle stair"
+   },
+   "ls_s0": {
+    "x": 1.05,
+    "y": 0,
+    "z": -26.05,
+    "floor": 1,
+    "area": "the left wing stair"
+   },
+   "ls_s1": {
+    "x": -1.5,
+    "y": 1.8,
+    "z": -26.0,
+    "floor": 1,
+    "area": "the left wing stair"
+   },
+   "ls_s2": {
+    "x": -2.4,
+    "y": 1.89,
+    "z": -26.0,
+    "floor": 2,
+    "area": "the left wing stair"
+   },
+   "ls_s3": {
+    "x": -2.4,
+    "y": 1.89,
+    "z": -24.5,
+    "floor": 2,
+    "area": "the left wing stair"
+   },
+   "ls_s4": {
+    "x": -1.5,
+    "y": 1.98,
+    "z": -24.5,
+    "floor": 2,
+    "area": "the left wing stair"
+   },
+   "ls_s5": {
+    "x": 0.9,
+    "y": 3.7,
+    "z": -24.45,
+    "floor": 2,
+    "area": "the left wing stair"
+   },
+   "rs_s0": {
+    "x": 57.7,
+    "y": 0,
+    "z": -27.95,
+    "floor": 1,
+    "area": "the right wing stair"
+   },
+   "rs_s1": {
+    "x": 60.0,
+    "y": 1.8,
+    "z": -27.95,
+    "floor": 1,
+    "area": "the right wing stair"
+   },
+   "rs_s2": {
+    "x": 61.0,
+    "y": 1.89,
+    "z": -27.95,
+    "floor": 2,
+    "area": "the right wing stair"
+   },
+   "rs_s3": {
+    "x": 61.0,
+    "y": 1.89,
+    "z": -26.5,
+    "floor": 2,
+    "area": "the right wing stair"
+   },
+   "rs_s4": {
+    "x": 60.1,
+    "y": 1.98,
+    "z": -26.5,
+    "floor": 2,
+    "area": "the right wing stair"
+   },
+   "rs_s5": {
+    "x": 57.55,
+    "y": 3.7,
+    "z": -26.55,
+    "floor": 2,
+    "area": "the right wing stair"
+   },
+   "l2_stairdoor": {
+    "x": -2.35,
+    "y": 3.7,
+    "z": -20.75,
+    "floor": 2,
+    "area": "the left wing hallway"
+   },
+   "l2_corner": {
+    "x": -2.35,
+    "y": 3.7,
+    "z": 12.35,
+    "floor": 2,
+    "area": "the left wing hallway"
+   },
+   "l2_bridge_a": {
+    "x": 5.55,
+    "y": 3.7,
+    "z": 12.35,
+    "floor": 2,
+    "area": "the left bridge"
+   },
+   "l2_bridge_mid": {
+    "x": 7.65,
+    "y": 3.7,
+    "z": 12.35,
+    "floor": 2,
+    "area": "the left bridge"
+   },
+   "l2_bridge_b": {
+    "x": 9.75,
+    "y": 3.7,
+    "z": 12.35,
+    "floor": 2,
+    "area": "the left bridge"
+   },
+   "m2_a": {
+    "x": 11.85,
+    "y": 3.7,
+    "z": 12.9,
+    "floor": 2,
+    "area": "the middle hallway"
+   },
+   "ms2_land": {
+    "x": 11.78,
+    "y": 3.7,
+    "z": 11.3,
+    "floor": 2,
+    "area": "the middle stair landing"
+   },
+   "m2_elev": {
+    "x": 16.25,
+    "y": 3.7,
+    "z": 13.2,
+    "floor": 2,
+    "area": "the middle hallway"
+   },
+   "elev2": {
+    "x": 16.25,
+    "y": 3.7,
+    "z": 11.45,
+    "floor": 2,
+    "area": "the elevator"
+   },
+   "m2_b": {
+    "x": 17.8,
+    "y": 3.7,
+    "z": 13.6,
+    "floor": 2,
+    "area": "the middle hallway"
+   },
+   "m2_c": {
+    "x": 46.4,
+    "y": 3.7,
+    "z": 13.6,
+    "floor": 2,
+    "area": "the middle hallway"
+   },
+   "m2_d": {
+    "x": 48.7,
+    "y": 3.7,
+    "z": 12.6,
+    "floor": 2,
+    "area": "the middle hallway"
+   },
+   "r2_bridge_mid": {
+    "x": 50.8,
+    "y": 3.7,
+    "z": 12.35,
+    "floor": 2,
+    "area": "the right bridge"
+   },
+   "r2_bridge_b": {
+    "x": 52.9,
+    "y": 3.7,
+    "z": 12.35,
+    "floor": 2,
+    "area": "the right bridge"
+   },
+   "r2_corner": {
+    "x": 60.65,
+    "y": 3.7,
+    "z": 12.35,
+    "floor": 2,
+    "area": "the right wing hallway"
+   },
+   "r2_stairdoor": {
+    "x": 60.65,
+    "y": 3.7,
+    "z": -22.8,
+    "floor": 2,
+    "area": "the right wing hallway"
+   },
+   "ls2_a": {
+    "x": 2.0,
+    "y": 3.7,
+    "z": -24.45,
+    "floor": 2,
+    "area": "the left wing stair hall"
+   },
+   "ls2_b": {
+    "x": 2.0,
+    "y": 3.7,
+    "z": -22.6,
+    "floor": 2,
+    "area": "the left wing stair hall"
+   },
+   "ls2_c": {
+    "x": -2.35,
+    "y": 3.7,
+    "z": -22.6,
+    "floor": 2,
+    "area": "the left wing stair hall"
+   },
+   "rs2_a": {
+    "x": 56.3,
+    "y": 3.7,
+    "z": -26.55,
+    "floor": 2,
+    "area": "the right wing stair hall"
+   },
+   "rs2_b": {
+    "x": 56.3,
+    "y": 3.7,
+    "z": -24.7,
+    "floor": 2,
+    "area": "the right wing stair hall"
+   },
+   "rs2_c": {
+    "x": 60.65,
+    "y": 3.7,
+    "z": -24.7,
+    "floor": 2,
+    "area": "the right wing stair hall"
+   }
+  },
+  "edges": [
+   {
+    "a": "l1_stairdoor",
+    "b": "l1_corner",
+    "kind": "hall",
+    "len": 33.1
+   },
+   {
+    "a": "l1_corner",
+    "b": "l1_legdoor",
+    "kind": "hall",
+    "len": 7.8
+   },
+   {
+    "a": "l1_legdoor",
+    "b": "ent_mid",
+    "kind": "door",
+    "len": 2.15
+   },
+   {
+    "a": "ent_mid",
+    "b": "ms1_door",
+    "kind": "door",
+    "len": 2.15
+   },
+   {
+    "a": "ent_front",
+    "b": "ent_mid",
+    "kind": "outdoor",
+    "len": 5.0
+   },
+   {
+    "a": "ent_mid",
+    "b": "ent_court",
+    "kind": "outdoor",
+    "len": 3.8
+   },
+   {
+    "a": "ms1_door",
+    "b": "ms1_room",
+    "kind": "hall",
+    "len": 0.85
+   },
+   {
+    "a": "ms1_room",
+    "b": "ms1_foot",
+    "kind": "hall",
+    "len": 1.6
+   },
+   {
+    "a": "rb_front",
+    "b": "rb_mid",
+    "kind": "outdoor",
+    "len": 4.8
+   },
+   {
+    "a": "rb_mid",
+    "b": "rb_court",
+    "kind": "outdoor",
+    "len": 3.8
+   },
+   {
+    "a": "rb_mid",
+    "b": "r1_legdoor",
+    "kind": "door",
+    "len": 2.15
+   },
+   {
+    "a": "r1_legdoor",
+    "b": "r1_corner",
+    "kind": "hall",
+    "len": 7.7
+   },
+   {
+    "a": "r1_corner",
+    "b": "r1_stairdoor",
+    "kind": "hall",
+    "len": 35.15
+   },
+   {
+    "a": "l1_stairdoor",
+    "b": "ls1_a",
+    "kind": "hall",
+    "len": 2.35
+   },
+   {
+    "a": "ls1_a",
+    "b": "ls1_b",
+    "kind": "hall",
+    "len": 4.75
+   },
+   {
+    "a": "ls1_b",
+    "b": "ls1_c",
+    "kind": "hall",
+    "len": 2.75
+   },
+   {
+    "a": "r1_stairdoor",
+    "b": "rs1_a",
+    "kind": "hall",
+    "len": 2.2
+   },
+   {
+    "a": "rs1_a",
+    "b": "rs1_b",
+    "kind": "hall",
+    "len": 4.15
+   },
+   {
+    "a": "rs1_b",
+    "b": "rs1_c",
+    "kind": "hall",
+    "len": 2.95
+   },
+   {
+    "a": "ms_s0",
+    "b": "ms_s1",
+    "kind": "stairs",
+    "len": 3.08
+   },
+   {
+    "a": "ms_s1",
+    "b": "ms_s2",
+    "kind": "stairs",
+    "len": 0.71
+   },
+   {
+    "a": "ms_s2",
+    "b": "ms_s3",
+    "kind": "stairs",
+    "len": 1.2
+   },
+   {
+    "a": "ms_s3",
+    "b": "ms_s4",
+    "kind": "stairs",
+    "len": 0.71
+   },
+   {
+    "a": "ms_s4",
+    "b": "ms_s5",
+    "kind": "stairs",
+    "len": 3.08
+   },
+   {
+    "a": "ls_s0",
+    "b": "ls_s1",
+    "kind": "stairs",
+    "len": 3.12
+   },
+   {
+    "a": "ls_s1",
+    "b": "ls_s2",
+    "kind": "stairs",
+    "len": 0.9
+   },
+   {
+    "a": "ls_s2",
+    "b": "ls_s3",
+    "kind": "stairs",
+    "len": 1.5
+   },
+   {
+    "a": "ls_s3",
+    "b": "ls_s4",
+    "kind": "stairs",
+    "len": 0.9
+   },
+   {
+    "a": "ls_s4",
+    "b": "ls_s5",
+    "kind": "stairs",
+    "len": 2.95
+   },
+   {
+    "a": "rs_s0",
+    "b": "rs_s1",
+    "kind": "stairs",
+    "len": 2.92
+   },
+   {
+    "a": "rs_s1",
+    "b": "rs_s2",
+    "kind": "stairs",
+    "len": 1.0
+   },
+   {
+    "a": "rs_s2",
+    "b": "rs_s3",
+    "kind": "stairs",
+    "len": 1.45
+   },
+   {
+    "a": "rs_s3",
+    "b": "rs_s4",
+    "kind": "stairs",
+    "len": 0.9
+   },
+   {
+    "a": "rs_s4",
+    "b": "rs_s5",
+    "kind": "stairs",
+    "len": 3.08
+   },
+   {
+    "a": "ms1_foot",
+    "b": "ms_s0",
+    "kind": "hall",
+    "len": 1.2
+   },
+   {
+    "a": "ls1_c",
+    "b": "ls_s0",
+    "kind": "hall",
+    "len": 1.35
+   },
+   {
+    "a": "rs1_c",
+    "b": "rs_s0",
+    "kind": "hall",
+    "len": 1.2
+   },
+   {
+    "a": "l2_stairdoor",
+    "b": "l2_corner",
+    "kind": "hall",
+    "len": 33.1
+   },
+   {
+    "a": "l2_corner",
+    "b": "l2_bridge_a",
+    "kind": "hall",
+    "len": 7.9
+   },
+   {
+    "a": "l2_bridge_a",
+    "b": "l2_bridge_mid",
+    "kind": "hall",
+    "len": 2.1
+   },
+   {
+    "a": "l2_bridge_mid",
+    "b": "l2_bridge_b",
+    "kind": "hall",
+    "len": 2.1
+   },
+   {
+    "a": "l2_bridge_b",
+    "b": "m2_a",
+    "kind": "hall",
+    "len": 2.17
+   },
+   {
+    "a": "m2_a",
+    "b": "m2_elev",
+    "kind": "hall",
+    "len": 4.41
+   },
+   {
+    "a": "m2_elev",
+    "b": "m2_b",
+    "kind": "hall",
+    "len": 1.6
+   },
+   {
+    "a": "m2_b",
+    "b": "m2_c",
+    "kind": "hall",
+    "len": 28.6
+   },
+   {
+    "a": "m2_c",
+    "b": "m2_d",
+    "kind": "hall",
+    "len": 2.51
+   },
+   {
+    "a": "m2_d",
+    "b": "r2_bridge_mid",
+    "kind": "hall",
+    "len": 2.11
+   },
+   {
+    "a": "r2_bridge_mid",
+    "b": "r2_bridge_b",
+    "kind": "hall",
+    "len": 2.1
+   },
+   {
+    "a": "r2_bridge_b",
+    "b": "r2_corner",
+    "kind": "hall",
+    "len": 7.75
+   },
+   {
+    "a": "r2_corner",
+    "b": "r2_stairdoor",
+    "kind": "hall",
+    "len": 35.15
+   },
+   {
+    "a": "ms_s5",
+    "b": "ms2_land",
+    "kind": "hall",
+    "len": 1.55
+   },
+   {
+    "a": "ms2_land",
+    "b": "m2_a",
+    "kind": "hall",
+    "len": 1.6
+   },
+   {
+    "a": "m2_elev",
+    "b": "elev2",
+    "kind": "hall",
+    "len": 1.75
+   },
+   {
+    "a": "ls_s5",
+    "b": "ls2_a",
+    "kind": "hall",
+    "len": 1.1
+   },
+   {
+    "a": "ls2_a",
+    "b": "ls2_b",
+    "kind": "hall",
+    "len": 1.85
+   },
+   {
+    "a": "ls2_b",
+    "b": "ls2_c",
+    "kind": "hall",
+    "len": 4.35
+   },
+   {
+    "a": "ls2_c",
+    "b": "l2_stairdoor",
+    "kind": "hall",
+    "len": 1.85
+   },
+   {
+    "a": "rs_s5",
+    "b": "rs2_a",
+    "kind": "hall",
+    "len": 1.25
+   },
+   {
+    "a": "rs2_a",
+    "b": "rs2_b",
+    "kind": "hall",
+    "len": 1.85
+   },
+   {
+    "a": "rs2_b",
+    "b": "rs2_c",
+    "kind": "hall",
+    "len": 4.35
+   },
+   {
+    "a": "rs2_c",
+    "b": "r2_stairdoor",
+    "kind": "hall",
+    "len": 1.9
+   }
+  ],
+  "stairs": [
+   {
+    "id": "middle",
+    "name": "the middle stair",
+    "nodes": [
+     "ms_s0",
+     "ms_s1",
+     "ms_s2",
+     "ms_s3",
+     "ms_s4",
+     "ms_s5"
+    ]
+   },
+   {
+    "id": "left",
+    "name": "the left wing stair",
+    "nodes": [
+     "ls_s0",
+     "ls_s1",
+     "ls_s2",
+     "ls_s3",
+     "ls_s4",
+     "ls_s5"
+    ]
+   },
+   {
+    "id": "right",
+    "name": "the right wing stair",
+    "nodes": [
+     "rs_s0",
+     "rs_s1",
+     "rs_s2",
+     "rs_s3",
+     "rs_s4",
+     "rs_s5"
+    ]
+   }
+  ],
+  "walk_speed": 1.3,
+  "stair_speed": 0.55
+ },
+ "places": [
+  {
+   "id": "entrance",
+   "node": "ent_front",
+   "name": "Entrance (front of the left breezeway)",
+   "kind": "entrance"
+  },
+  {
+   "id": "entrance-courtyard",
+   "node": "ent_court",
+   "name": "Entrance breezeway, courtyard side",
+   "kind": "entrance"
+  },
+  {
+   "id": "breezeway-right",
+   "node": "rb_front",
+   "name": "Right breezeway, front",
+   "kind": "entrance"
+  },
+  {
+   "id": "breezeway-right-courtyard",
+   "node": "rb_court",
+   "name": "Right breezeway, courtyard side",
+   "kind": "entrance"
+  },
+  {
+   "id": "middle-stair-1",
+   "node": "ms1_room",
+   "name": "Middle stair, floor 1",
+   "kind": "stairs"
+  },
+  {
+   "id": "middle-stair-2",
+   "node": "ms2_land",
+   "name": "Middle stair, floor 2",
+   "kind": "stairs"
+  },
+  {
+   "id": "elevator-2",
+   "node": "elev2",
+   "name": "Elevator, floor 2",
+   "kind": "elevator"
+  },
+  {
+   "id": "bridge-left",
+   "node": "l2_bridge_mid",
+   "name": "Left bridge, floor 2",
+   "kind": "hall"
+  },
+  {
+   "id": "bridge-right",
+   "node": "r2_bridge_mid",
+   "name": "Right bridge, floor 2",
+   "kind": "hall"
+  },
+  {
+   "id": "left-stair-1",
+   "node": "ls1_b",
+   "name": "Left wing stair, floor 1",
+   "kind": "stairs"
+  },
+  {
+   "id": "left-stair-2",
+   "node": "ls2_b",
+   "name": "Left wing stair, floor 2",
+   "kind": "stairs"
+  },
+  {
+   "id": "right-stair-1",
+   "node": "rs1_b",
+   "name": "Right wing stair, floor 1",
+   "kind": "stairs"
+  },
+  {
+   "id": "right-stair-2",
+   "node": "rs2_b",
+   "name": "Right wing stair, floor 2",
+   "kind": "stairs"
+  }
+ ],
+ "rooms": []
+}

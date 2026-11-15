@@ -37,6 +37,14 @@ export function floorDiv(vx, wx) {
   if (div - fd > 0.5) fd += 1;
   return fd;
 }
+// Polygon closures (staff "closed on foot" areas). Ring is [[lon, lat], ...].
+function inRing(p,ring){let inside=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const [xi,yi]=ring[i],[xj,yj]=ring[j];
+ if((yi>p[0])!==(yj>p[0])&&p[1]<(xj-xi)*(p[0]-yi)/(yj-yi)+xi)inside=!inside;}return inside;}
+function segCross(a,b,c,d){const o=(p,q,r)=>(q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]);
+ return o(a,b,c)*o(a,b,d)<0&&o(c,d,a)*o(c,d,b)<0;}
+export function segmentInPolygon(a,b,ring){ // a, b are [lat, lon]
+ if(inRing(a,ring)||inRing(b,ring))return true;const A=[a[1],a[0]],B=[b[1],b[0]];
+ for(let i=1;i<ring.length;i++)if(segCross(A,B,ring[i-1],ring[i]))return true;return false;}
 export class Unreachable extends Error {
   constructor(reason, blockedBy = [], choices = []) {
     super(reason); this.blockedBy = blockedBy; this.choices = choices;
@@ -129,6 +137,18 @@ export class WalkRouter {
   blockedEdges(closures, coord, virtual) {
     const blocked = new Map(), count = this.data.edges.length;
     for (const c of closures) {
+      if (c.polygon) {           // area closure: any path segment touching the area
+        const lons = c.polygon.map(p => p[0]), lats = c.polygon.map(p => p[1]), cand = new Set(virtual.map((_, i) => count + i));
+        for (let i = Math.floor(Math.min(...lats) / CELL); i <= Math.floor(Math.max(...lats) / CELL); i++)
+          for (let j = Math.floor(Math.min(...lons) / CELL); j <= Math.floor(Math.max(...lons) / CELL); j++)
+            for (const index of this.data.edgeCells[`${i},${j}`] || []) cand.add(index);
+        for (const index of cand) {
+          if (blocked.has(index)) continue;
+          const [u, v] = index < count ? this.data.edges[index] : virtual[index - count];
+          if (segmentInPolygon(coord(u), coord(v), c.polygon)) blocked.set(index, c.id);
+        }
+        continue;
+      }
       const radius = c.radius_m ?? 15, dy = radius / 110540, dx = radius / (111320 * Math.cos(c.lat * RAD));
       const candidates = new Set(virtual.map((_, i) => count + i));
       for (let i = Math.floor((c.lat - dy) / CELL); i <= Math.floor((c.lat + dy) / CELL); i++) {
@@ -225,7 +245,7 @@ export class WalkRouter {
     const coordinates = path.map(coord);
     const entranceId = path.at(-1).slice(2), entrance = (b.entrances || []).find(e => e.id === entranceId);
     const entranceLL = this.data.nodes[path.at(-1)], toDoor = haversine([lat, lon], entranceLL);
-    const warnings = reports.filter(r => coordinates.slice(1).some((q, i) => pointSegment([r.lat, r.lon], coordinates[i], q) <= 30 + (r.radius_m || 0)));
+    const warnings = reports.filter(r => r.lat !== undefined).filter(r => coordinates.slice(1).some((q, i) => pointSegment([r.lat, r.lon], coordinates[i], q) <= 30 + (r.radius_m || 0)));
     const point = (ll, properties) => ({type: 'Feature', properties, geometry: {type: 'Point', coordinates: [ll[1], ll[0]]}});
     return {
       type: 'FeatureCollection',

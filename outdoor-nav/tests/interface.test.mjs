@@ -24,5 +24,9 @@ test('page sends driving mode, then switches to walking from the selected pedest
   elements.parking.value='downey';await elements.goBtn.click();
   assert.equal(calls.at(-1).mode,'driving');assert.equal(elements.parkedBtn.hidden,false);assert.match(elements.result.innerHTML,/Downey/);
   await elements.parkedBtn.click();assert.equal(calls.at(-1).mode,'walking');assert.equal(calls.at(-1).from.exit,'DOWNEY.ped.main');assert.equal(calls.at(-1).from.place,'downey');assert.equal(elements.driveOptions.hidden,true);assert.equal(elements.parkedBtn.hidden,true);assert.match(elements.result.innerHTML,/pedestrian exit/);
+  // Regression: entering a staff token threw "loadQuestions is not defined" (it was
+  // trapped inside the startup block). The handler must run without a ReferenceError.
+  elements.token.value='staff-token';await elements.token.onchange();
+  assert.doesNotMatch(elements.hint.textContent,/is not defined/);
  }finally{globalThis.fetch=original;db.close();}
 });

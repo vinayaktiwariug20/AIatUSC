@@ -36,7 +36,8 @@
    "Joseph Medicine Crow Center",
    "Medicine Crow",
    "JMC",
-   "Joseph Crow Medicine Building"
+   "Joseph Crow Medicine Building",
+   "DMC"
   ],
   "id": "jmc-main",
   "name": "Main entrance, under the \"Tyler Environmental\" sign",
@@ -46,5 +47,383 @@
   "photo": "/doors/jmc-main.jpg",
   "replace_osm": true,
   "_source": "pin at the scanned entrance, 2026-11-14; photo is a frame from the indoor scan; indoor_node 'entrance' to be confirmed by the indoor team"
+ },
+ {
+  "building": "elaine-and-kenneth-leventhal-school-of-accounting",
+  "aliases": [
+   "ACC"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "bovard-administration-building",
+  "aliases": [
+   "ADM"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "allan-hancock-foundation",
+  "aliases": [
+   "AHF"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "widney-alumni-house",
+  "aliases": [
+   "ALM"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "wallis-annenberg-hall",
+  "aliases": [
+   "ANN"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "annenberg-school-for-communication-journalism",
+  "aliases": [
+   "ASC"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "mrs-willis-h-booth-ferris-memorial-hall",
+  "aliases": [
+   "BMH"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "college-academic-services-building",
+  "aliases": [
+   "CAS"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "cardinal-n-gold",
+  "aliases": [
+   "CNG"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "cowlings-residential-college",
+  "aliases": [
+   "CRC"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "edward-l-doheny-junior-memorial-library",
+  "aliases": [
+   "DML"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "marks-tower",
+  "aliases": [
+   "DMT"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "drc",
+  "aliases": [
+   "DRB"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "engemann-student-health-center",
+  "aliases": [
+   "ESH"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "figueroa-building",
+  "aliases": [
+   "FIG"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "ginsburg-hall",
+  "aliases": [
+   "GCS"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "heritage-hall",
+  "aliases": [
+   "HER"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "hedco-neurosciences-building",
+  "aliases": [
+   "HNB"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "hoffman-hall",
+  "aliases": [
+   "HOH"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "jefferson-building",
+  "aliases": [
+   "JEF"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "joint-educational-project-house",
+  "aliases": [
+   "JEP"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "jill-frank-fertitta-hall",
+  "aliases": [
+   "JFF"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "popovich-hall",
+  "aliases": [
+   "JKP"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "john-williams-scoring-stage",
+  "aliases": [
+   "JWS"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "glorya-kaufman-international-dance-center",
+  "aliases": [
+   "KDC"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "la-sorbonne-apartments",
+  "aliases": [
+   "LAB"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "elvon-and-mabel-musick-law-building",
+  "aliases": [
+   "LAW"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "mccarthy-honors-residential-college",
+  "aliases": [
+   "MHC"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "montgomery-ross-fisher-building",
+  "aliases": [
+   "MRF"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "albert-s-raubenheimer-music-faculty-memorial-building",
+  "aliases": [
+   "MUS"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "physical-education-building",
+  "aliases": [
+   "PED"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "downey-way-parking-structure",
+  "aliases": [
+   "PSA"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "royal-street-parking-structure",
+  "aliases": [
+   "PSD"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "mccarthy-way-parking-structure",
+  "aliases": [
+   "PSX"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "pardee-tower",
+  "aliases": [
+   "PTD"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "ralph-and-goldy-lewis-hall",
+  "aliases": [
+   "RGL"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "virginia-ramo-hall-of-music",
+  "aliases": [
+   "RHM"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "scene-dock-theatre",
+  "aliases": [
+   "SCD"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "usc-shrine-parking-structure",
+  "aliases": [
+   "SHP"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "shrine-auditorium",
+  "aliases": [
+   "SHR"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "seaver-science-library",
+  "aliases": [
+   "SSL"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "stonier-hall",
+  "aliases": [
+   "STO"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "student-union",
+  "aliases": [
+   "STU"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "social-work-center",
+  "aliases": [
+   "SWC"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "rtcc",
+  "aliases": [
+   "TCC"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "town-and-gown",
+  "aliases": [
+   "TGF"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "the-music-complex",
+  "aliases": [
+   "TMC"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "technical-theatre-laboratory",
+  "aliases": [
+   "TTL"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "uytengsu-aquatics-center",
+  "aliases": [
+   "UAC"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "university-gardens-building",
+  "aliases": [
+   "UGB"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "university-gateway",
+  "aliases": [
+   "UGW"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "university-religious-center",
+  "aliases": [
+   "URC"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "verna-and-peter-dauterive-hall",
+  "aliases": [
+   "VPD"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "webb-tower",
+  "aliases": [
+   "WTO"
+  ],
+  "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
  }
 ]

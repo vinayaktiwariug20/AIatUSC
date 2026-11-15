@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
 import {WalkRouter, haversine} from '../cloudflare/router.mjs';
 import {parseTime,campusISO,gateStatus,handleApi} from '../cloudflare/api.mjs';
-import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M} from '../cloudflare/mobility.mjs';
+import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M,walkingRuleClosures} from '../cloudflare/mobility.mjs';
 const json=name=>JSON.parse(readFileSync(new URL('../'+name,import.meta.url),'utf8'));
 const context={router:new WalkRouter(json('cloudflare/graph.json')),gateData:json('data/gates.json'),mobilityData:json('data/mobility.json'),footballData:json('data/football.json'),survey:json('data/surveyed.json'),time:{parseTime,campusISO,gateStatus}};
 class D1{constructor(){this.db=new DatabaseSync(':memory:');for(const f of ['0001_closures.sql','0002_mobility.sql'])this.db.exec(readFileSync(new URL('../migrations/'+f,import.meta.url),'utf8'));}prepare(sql){let params=[];const db=this.db;return{bind(...values){params=values;return this;},async first(column){const row=db.prepare(sql).get(...params);return row?column?row[column]:row:null;},async run(){return db.prepare(sql).run(...params);}};}}
@@ -45,27 +45,39 @@ test('segment crossing is detected even when neither vertex lies inside the poly
  assert.equal(intersectsPolygon([[-1,2],[2,2]],poly),false);
  assert.equal(intersectsPolygon([[-1,0],[2,0]],poly),true);
 });
-test('a valid driving route forces a gate, uses the vehicle entrance, and previews the surveyed walking exit',async()=>{
+test('a valid driving route drives to the open gate, then the campus leg to the structure, and previews the walk',async()=>{
  const e=env(),mock=provider(),out=await drivingRoute(context,body,monday,[],[],e,mock.fn);
  assert.equal(out.ok,true);assert.equal(out.mode,'driving');assert.equal(out.summary.parking.id,'downey');assert.equal(out.summary.live_traffic,false);
  assert.equal(out.handoff.exit,'DOWNEY.ped.main');assert.equal(out.walking_preview.summary.start_place.exit,'DOWNEY.ped.main');
- assert.equal(mock.calls.length,1);assert.equal(mock.calls[0].body.coordinates.length,3);
- assert.deepEqual(mock.calls[0].body.coordinates.at(-1),[-118.28997731807364,34.02077789075529]);
+ // the provider is asked to reach the GATE, never to drive campus roads
+ assert.equal(mock.calls.length,1);assert.equal(mock.calls[0].body.coordinates.length,2);
+ assert.deepEqual(mock.calls[0].body.coordinates.at(-1),[-118.2871694,34.0250085]);
+ // campus leg: gate -> surveyed McClintock/Downey Way intersection -> structure entrance
+ const leg=out.features.find(f=>f.properties.kind==='campus');assert.ok(leg);
+ assert.deepEqual(leg.geometry.coordinates.at(-1),[-118.28997731807364,34.02077789075529]);
+ assert.ok(out.summary.campus_m>500&&out.summary.campus_m<600,out.summary.campus_m);
+ assert.match(out.steps.at(-1).instruction,/Enter campus at McClintock/);
  assert.equal(mock.calls[0].headers.Authorization,'private-test-key');assert.equal(JSON.stringify(out).includes('private-test-key'),false);
  const walk=await api(e,'/api/outdoor/route','POST',{from:{place:out.handoff.parking,exit:out.handoff.exit},to:out.handoff.building,mode:'walking',at:'2026-11-16T12:05:00'});
  assert.equal(walk.data.ok,true);assert.equal(walk.data.summary.start_place.exit,'DOWNEY.ped.main');
 });
+
 test('a provider route passing a closed gate is discarded even if the provider ignored avoidance',async()=>{
  const mock=provider(coords=>[...coords.slice(0,-1),[-118.2889172,34.0184081],coords.at(-1)]);
  const out=await drivingRoute(context,body,saturday,[],[],env(),mock.fn);
  assert.equal(out.ok,false);assert.equal(mock.calls.length,1);
  assert.ok(mock.calls[0].body.options.avoid_polygons.coordinates.length);
 });
-test('a provider cannot skip the requested gate or snap to a different parking entrance',async()=>{
- for(const transform of [coords=>[coords[0],coords.at(-1)],coords=>[...coords.slice(0,-1),[-118.30,34.02]]]){
+// Live bug: asked to continue past the gate to the structure, the provider
+// touched the gate, turned back and parked on the nearest public street. The
+// route must END at the gate; anything that stops elsewhere is rejected.
+test('a provider route that does not end at the planned gate is rejected',async()=>{
+ for(const transform of [coords=>[...coords.slice(0,-1),[-118.30,34.02]],coords=>[...coords.slice(0,-1),[-118.2899,34.0221]]]){
   const out=await drivingRoute(context,body,monday,[],[],env(),provider(transform).fn);assert.equal(out.ok,false);
+  assert.ok(out.checks.some(c=>c.check==='route does not reach the gate'),JSON.stringify(out.checks));
  }
 });
+
 test('staff gate closures apply only during their exact interval',()=>{
  const rule=validateRule({kind:'gate',gate:'mcclintock',starts:'2026-11-16T12:00',ends:'2026-11-16T13:00'},context);
  assert.equal(gateState(context,monday-1,[rule]).find(g=>g.id==='mcclintock').eligible,true);
@@ -153,23 +165,90 @@ test('a failed driving search says which check rejected each candidate',async()=
  assert.equal(out.ok,false);assert.ok(out.checks.length>=1);assert.equal(out.checks[0].check,'provider returned no route');assert.equal(out.checks[0].status,404);
 });
 // Live: openrouteservice refused with "Could not find routable point within a radius
-// of 25.0 meters of specified coordinate 0" -- the off-road start. Each point now
-// gets its own search radius; the parking entrance stays strict.
-test('driving request gives the start a wide road-search radius and the entrance a strict one',async()=>{
+// of 25.0 meters of specified coordinate 0" -- the off-road start.
+test('driving request gives the start a wide road-search radius and the gate a tight one',async()=>{
  const mock=provider(),out=await drivingRoute(context,body,monday,[],[],env(),mock.fn);
  assert.equal(out.ok,true);
- const r=mock.calls[0].body.radiuses;assert.equal(r.length,mock.calls[0].body.coordinates.length);
- assert.equal(r[0],300);assert.equal(r.at(-1),150);
+ const r=mock.calls[0].body.radiuses;assert.deepEqual(r,[300,30]);           // McClintock pin is surveyed
 });
-// Live: "Could not find routable point within 25 m of coordinate 2" -- the parking
-// mouth is on a campus road the provider will not drive. The route may end up to
-// END_TO_ENTRANCE_LIMIT_M from the entrance, with a dotted connector.
-test('a driving route may end on the nearest drivable road, up to 150 m from the parking entrance',async()=>{
- const short=coords=>[...coords.slice(0,-1),[coords.at(-1)[0],coords.at(-1)[1]+0.0009]];   // ~100 m short
- const mock=provider(short),out=await drivingRoute(context,body,monday,[],[],env(),mock.fn);
- assert.equal(out.ok,true,JSON.stringify(out.checks));assert.ok(Math.abs(out.summary.end_to_entrance_m-100)<5);
- assert.ok(out.features.some(f=>f.properties.kind==='to_entrance'));
- assert.equal(mock.calls[0].body.radiuses.at(-1),150);
- const far=coords=>[...coords.slice(0,-1),[coords.at(-1)[0],coords.at(-1)[1]+0.0018]];     // ~200 m short
- assert.equal((await drivingRoute(context,body,monday,[],[],env(),provider(far).fn)).ok,false);
+
+
+test('rule modes: default cars; walking needs a surveyed gate pin; bad modes rejected',()=>{
+ const base={kind:'gate',gate:'mcclintock',starts:'2026-11-16T12:00',ends:'2026-11-16T13:00'};
+ assert.deepEqual(validateRule(base,context).modes,['driving']);
+ assert.deepEqual(validateRule({...base,modes:['walking','driving']},context).modes,['walking','driving']);
+ assert.throws(()=>validateRule({...base,modes:['flying']},context),/Closed to/);
+ assert.throws(()=>validateRule({...base,gate:'downey-way',modes:['walking']},context),/approximate/);
+});
+test('a walking-only gate closure leaves car access alone; a cars-only one leaves walking alone',()=>{
+ const when=parseTime('2026-11-16T12:30'),walk={...validateRule({kind:'gate',gate:'mcclintock',starts:'2026-11-16T12:00',ends:'2026-11-16T13:00',modes:['walking']},context)};
+ assert.equal(gateState(context,when,[walk]).find(g=>g.id==='mcclintock').vehicle.status!=='closed',true);
+ assert.equal(walkingRuleClosures(context,[walk],when).length,1);
+ const cars=validateRule({kind:'gate',gate:'mcclintock',starts:'2026-11-16T12:00',ends:'2026-11-16T13:00'},context);
+ assert.equal(walkingRuleClosures(context,[cars],when).length,0);
+});
+test('a walking-only AREA makes walking routes go round it, and is not a driving no-go area',async()=>{
+ const e=env(),at='2026-11-16T12:30:00',from={lat:34.02065,lon:-118.2872};
+ const plain=(await api(e,'/api/outdoor/route','POST',{from,to:'Doheny',at})).data;
+ const line=plain.features[0].geometry.coordinates,[x,y]=line[Math.floor(line.length/2)],d=0.00015;
+ const ring=[[x-d,y-d],[x+d,y-d],[x+d,y+d],[x-d,y+d],[x-d,y-d]];
+ const rule=(await api(e,'/api/mobility/rules','POST',{kind:'road',modes:['walking'],starts:'2026-11-16T12:00',ends:'2026-11-16T14:00',note:'Stage build',geometry:{type:'Polygon',coordinates:[ring]}},'staff')).data;
+ assert.deepEqual(rule.modes,['walking']);
+ const after=(await api(e,'/api/outdoor/route','POST',{from,to:'Doheny',at})).data;
+ assert.equal(after.ok,true);
+ assert.ok(after.summary.avoided.some(a=>a.closure==='rule:'+rule.id),JSON.stringify(after.summary.avoided));
+ assert.ok(!avoidance(context,parseTime(at),parseTime(at)+1800000,[rule]).some(a=>a.id===rule.id));
+});
+// Permits, as described by people who park at USC: a permit always lets its holder park in
+// its own structure; on weekends a permit for any structure is valid at every structure.
+// A permit never overrides a closure that staff confirmed.
+test('a parking permit opens its own structure when the public cannot use it',()=>{
+ const night=parseTime('2026-11-16T22:00:00');   // Monday: the Royal gate's public hours end at 20:00
+ const royal=c=>parkingState(context,night,[],c).find(p=>p.id==='royal');
+ assert.equal(royal({}).eligible,false);
+ const mine=royal({permit:'royal'});assert.equal(mine.eligible,true);assert.equal(mine.permit_access,true);
+ assert.equal(gateState(context,night,[],{permit:'royal'}).find(g=>g.id==='royal').permit_access,true);
+ // A weekday permit for another structure does not help, and an unknown value is ignored.
+ assert.equal(royal({permit:'downey'}).eligible,false);assert.equal(royal({permit:'nope'}).eligible,false);
+ // It only opens the gate of the structure it covers.
+ assert.equal(gateState(context,night,[],{permit:'royal'}).find(g=>g.id==='watt').eligible,false);
+});
+test('on weekends a permit for any structure is valid at every structure; not on weekdays',()=>{
+ const sat=parseTime('2026-11-14T20:00:00');     // Saturday evening: Jefferson and Royal gates are closed to the public
+ const state=c=>Object.fromEntries(parkingState(context,sat,[],c).map(p=>[p.id,p.eligible]));
+ assert.equal(state({}).jefferson,false);assert.equal(state({}).royal,false);
+ const withPermit=state({permit:'downey'});
+ for(const id of ['downey','jefferson','royal','mccarthy','figueroa'])assert.equal(withPermit[id],true,id);
+ const weekday=parseTime('2026-11-16T22:00:00');
+ assert.equal(parkingState(context,weekday,[],{permit:'downey'}).find(p=>p.id==='royal').eligible,false);
+});
+test('a permit also covers game-day restrictions, but never a staff-confirmed gate closure',()=>{
+ const game=parseTime('2026-11-21T10:00:00');    // home game (a Saturday)
+ assert.equal(parkingState(context,game,[],{}).find(p=>p.id==='royal').eligible,false);
+ assert.equal(parkingState(context,game,[],{permit:'royal'}).find(p=>p.id==='royal').eligible,true);
+ const rule={id:'r1',kind:'gate',gate:'royal',modes:['driving'],starts_ms:game-3600000,ends_ms:game+3600000,note:'Closed for the game'};
+ const shut=parkingState(context,game,[rule],{permit:'royal'}).find(p=>p.id==='royal');
+ assert.equal(shut.eligible,false);assert.match(shut.reason,/staff/i);
+ assert.equal(gateState(context,game,[rule],{permit:'royal'}).find(g=>g.id==='royal').eligible,false);
+});
+test('a driving route uses the permit, and an unknown permit is rejected',async()=>{
+ const sat=parseTime('2026-11-14T20:00:00'),request={...body,parking:'jefferson'};
+ assert.equal((await drivingRoute(context,request,sat,[],[],env(),provider().fn)).ok,false);
+ const out=await drivingRoute(context,{...request,permit:'downey'},sat,[],[],env(),provider().fn);
+ assert.equal(out.ok,true,JSON.stringify(out.checks));assert.equal(out.summary.parking.id,'jefferson');assert.equal(out.summary.parking.permit_access,true);
+ await assert.rejects(()=>drivingRoute(context,{...request,permit:'nope'},sat,[],[],env(),provider().fn),e=>e.status===400);
+ const state=await api(env(),'/api/mobility?at=2026-11-14T20:00&permit=downey');
+ assert.equal(state.data.parking.find(p=>p.id==='jefferson').eligible,true);
+});
+// Official three-letter building codes (USC FPM base map), so "JFF" or "HOH" finds the building.
+test('official USC building codes find their buildings',()=>{
+ const find=t=>context.router.findBuilding(t)?.name;
+ assert.equal(find('JFF'),'Jill & Frank Fertitta Hall');assert.equal(find('jff'),'Jill & Frank Fertitta Hall');
+ assert.equal(find('HOH'),'Hoffman Hall');assert.equal(find('DML'),'Edward L Doheny Junior Memorial Library');
+ assert.equal(find('DMC'),'Dr. Joseph Medicine Crow Center for International and Public Affairs');
+ assert.equal(find('JMC'),'Dr. Joseph Medicine Crow Center for International and Public Affairs');   // the name used for the demo venue
+ assert.equal(find('TCC'),'Ronald Tutor Campus Center');
+ // No code may point at two buildings.
+ const seen=new Map();
+ for(const b of Object.values(context.router.data.buildings))for(const a of b.aliases||[])if(/^[A-Z]{2,4}$/.test(a)){assert.ok(!seen.has(a)||seen.get(a)===b.id,a+' is used twice');seen.set(a,b.id);}
 });
