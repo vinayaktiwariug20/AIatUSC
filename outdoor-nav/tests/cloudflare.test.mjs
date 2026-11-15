@@ -134,3 +134,8 @@ test('campus malls tagged cycleway are walkable (Childs Way / Watt Way)',async()
   const out=(await call({},'/api/outdoor/route','POST',{from:{lat:34.02065,lon:-118.28720},to:'Doheny'})).data;
   assert.ok(out.summary.metres<500,out.summary.metres);
 });
+test('a report without migration 0002 gets a clear "database needs an update" error, not "storage unavailable"',async()=>{
+  const d=new D1(false);d.db.exec(readFileSync(new URL('../migrations/0001_closures.sql',import.meta.url),'utf8'));
+  const r=await call({DB:d,PUBLIC_REPORTS_ENABLED:'true'},'/api/closures','POST',report);
+  assert.equal(r.status,503);assert.match(r.data.error,/migration 0002/);
+});
