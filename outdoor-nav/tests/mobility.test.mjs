@@ -152,3 +152,12 @@ test('a failed driving search says which check rejected each candidate',async()=
  const out=await drivingRoute(context,body,monday,[],[],env(),provider(c=>c,404).fn);
  assert.equal(out.ok,false);assert.ok(out.checks.length>=1);assert.equal(out.checks[0].check,'provider returned no route');assert.equal(out.checks[0].status,404);
 });
+// Live: openrouteservice refused with "Could not find routable point within a radius
+// of 25.0 meters of specified coordinate 0" -- the off-road start. Each point now
+// gets its own search radius; the parking entrance stays strict.
+test('driving request gives the start a wide road-search radius and the entrance a strict one',async()=>{
+ const mock=provider(),out=await drivingRoute(context,body,monday,[],[],env(),mock.fn);
+ assert.equal(out.ok,true);
+ const r=mock.calls[0].body.radiuses;assert.equal(r.length,mock.calls[0].body.coordinates.length);
+ assert.equal(r[0],300);assert.equal(r.at(-1),25);
+});
