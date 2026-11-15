@@ -167,7 +167,7 @@ export class WalkRouter {
     }
     return {cost: null, path: null, edges: null, hit};
   }
-  route({lat, lon, building, closures = [], reports = [], stepFree = false, place = null}) {
+  route({lat, lon, building, closures = [], reports = [], stepFree = false, place = null, exit = null}) {
     let startPlace = null;
     if (place !== null) { startPlace = this.findPlace(place); if (!startPlace) throw new Unreachable(`unknown place: '${place}'`); }
     const b = this.findBuilding(building);
@@ -190,9 +190,10 @@ export class WalkRouter {
     };
     let snapMetres;
     if (startPlace) {
+      if (exit !== null && !startPlace.nodes.includes('S:' + exit)) throw new Unreachable('That exit does not belong to this parking structure.');
       [lat, lon] = this.data.nodes[startPlace.nodes[0]];
       vnodes.set('O:start', [lat, lon]);
-      for (const n of startPlace.nodes) link('O:start', n, 0, 0);
+      for (const n of (exit === null ? startPlace.nodes : ['S:' + exit])) link('O:start', n, 0, 0);
       snapMetres = 0;
     } else {
       const snap = this.snapEdge(lat, lon, 150);
