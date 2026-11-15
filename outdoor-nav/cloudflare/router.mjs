@@ -238,7 +238,7 @@ export class WalkRouter {
         warnings: warnings.map(r => ({id: r.id, note: r.note || '', status: r.status})),
       },
       handoff: {building: b.id, entrance_id: entrance?.id ?? null, entrance_name: entrance?.name ?? null,
-        indoor_node: entrance?.indoor_node ?? null, lat: entranceLL[0], lon: entranceLL[1]},
+        indoor_node: entrance?.indoor_node ?? null, photo: entrance?.photo ?? null, lat: entranceLL[0], lon: entranceLL[1]},
       features: [
         {type: 'Feature', properties: {kind: 'route', minutes: round1(found.cost / 60), metres: Math.round(metres)},
           geometry: {type: 'LineString', coordinates: coordinates.map(([a, b]) => [b, a])}},

@@ -483,6 +483,7 @@ class WalkGraph:
                 "entrance_id": ent["id"] if ent else None,
                 "entrance_name": ent.get("name") if ent else None,
                 "indoor_node": ent.get("indoor_node") if ent else None,
+                "photo": ent.get("photo") if ent else None,
                 "lat": ent_ll[0], "lon": ent_ll[1],
             },
             "features": [

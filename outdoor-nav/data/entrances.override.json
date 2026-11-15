@@ -38,6 +38,13 @@
    "JMC",
    "Joseph Crow Medicine Building"
   ],
-  "_note": "DEMO VENUE. Add the scanned entrance here: id, name, lat, lon (pin standing at the door), indoor_node (the indoor team's entrance anchor), photo."
+  "id": "jmc-main",
+  "name": "Main entrance, under the \"Tyler Environmental\" sign",
+  "lat": 34.0215019,
+  "lon": -118.2840557,
+  "indoor_node": "entrance",
+  "photo": "/doors/jmc-main.jpg",
+  "replace_osm": true,
+  "_source": "pin at the scanned entrance, 2026-11-14; photo is a frame from the indoor scan; indoor_node 'entrance' to be confirmed by the indoor team"
  }
 ]
