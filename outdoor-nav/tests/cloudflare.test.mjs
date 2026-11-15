@@ -9,7 +9,7 @@ import {campusISO,parseTime} from '../cloudflare/api.mjs';
 class D1 {
   constructor(migrate=true) {
     this.db=new DatabaseSync(':memory:');
-    if(migrate)this.db.exec(readFileSync(new URL('../migrations/0001_closures.sql',import.meta.url),'utf8'));
+    if(migrate)for(const name of ['0001_closures.sql','0002_mobility.sql'])this.db.exec(readFileSync(new URL('../migrations/'+name,import.meta.url),'utf8'));
   }
   prepare(sql) {
     let params=[]; const self=this;
@@ -47,11 +47,7 @@ test('unverified reports persist across calls and never change the walking route
   const next=(await call(e,'/api/outdoor/route','POST',route)).data;assert.deepEqual(next.features,plain.features);
 });
 test('approval is authenticated, persists, and produces a detour',async()=>{
-  // Close a point ON the current route (its midpoint), so the test does not
-  // depend on which paths the map happens to have.
-  const e=env(),line=(await call(e,'/api/outdoor/route','POST',route)).data.features[0].geometry.coordinates;
-  const [mlon,mlat]=line[Math.floor(line.length/2)];
-  const c=(await call(e,'/api/closures','POST',{...report,lat:mlat,lon:mlon,radius_m:10})).data,p='/api/closures/'+c.id;
+  const e=env(),c=(await call(e,'/api/closures','POST',report)).data,p='/api/closures/'+c.id;
   assert.equal((await call(e,p+'/approve','POST',{})).status,403);
   assert.equal((await call(e,p+'/approve','POST',{},'test-secret')).data.status,'approved');
   const out=(await call(e,'/api/outdoor/route','POST',route)).data;assert.ok(out.summary.avoided.some(x=>x.closure===c.id));
@@ -70,7 +66,7 @@ test('staff reports are approved immediately and expire without reopening',async
   const e=env(),c=(await call(e,'/api/closures','POST',report,'test-secret')).data;assert.equal(c.status,'approved');
   assert.deepEqual((await call(e,'/api/closures?at=2026-11-14T15:00:00')).data,[]);
 });
-test('public reports default off; staff still have access',async()=>{
+test('a missing reporting variable keeps writes off; staff still have access',async()=>{
   const e={DB:new D1(),ADMIN_TOKEN:'test-secret'};assert.equal((await call(e,'/api/closures','POST',report)).status,403);assert.equal((await call(e,'/api/closures','POST',report,'test-secret')).status,201);
   assert.equal((await call({DB:new D1()},'/api/closures/abc/approve','POST',{})).status,403);
 });
@@ -86,7 +82,7 @@ test('invalid JSON shapes, coordinates, intervals and dates are rejected',async(
 test('far-away start is refused before graph exploration',async()=>{
   const out=await call({},'/api/outdoor/route','POST',{...route,from:{lat:0,lon:0}});assert.equal(out.data.ok,false);assert.match(out.data.reason,/outside/);
 });
-test('driving requests are never silently answered with walking routes',async()=>{assert.equal((await call({},'/api/outdoor/route','POST',{...route,mode:'driving'})).status,501);});
+test('driving without a configured key is never silently answered with a walking route',async()=>{assert.equal((await call({},'/api/outdoor/route','POST',{...route,mode:'driving'})).status,503);});
 test('Los Angeles timestamps and gate schedules handle UTC offsets',async()=>{
   assert.equal(parseTime('2026-11-16T22:00:00'),parseTime('2026-11-17T06:00:00Z'));
   assert.equal(campusISO(parseTime('2026-11-17T06:00:00Z')),'2026-11-16T22:00:00-08:00');
@@ -119,14 +115,4 @@ test('object prototype names cannot masquerade as buildings or start places',asy
   assert.equal((await call({},'/api/buildings/constructor')).status,404);
   assert.equal((await call({},'/api/outdoor/route','POST',{...route,to:'__proto__'})).data.ok,false);
   assert.equal((await call({},'/api/outdoor/route','POST',{...route,from:{place:'constructor'}})).data.ok,false);
-});
-test('start on a long footway snaps to the segment, not a far node (no loop)',async()=>{
-  // Tutor Center footway: nearest-NODE snapping walked west to a corner and back.
-  const out=(await call({},'/api/outdoor/route','POST',{from:{lat:34.01995,lon:-118.28690},to:'Doheny'})).data;
-  assert.equal(out.ok,true);assert.ok(out.summary.snap_m<15);
-  const lons=out.features[0].geometry.coordinates.map(c=>c[0]);assert.ok(Math.min(...lons)>-118.28690-0.0003);
-});
-test('campus malls tagged cycleway are walkable (Childs Way / Watt Way)',async()=>{
-  const out=(await call({},'/api/outdoor/route','POST',{from:{lat:34.02065,lon:-118.28720},to:'Doheny'})).data;
-  assert.ok(out.summary.metres<500,out.summary.metres);
 });

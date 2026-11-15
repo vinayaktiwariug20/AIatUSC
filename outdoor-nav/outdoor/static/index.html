@@ -1,287 +1,138 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Campus Wayfinding</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Campus Access · USC</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--line:#dde2ea;--ink:#16191f;--dim:#5b6374;
- --accent:#1f4fd8;--ok:#0d7a4f;--warn:#9a5b00;--warnbg:#fff4dc;--stop:#b3261e}
-@media (prefers-color-scheme:dark){:root{--bg:#121419;--card:#1b1e26;--line:#2c3140;
- --ink:#e8ebf1;--dim:#98a0b3;--accent:#7aa2ff;--ok:#5ad19a;--warn:#f0b849;
- --warnbg:rgba(240,184,73,.12);--stop:#ff6b6b}}
-*{box-sizing:border-box}
-html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);display:flex;flex-direction:column;
- font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-#map{flex:1;min-height:45vh}
-#panel{padding:12px 16px calc(12px + env(safe-area-inset-bottom));max-height:52vh;overflow:auto;
- border-top:1px solid var(--line);background:var(--bg)}
-.row{display:flex;gap:8px}
-input,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);
- border-radius:10px;min-height:44px;padding:0 12px}
-input{flex:1;min-width:0}
-button{cursor:pointer;white-space:nowrap}
-button.go{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
-button[aria-pressed=true]{background:var(--stop);border-color:var(--stop);color:#fff}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:10px}
-.big{font-size:20px;font-weight:650}
-.dim{color:var(--dim);font-size:13px}
-.warn{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:6px 9px;margin-top:6px;font-size:14px}
-.avoid{color:var(--ok);font-size:14px;margin-top:6px}
-.stop{color:var(--stop)}
-#handoff{display:none;background:var(--ok);color:#fff;border-radius:12px;padding:12px;margin-top:10px;
- font-weight:600;text-decoration:none;text-align:center}
-details{margin-top:12px}
-summary{cursor:pointer;color:var(--dim);font-size:13px}
-.rep{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:14px}
-.rep span{flex:1}
-.rep button{min-height:34px;padding:0 9px;font-size:13px}
-#reportForm{display:none}
+:root{--bg:#f6f5f2;--card:#fff;--ink:#202329;--dim:#59616e;--line:#dcdedc;--brand:#8b1e2c;--ok:#08734d;--stop:#b42328;--warn:#8c5e00;--blue:#2459d3}
+*{box-sizing:border-box}html,body{height:100%;margin:0}body{color:var(--ink);background:var(--bg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;flex-direction:column}
+#map{flex:1;min-height:38vh}#panel{padding:16px 18px calc(18px + env(safe-area-inset-bottom));max-height:58vh;overflow:auto;border-top:1px solid var(--line)}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}h1{font-size:21px;margin:0;letter-spacing:-.5px}h2{font-size:16px;margin:0 0 8px}small,.dim{color:var(--dim);font-size:12px}a{color:var(--blue)}
+.row{display:flex;gap:8px;align-items:center}.wrap{flex-wrap:wrap}.grow{flex:1;min-width:0}input,select,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;min-height:44px;padding:8px 10px}input,select{min-width:0}button{cursor:pointer}button:disabled{opacity:.55;cursor:wait}button.primary{background:var(--brand);color:white;border-color:var(--brand);font-weight:650}button.active{background:var(--ink);color:white}button.small{min-height:32px;font-size:12px;padding:4px 9px}
+.modes{display:flex;padding:3px;background:#e9e9e5;border-radius:12px;gap:3px;margin-bottom:10px}.modes button{flex:1;border:0;background:transparent}.modes button.active{background:var(--card);color:var(--brand);box-shadow:0 1px 4px #0001;font-weight:700}
+.card{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:13px}.notice{padding:9px 11px;background:#fff4d8;border-radius:9px;color:var(--warn);font-size:13px;margin:8px 0}.error{color:var(--stop)}.success{color:var(--ok)}.big{font-size:23px;font-weight:700}.pill{font-size:11px;border-radius:20px;background:#edf0f2;padding:4px 8px;white-space:nowrap}.gate{padding:9px 0;border-bottom:1px solid var(--line)}.gate:last-child{border:0}.closed{color:var(--stop)}.restricted{color:var(--warn)}
+label.check{display:flex;align-items:center;gap:5px;font-size:13px}input[type=checkbox]{min-height:16px;flex:none}details{margin-top:12px}summary{cursor:pointer;font-weight:600}.stack{display:grid;gap:8px;margin-top:10px}.hidden,[hidden]{display:none!important}#parkedBtn{width:100%;background:var(--ok);color:#fff;border:0;margin-top:12px;font-weight:700}#routeSteps{padding-left:24px;font-size:13px}.rep{display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--line);padding:7px 0}.rep span{flex:1}.legend{font-size:11px;color:var(--dim);margin-top:7px}.fieldLabel{display:grid;gap:4px;color:var(--dim);font-size:12px}.fieldLabel input{font-size:14px;width:100%}
+@media(min-width:850px){body{flex-direction:row-reverse}#panel{width:440px;max-height:100vh;border-top:0;border-right:1px solid var(--line);flex-shrink:0}#map{height:100vh}header{margin-bottom:18px}}
 </style>
 </head>
 <body>
-<div id="map"></div>
-<div id="panel">
-  <div class="dim" style="margin-bottom:6px">Walking preview · vehicle routing and indoor navigation are not connected yet.</div>
-  <div id="deploymentNotice" class="warn" style="display:none;margin-bottom:8px"></div>
-  <div class="row">
-    <input id="to" list="blds" placeholder="Where to? (building)" autocomplete="off">
-    <datalist id="blds"></datalist>
-    <button class="go" id="goBtn">Go</button>
-  </div>
-  <div class="row" style="margin-top:8px">
-    <button id="locBtn">Use my location</button>
-    <button id="repBtn" aria-pressed="false">Report blockage</button>
-    <label class="dim" style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="stepFree" style="min-height:auto;flex:none"> step-free</label>
-  </div>
-  <div class="dim" id="hint" style="margin-top:6px">Tap the map to set where you are, or use your location.</div>
-
-  <div class="card" id="reportForm">
-    <div class="dim">Report at the pin you placed</div>
-    <div class="row" style="margin-top:6px">
-      <input id="repNote" placeholder="What's blocked? e.g. fence across path">
-      <button class="go" id="repSend">Send</button>
-    </div>
-  </div>
-
-  <div id="result"></div>
-  <a id="handoff" href="#">You're here, so continue inside →</a>
-
-  <details>
-    <summary>Staff / organizer</summary>
-    <div class="row" style="margin-top:8px">
-      <input id="token" type="password" placeholder="Admin token">
-    </div>
-    <div class="dim" style="margin-top:4px">With a token, your reports are official and reroute everyone at once.</div>
-    <div id="queue"></div>
-  </details>
-  <div class="dim" style="margin-top:12px" id="attr"></div>
+<div id="map" aria-label="USC route map"></div>
+<main id="panel">
+<header><div><small>UNIVERSITY PARK CAMPUS</small><h1>Campus Access <span style="color:var(--brand)">USC</span></h1></div><span class="pill" id="statusPill">Connecting</span></header>
+<div class="modes" role="group" aria-label="Travel mode"><button id="walkMode" class="active" aria-pressed="true">Walking</button><button id="driveMode" aria-pressed="false">Drive + park</button></div>
+<div class="row"><input class="grow" id="to" list="blds" placeholder="Event building / destination" autocomplete="off" aria-label="Destination"><datalist id="blds"></datalist><button id="goBtn" class="primary">Find route</button></div>
+<div class="row wrap" style="margin-top:9px"><button id="locBtn" class="small">Use my location</button><label class="check"><input type="checkbox" id="stepFree">Avoid stairs</label><button id="repBtn" class="small" aria-pressed="false">Report blockage</button></div>
+<div id="driveOptions" class="stack" hidden>
+<label class="fieldLabel">Parking<select id="parking"><option value="auto">Auto · gate access and walking distance</option></select></label>
+<div class="row wrap"><label class="check"><input type="checkbox" id="uscId">I have a USC ID</label><label class="check"><input type="checkbox" id="parkingPass">I have a prepaid pass for this structure</label></div>
+<div class="dim">Routes use gate access rules and parking entrances. Space availability is unknown. Driving requests send your starting coordinates to openrouteservice.</div>
 </div>
-
+<details><summary class="dim">Departure time · Los Angeles</summary><div class="row" style="margin-top:8px"><input id="departAt" class="grow" type="datetime-local" aria-label="Departure time in Los Angeles"><button id="nowBtn" class="small">Now</button></div><div class="dim">Leave blank for now. Check official notices and staff updates for holiday or special access.</div></details>
+<div id="deploymentNotice" class="notice" hidden></div><div id="hint" class="dim" role="status" style="margin-top:9px">Tap the map to set your start, or use your location.</div>
+<div id="reportForm" class="card" hidden><h2>Report a blockage at the selected point</h2><div class="stack"><input id="repNote" placeholder="For example: construction fence blocking the path" aria-label="Report description"><select id="repModes" aria-label="Affected travel modes"><option value="walking">Walking</option><option value="driving">Driving</option><option value="both">Driving and walking</option></select><button id="repSend" class="primary">Send report</button></div></div>
+<div id="result" aria-live="polite"></div><button id="parkedBtn" hidden>I have parked · continue walking →</button>
+<div id="football" class="notice" hidden></div>
+<details open><summary>Gate status <small>Vehicle access</small></summary><div class="legend">● Green: scheduled open · Red: closed · Amber: access requirements<br>Vehicle hours do not determine pedestrian access. Approximate gate pins are labeled.</div><div id="gates"></div></details>
+<details><summary>Official access, schedule and traffic maps</summary><div class="stack dim"><a href="https://transnet.usc.edu/index.php/about-us/entrance-hours/" target="_blank" rel="noopener">USC Entrance Hours</a><a href="https://usctrojans.com/sports/football/schedule" target="_blank" rel="noopener">USC Football Schedule</a><a href="https://gameday.usc.edu/getting-here/post-game-traffic-flow/" target="_blank" rel="noopener">Game Day Traffic Map · official map and traffic directions</a><a href="https://bpb-us-w1.wpmucdn.com/sites.usc.edu/dist/0/639/files/2023/08/image.png" target="_blank" rel="noopener">Traffic map image from the official page</a><div id="sourcesNote"></div></div></details>
+<details id="staffPanel"><summary>Staff / organizer</summary><div class="stack"><input id="token" type="password" placeholder="Admin token" autocomplete="off" aria-label="Admin token"><div class="dim">Approved restrictions affect routes immediately. Road areas apply to driving; report pedestrian blockages separately.</div><div class="row"><select id="ruleKind" class="grow"><option value="gate">Temporary vehicle gate closure</option><option value="road">Vehicle road closure area</option></select><button id="drawBtn" class="small" hidden>Draw area</button></div><select id="ruleGate" aria-label="Gate to close"></select><div id="drawHint" class="dim" hidden>Tap at least three boundary points in order. Check the red closure lines on the official map and current on-site instructions.</div><label class="fieldLabel">Closure starts · Los Angeles<input id="ruleStarts" type="datetime-local"></label><label class="fieldLabel">Closure ends · Los Angeles<input id="ruleEnds" type="datetime-local"></label><input id="ruleNote" placeholder="For example: post-game traffic closure confirmed by staff" aria-label="Reason for restriction"><button id="saveRule" class="primary">Save confirmed closure</button><div class="dim">The end of the third quarter and game end are not predicted. Enter confirmed start and end times. Routes avoid registered road areas; map arrows are not used for parking egress guidance.</div><div id="ruleQueue"></div><div id="queue"></div></div></details>
+<footer id="attr" class="dim" style="margin-top:18px">© OpenStreetMap contributors · ODbL<br><span>Driving is a route preview. Live traffic and voice navigation are unavailable.</span></footer>
+</main>
 <script>
-// Same-origin API: a query parameter must never redirect staff tokens elsewhere.
-const API = '';
-const qs = new URLSearchParams(location.search);
-const INDOOR = qs.get('indoor') || '/indoor';   // the indoor app's URL
-const $ = id => document.getElementById(id);
-// Staff credentials stay in this tab only. Clear the old demo's stored value.
-try { localStorage.removeItem('adminToken'); } catch {}
-let deployment = null, closureFingerprint = '';
-function updateReportAvailability() {
-  if (!deployment) return;
-  const enabled = deployment.database === 'connected' && (deployment.public_reports || $('token').value.trim());
-  $('repBtn').disabled = !enabled;
-  $('repBtn').title = enabled ? '' : 'Reports require D1 and either public reporting enabled or a staff token.';
+'use strict';
+const $=id=>document.getElementById(id),qs=new URLSearchParams(location.search);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+try{localStorage.removeItem('adminToken');}catch{}
+let mode=qs.get('mode')==='driving'?'driving':'walking',buildings=[],start=null,startMarker=null,health=null,mobility=null,plan=null,watchId=null;
+let reporting=false,reportPin=null,drawing=false,polygonPoints=[],polygonLayer=null,routeLayer=null,walkingLayer=null,routeVersion=0,controller=null,lastRouted=0;
+let mobilityFingerprint='',closureFingerprint='',busy=false,refreshing=false;
+const gateLayer=L.layerGroup(),closureLayer=L.layerGroup(),avoidLayer=L.layerGroup(),parkingLayer=L.layerGroup();
+const map=L.map('map').setView([34.0205,-118.2856],15);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+for(const layer of [gateLayer,closureLayer,avoidLayer,parkingLayer])layer.addTo(map);
+function query(){const p=new URLSearchParams();if($('departAt').value)p.set('at',$('departAt').value);p.set('usc_id',$('uscId').checked);p.set('parking_pass',$('parkingPass').checked);return '?'+p;}
+async function api(path,options={}){const headers={'Content-Type':'application/json'};if($('token').value.trim())headers['X-Admin-Token']=$('token').value.trim();const r=await fetch(path,{...options,headers});let data;try{data=await r.json();}catch{throw new Error('Could not read the server response. Please retry.');}if(!r.ok)throw new Error(data.error||'Request failed ('+r.status+')');return data;}
+function info(text,error=false){$('hint').textContent=text;$('hint').classList.toggle('error',error);}
+function clearRoute(){routeVersion++;controller?.abort();if(routeLayer)routeLayer.remove();if(walkingLayer)walkingLayer.remove();routeLayer=walkingLayer=null;plan=null;$('parkedBtn').hidden=true;$('result').innerHTML='';busy=false;$('goBtn').disabled=false;}
+function showError(error){if(error.name==='AbortError')return;clearRoute();info(error.message,true);}
+function safe(fn){return(...args)=>Promise.resolve().then(()=>fn(...args)).catch(showError);}
+window.addEventListener('unhandledrejection',e=>{showError(e.reason);e.preventDefault();});
+function buildingId(){const text=$('to').value.trim();return buildings.find(b=>b.id===text||b.name.toLowerCase()===text.toLowerCase())?.id||text;}
+function marker(lat,lon){if(!startMarker)startMarker=L.circleMarker([lat,lon],{radius:7,color:'#fff',weight:3,fillColor:'#2459d3',fillOpacity:1}).addTo(map);else startMarker.setLatLng([lat,lon]);}
+function setStart(lat,lon,gps=false){start={lat,lon};marker(lat,lon);info(gps?'Using your current location.':'Start set on the map.');if(mode==='walking'&&$('to').value)route(false);else if(mode==='driving'&&plan&&Date.now()-lastRouted>45000)route(false);}
+function setMode(next){clearRoute();mode=next;$('walkMode').classList.toggle('active',mode==='walking');$('driveMode').classList.toggle('active',mode==='driving');$('walkMode').setAttribute('aria-pressed',mode==='walking');$('driveMode').setAttribute('aria-pressed',mode==='driving');$('driveOptions').hidden=mode!=='driving';if(start?.place)start=null;info(mode==='driving'?'Choose a start and destination, then select Find route.':'Walking routes cover campus and the surrounding area.');}
+function availableReports(){const enabled=health?.database==='connected'&&(health.public_reports||$('token').value.trim());$('repBtn').disabled=!enabled;}
+function drawPlan(r,fit){
+ routeLayer=L.geoJSON(r,{style:{color:mode==='driving'?'#2459d3':'#08734d',weight:6,opacity:.9},pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:f.properties.kind==='start'?0:7,color:mode==='driving'?'#2459d3':'#08734d',weight:3,fillOpacity:.9})}).addTo(map);
+ if(r.walking_preview)walkingLayer=L.geoJSON(r.walking_preview,{style:{color:'#08734d',weight:4,dashArray:'6 7',opacity:.7},pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:0,opacity:0})}).addTo(map);
+ if(fit)map.fitBounds(routeLayer.getBounds(),{padding:[25,25]});
 }
-
-const map = L.map('map', {zoomControl: false}).setView([34.0205, -118.2856], 16);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'}).addTo(map);
-
-let buildings = [], start = null, startMk = null, routeLayer = null,
-    closureLayer = L.layerGroup().addTo(map), reporting = false, repPin = null, watchId = null;
-
-const headers = () => {
-  const h = {'Content-Type': 'application/json'};
-  const t = $('token').value.trim(); if (t) h['X-Admin-Token'] = t; return h;
-};
-async function api(path, opts = {}) {
-  const r = await fetch(API + path, {headers: headers(), ...opts});
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error || 'API request failed (' + r.status + ')');
-  return data;
-}
-window.addEventListener('unhandledrejection', event => {
-  $('hint').textContent = event.reason?.message || 'Connection failed. Please retry.';
-  if (routeLayer) { routeLayer.remove(); routeLayer = null; }
-  $('handoff').style.display = 'none';
-  event.preventDefault();
-});
-function esc(s){return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-
-function buildingId(text) {
-  const t = text.trim().toLowerCase();
-  const b = buildings.find(b => b.id === t || b.name.toLowerCase() === t);
-  return b ? b.id : text.trim();
-}
-
-function setStart(lat, lon, fromGps) {
-  start = {lat, lon};
-  if (!startMk) startMk = L.circleMarker([lat, lon], {radius: 8, color: '#fff', weight: 3,
-    fillColor: '#1f4fd8', fillOpacity: 1}).addTo(map);
-  startMk.setLatLng([lat, lon]);
-  $('hint').textContent = fromGps ? 'Following your location.' : 'Start set by tap (demo mode).';
-  route();
-}
-
-async function route() {
-  const to = $('to').value.trim();
-  if (!start || !to) return;
-  const r = await api('/api/outdoor/route', {method: 'POST', body: JSON.stringify(
-    {from: start, to: buildingId(to), step_free: $('stepFree').checked})});
-  if (routeLayer) routeLayer.remove();
-  if (!r.ok) {
-    const choices = (r.choices || []).map(c =>
-      `<button data-pick="${esc(c.id)}" style="margin:6px 6px 0 0">${esc(c.name)}</button>`).join('');
-    $('result').innerHTML = choices
-      ? `<div class="card">Which one?<div>${choices}</div></div>`
-      : `<div class="card stop">${esc(r.reason || r.error)}</div>`;
-    $('handoff').style.display = 'none';
-    return;
+async function route(fit=true){
+ if(!start||!$('to').value.trim()){info('Choose a start and destination first.');return;}
+ const id=++routeVersion;controller?.abort();controller=new AbortController();busy=true;$('goBtn').disabled=true;$('parkedBtn').hidden=true;plan=null;
+ if(routeLayer){routeLayer.remove();routeLayer=null;}if(walkingLayer){walkingLayer.remove();walkingLayer=null;}$('result').innerHTML='';info('Checking access and routes…');
+ try{
+  const r=await api('/api/outdoor/route',{method:'POST',signal:controller.signal,body:JSON.stringify({from:start,to:buildingId(),mode,at:$('departAt').value||undefined,parking:$('parking').value,usc_id:$('uscId').checked,parking_pass:$('parkingPass').checked,step_free:$('stepFree').checked})});
+  if(id!==routeVersion)return;lastRouted=Date.now();
+  if(!r.ok){const choices=(r.choices||[]).map(c=>'<button class="small" data-pick="'+esc(c.id)+'">'+esc(c.name)+'</button>').join(' ');$('result').innerHTML='<div class="card error">'+esc(r.reason||r.error)+(choices?'<div class="row wrap" style="margin-top:8px">'+choices+'</div>':'')+'</div>';info('Choose another start or parking structure.');return;}
+  plan=r;drawPlan(r,fit);const s=r.summary;
+  if(mode==='driving'){
+   $('result').innerHTML='<section class="card"><div class="dim">DRIVE → PARK → WALK</div><div class="big">About '+esc(s.minutes)+' min drive + '+esc(s.walking_minutes)+' min walk</div><h2 style="margin-top:8px">'+esc(s.parking.name)+'</h2><div>Via '+esc(s.gate.name)+'</div><div class="dim">'+esc(s.parking.address)+' · Space availability unknown</div><div class="notice">'+(s.gate.location_source==='approximate_intersection'?'The gate pin is approximate. Follow posted signs. ':'')+'Estimated time does not include live traffic.</div><div class="dim">Routes crossing closed gate areas or registered closures are excluded. Auto selection tries up to two candidates and does not guarantee the fastest route.</div>'+(r.steps.length?'<details><summary>Driving directions</summary><ol id="routeSteps">'+r.steps.map(step=>'<li>'+esc(step.instruction)+' <small>'+Math.round(step.distance||0)+' m</small></li>').join('')+'</ol></details>':'')+'</section>';
+   $('parkedBtn').hidden=false;info('Blue: driving · dotted green: walking after parking. Select the parking button after you have parked.');
+  }else{
+   let h='<section class="card"><div class="big">About '+esc(s.minutes)+' min walk</div><div>'+esc(s.building_name)+' · '+esc(s.metres)+' m</div>';
+   if(s.start_place)h+='<div class="dim">Starting at the parking pedestrian exit. Select Use my location to recalculate from your actual position.</div>';
+   if(s.entrance_source==='outline')h+='<div class="notice">A door has not been mapped. This route ends at the building outline.</div>';
+   if(s.off_network)h+='<div class="notice">You are '+esc(s.snap_m)+' m from the walking map. Check where the route joins the mapped paths.</div>';
+   for(const a of s.avoided)h+='<div class="success">Avoiding a blockage · about '+esc(a.extra_min)+' extra min</div>';
+   for(const w of s.warnings)h+='<div class="notice">Unverified report: '+esc(w.note)+'</div>';
+   if(s.near_venue)h+='<div class="success">You are near your destination. Check the building entrance.</div>';
+   $('result').innerHTML=h+'</section>';info('Follow the green route to your destination.');
   }
-  routeLayer = L.geoJSON(r, {
-    style: {color: '#1f4fd8', weight: 6, opacity: .85},
-    pointToLayer: (f, ll) => f.properties.kind === 'entrance'
-      ? L.circleMarker(ll, {radius: 9, color: '#0d7a4f', weight: 3, fillOpacity: .9})
-          .bindTooltip(f.properties.guess ? 'nearest side of building (door not mapped)' : esc(f.properties.name))
-      : L.circleMarker(ll, {radius: 0, opacity: 0})
-  }).addTo(map);
-  const s = r.summary;
-  let h = `<div class="card"><div class="big">${s.minutes} min walk</div>
-    <div class="dim">${s.metres} m to ${esc(s.building_name)}${r.handoff.entrance_name ? ' · ' + esc(r.handoff.entrance_name) : ''}</div>`;
-  if (s.storage === 'read_only_preview') h += '<div class="warn">Preview: live closures are not connected. Follow posted access instructions.</div>';
-  if (s.entrance_source === 'outline') h += `<div class="dim">Door not mapped, so this ends at the nearest side of the building.</div>`;
-  if (s.off_network) h += `<div class="warn">You're ${s.snap_m} m from the nearest campus path. Get to campus first.</div>`;
-  for (const a of s.avoided) h += `<div class="avoid">✓ Avoiding a closure (+${a.extra_min} min)</div>`;
-  for (const w of s.warnings) h += `<div class="warn">Unconfirmed report on this route: ${esc(w.note || 'blockage')}</div>`;
-  $('result').innerHTML = h + '</div>';
-  const hand = $('handoff');
-  if (s.near_venue) {
-    const u = new URL(INDOOR, location.href);
-    u.searchParams.set('building', r.handoff.building);
-    if (r.handoff.entrance_id) u.searchParams.set('entrance', r.handoff.entrance_id);
-    if (r.handoff.indoor_node) u.searchParams.set('node', r.handoff.indoor_node);
-    hand.href = u.toString(); hand.style.display = 'block';
-  } else hand.style.display = 'none';
-  if (!route.fitted) { map.fitBounds(routeLayer.getBounds(), {padding: [30, 30]}); route.fitted = true; }
+ }catch(error){if(id===routeVersion&&error.name!=='AbortError')showError(error);}finally{if(id===routeVersion){busy=false;$('goBtn').disabled=false;}}
 }
-
-async function loadClosures() {
-  const cs = await api('/api/closures');
-  const fingerprint = JSON.stringify(cs);
-  const changed = fingerprint !== closureFingerprint;
-  closureFingerprint = fingerprint;
-  closureLayer.clearLayers();
-  const admin = !!$('token').value.trim();
-  let q = '';
-  for (const c of cs) {
-    const approved = c.status === 'approved';
-    L.circle([c.lat, c.lon], {radius: Math.max(c.radius_m, 8),
-      color: approved ? '#b3261e' : '#d48806', weight: 2, dashArray: approved ? null : '5 5',
-      fillOpacity: approved ? .35 : .15})
-      .bindTooltip(`${approved ? 'Closed' : 'Unconfirmed'}: ${esc(c.note || c.kind)} (until ${c.ends.slice(11,16)})`)
-      .addTo(closureLayer);
-    if (admin) q += `<div class="rep"><span>${approved ? '🔴' : '🟠'} ${esc(c.note || c.kind)} <span class="dim">${c.source}</span></span>
-      ${approved ? '' : `<button data-act="approve" data-id="${c.id}">Approve</button>`}
-      <button data-act="reject" data-id="${c.id}">${approved ? 'Lift' : 'Reject'}</button></div>`;
-  }
-  $('queue').innerHTML = admin ? (q || '<div class="dim" style="margin-top:6px">No active closures.</div>') : '';
-  return changed;
+const labels={open:'Scheduled open',closed:'Closed',usc_id:'USC ID required',reservation:'Reservation required'};
+async function loadMobility(){
+ const state=await api('/api/mobility'+query());mobility=state;
+ const fingerprint=JSON.stringify({gates:state.gates.map(g=>[g.id,g.vehicle,g.eligible]),rules:state.rules,game:state.football.game});const changed=mobilityFingerprint!==''&&mobilityFingerprint!==fingerprint;mobilityFingerprint=fingerprint;
+ gateLayer.clearLayers();parkingLayer.clearLayers();avoidLayer.clearLayers();
+ $('gates').innerHTML=state.gates.map(g=>{
+  const status=g.vehicle.status,color=status==='closed'?'#b42328':g.eligible?'#08734d':'#8c5e00';
+  if(g.lat!==undefined)L.circleMarker([g.lat,g.lon],{radius:7,color,weight:2,fillOpacity:.8,dashArray:g.location_source==='approximate_intersection'?'3 3':null}).bindTooltip(esc(g.name)+': '+esc(labels[status]||status)).addTo(gateLayer);
+  const schedule=g.schedule,col=g.vehicle.column,spans=(schedule[col]||[]).map(s=>s.from+'–'+s.to+(s.access?' ('+(labels[s.access]||s.access)+')':'')).join(', ')||'Closed';
+  return '<div class="gate"><div class="row"><span class="grow">'+esc(g.name)+'</span><strong class="'+(status==='closed'?'closed':g.eligible?'success':'restricted')+'">'+esc(labels[status]||status)+'</strong></div><div class="dim">'+(g.basis==='staff_confirmed'?'Staff confirmed: '+esc(g.vehicle.reason):'Hours in effect: '+esc(spans))+(g.location_source==='approximate_intersection'?' · Approximate pin':'')+'</div></div>';
+ }).join('');
+ for(const a of state.avoid.filter(a=>!a.id.startsWith('gate:')))L.geoJSON({type:'Feature',geometry:a.geometry,properties:{}},{style:{color:a.basis==='precaution_not_confirmed'?'#be8100':'#b42328',weight:2,dashArray:a.basis==='precaution_not_confirmed'?'6 5':null,fillOpacity:.15}}).bindTooltip(esc(a.name)+(a.basis==='precaution_not_confirmed'?' · Game-day precaution (not a confirmed closure)':' · Staff-confirmed vehicle closure')).addTo(avoidLayer);
+ const previous=$('parking').value;
+ $('parking').innerHTML='<option value="auto">Auto · gate access and walking distance</option>'+state.parking.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+(p.eligible?'':' · Access requirements not met')+'</option>').join('');if([...$('parking').options].some(o=>o.value===previous))$('parking').value=previous;
+ for(const p of state.parking)L.circleMarker([p.entrance.lat,p.entrance.lon],{radius:6,color:p.eligible?'#2459d3':'#7b7f88',fillOpacity:.8}).bindTooltip(esc(p.name)+' · '+(p.eligible?'Access requirements met · Spaces unknown':esc(p.reason))).addTo(parkingLayer);
+ const previousGate=$('ruleGate').value;
+ $('ruleGate').innerHTML=state.gates.map(g=>'<option value="'+esc(g.id)+'">'+esc(g.name)+'</option>').join('');if([...$('ruleGate').options].some(o=>o.value===previousGate))$('ruleGate').value=previousGate;
+ const f=state.football;$('football').hidden=!f.game&&f.known_season;
+ $('football').innerHTML=f.game?'<strong>Home game · USC vs '+esc(f.game.opponent)+'</strong><br>Kickoff '+esc(f.game.kickoff?.slice(11,16)||'TBD')+' PT. Amber areas are precautionary detours along four nearby roads, not confirmed closures. Check the official red closure lines, traffic arrows and on-site directions. The official page includes older-year guidance, so verify current restrictions. Staff enter confirmed closure times.':!f.known_season?'The football schedule for this year is not registered. Staff must update it before driving routes are available.':'';
+ $('sourcesNote').textContent='Sources checked: '+state.checked+' · '+f.season+' schedule snapshot. Verify traffic restriction boundaries on site. Game-day precautions conservatively cover the campus-area portions of the roads named in the official guidance.';
+ return changed;
 }
-
-$('queue').addEventListener('click', async e => {
-  const b = e.target.closest('button[data-act]'); if (!b) return;
-  await api(`/api/closures/${b.dataset.id}/${b.dataset.act}`, {method: 'POST'});
-  await loadClosures(); route();
-});
-
-map.on('click', e => {
-  if (reporting) {
-    if (!repPin) repPin = L.marker(e.latlng).addTo(map); else repPin.setLatLng(e.latlng);
-    $('reportForm').style.display = 'block'; $('repNote').focus();
-    return;
-  }
-  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-  setStart(e.latlng.lat, e.latlng.lng, false);
-});
-
-$('repBtn').onclick = () => {
-  reporting = !reporting;
-  $('repBtn').setAttribute('aria-pressed', reporting);
-  $('hint').textContent = reporting ? 'Tap where the blockage is.' : '';
-  if (!reporting) { $('reportForm').style.display = 'none'; if (repPin) { repPin.remove(); repPin = null; } }
-};
-$('repSend').onclick = async () => {
-  if (!repPin) return;
-  const ll = repPin.getLatLng();
-  const c = await api('/api/closures', {method: 'POST', body: JSON.stringify(
-    {lat: ll.lat, lon: ll.lng, note: $('repNote').value.trim(), radius_m: 15})});
-  $('repNote').value = ''; $('repBtn').click();
-  $('hint').textContent = c.status === 'approved' ? 'Closure posted. Routes now avoid it.'
-                                                  : 'Thanks. Shown as unconfirmed until staff check it.';
-  await loadClosures(); route();
-};
-
-$('locBtn').onclick = () => {
-  if (!navigator.geolocation) { $('hint').textContent = 'No location on this device. Tap the map instead.'; return; }
-  $('hint').textContent = 'Finding you…';
-  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-  let last = null;
-  watchId = navigator.geolocation.watchPosition(p => {
-    const {latitude: la, longitude: lo} = p.coords;
-    // reroute only after a real move, not every GPS jitter
-    if (last && map.distance(last, [la, lo]) < 15) return;
-    last = [la, lo]; setStart(la, lo, true);
-  }, err => { $('hint').textContent = 'Location unavailable (' + err.message + '). Tap the map instead.'; },
-  {enableHighAccuracy: true, maximumAge: 5000});
-};
-
-$('result').addEventListener('click', e => {
-  const b = e.target.closest('button[data-pick]'); if (!b) return;
-  $('to').value = b.textContent; route.fitted = false; route();
-});
-$('goBtn').onclick =() => { route.fitted = false; route(); };
-$('to').addEventListener('change', () => { route.fitted = false; route(); });
-$('stepFree').onchange = route;
-$('token').value = '';
-$('token').addEventListener('change', () => { updateReportAvailability(); loadClosures(); });
-
-(async () => {
-  buildings = await api('/api/buildings');
-  $('blds').innerHTML = buildings.map(b => `<option value="${esc(b.name)}">`).join('');
-  $('attr').innerHTML = 'Paths and buildings &copy; OpenStreetMap contributors (ODbL)';
-  if (qs.get('to')) {
-    const id = qs.get('to');
-    const b = buildings.find(b => b.id === id);
-    $('to').value = b ? b.name : id;
-  }
-  try {
-    deployment = await api('/api/health');
-    const notice = $('deploymentNotice');
-    if (deployment.database !== 'connected') {
-      notice.textContent = 'Read-only preview: closure storage is not connected. Reports are disabled.';
-      notice.style.display = 'block';
-    }
-    updateReportAvailability();
-  } catch { /* The original local Python server has no health endpoint. */ }
-  await loadClosures();
-  const at = qs.get('at');          // ?at=lat,lon  fakes the start for a demo
-  if (at) { const [la, lo] = at.split(',').map(Number); setStart(la, lo, false); }
-  setInterval(async () => { if (await loadClosures()) route(); }, 30000);
-})();
+async function loadClosures(){const rows=await api('/api/closures'+query()),fingerprint=JSON.stringify(rows),changed=closureFingerprint!==''&&closureFingerprint!==fingerprint;closureFingerprint=fingerprint;closureLayer.clearLayers();let h='';for(const c of rows){const approved=c.status==='approved';L.circle([c.lat,c.lon],{radius:c.radius_m||15,color:approved?'#b42328':'#be8100',fillOpacity:.2,dashArray:approved?null:'5 5'}).bindTooltip(esc(c.note||c.kind)).addTo(closureLayer);h+='<div class="rep"><span>'+esc(c.note||c.kind)+'<br><small>'+esc((c.modes||['walking']).join(' / '))+' · '+esc(c.status)+'</small></span>'+(approved?'':'<button class="small" data-act="approve" data-id="'+c.id+'">Approve</button>')+'<button class="small" data-act="reject" data-id="'+c.id+'">Lift</button></div>';}$('queue').innerHTML=$('token').value.trim()?'<h2>Blockage reports</h2>'+h:'';return changed;}
+async function loadRules(){if(!$('token').value.trim()){$('ruleQueue').innerHTML='';return;}const rows=await api('/api/mobility/rules'+query());$('ruleQueue').innerHTML='<h2>Upcoming and active vehicle restrictions</h2>'+rows.map(r=>'<div class="rep"><span>'+esc(r.note)+'<br><small>'+esc(r.starts)+' → '+esc(r.ends)+'</small></span><button class="small" data-rule="'+r.id+'">Lift</button></div>').join('');}
+async function refresh(){if(refreshing)return;refreshing=true;try{const results=await Promise.all([loadMobility(),loadClosures()]);if(results.some(Boolean)&&plan&&!busy)await route(false);}finally{refreshing=false;}}
+$('walkMode').onclick=()=>setMode('walking');$('driveMode').onclick=()=>setMode('driving');$('goBtn').onclick=safe(()=>route());
+$('to').onchange=()=>{clearRoute();};$('stepFree').onchange=()=>{clearRoute();};$('parking').onchange=()=>{clearRoute();};
+for(const id of ['departAt','uscId','parkingPass'])$(id).onchange=safe(async()=>{clearRoute();await loadMobility();});
+$('nowBtn').onclick=safe(async()=>{$('departAt').value='';clearRoute();await refresh();});
+$('result').onclick=safe(async e=>{const b=e.target.closest('button[data-pick]');if(b){$('to').value=buildings.find(x=>x.id===b.dataset.pick)?.name||b.dataset.pick;await route();}});
+$('parkedBtn').onclick=safe(async()=>{if(!plan||mode!=='driving')return;const h=plan.handoff;if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}setMode('walking');$('departAt').value='';start={place:h.parking,exit:h.exit};marker(h.lat,h.lon);await loadMobility();await route();});
+$('locBtn').onclick=()=>{if(!navigator.geolocation){info('Location is unavailable on this device. Tap the map to choose your start.',true);return;}info('Finding your location…');if(watchId!==null)navigator.geolocation.clearWatch(watchId);let last=null;watchId=navigator.geolocation.watchPosition(p=>{const {latitude:lat,longitude:lon,accuracy}=p.coords;if(accuracy>100){info('GPS accuracy is low. Check your starting point on the map.',true);return;}if(last&&map.distance(last,[lat,lon])<(mode==='driving'?60:15))return;last=[lat,lon];setStart(lat,lon,true);},e=>info('Location failed: '+e.message+'. Tap the map to choose your start.',true),{enableHighAccuracy:true,maximumAge:5000});};
+map.on('click',safe(async e=>{if(drawing){polygonPoints.push([e.latlng.lat,e.latlng.lng]);if(polygonLayer)polygonLayer.remove();polygonLayer=L.polygon(polygonPoints,{color:'#b42328'}).addTo(map);$('drawHint').textContent='Boundary points selected: '+polygonPoints.length+'. Select Save confirmed closure to close and save the area.';return;}if(reporting){if(reportPin)reportPin.setLatLng(e.latlng);else reportPin=L.marker(e.latlng).addTo(map);$('reportForm').hidden=false;return;}if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}clearRoute();setStart(e.latlng.lat,e.latlng.lng);}));
+$('repBtn').onclick=()=>{reporting=!reporting;drawing=false;$('repBtn').setAttribute('aria-pressed',reporting);if(!reporting){$('reportForm').hidden=true;reportPin?.remove();reportPin=null;}info(reporting?'Tap the blockage location on the map.':'You can select your starting point on the map.');};
+$('repSend').onclick=safe(async()=>{if(!reportPin)return;const p=reportPin.getLatLng(),value=$('repModes').value;await api('/api/closures',{method:'POST',body:JSON.stringify({lat:p.lat,lon:p.lng,note:$('repNote').value,modes:value==='both'?['walking','driving']:[value]})});$('repNote').value='';$('repBtn').click();await refresh();info('Report saved. Public reports affect routes after staff approval. The map shows up to 20 recent unverified reports.');});
+$('token').onchange=safe(async()=>{availableReports();await Promise.all([loadClosures(),loadRules()]);});
+$('ruleKind').onchange=()=>{const road=$('ruleKind').value==='road';$('drawBtn').hidden=!road;$('drawHint').hidden=!road;$('ruleGate').hidden=road;drawing=false;};
+$('drawBtn').onclick=()=>{drawing=true;reporting=false;polygonPoints=[];polygonLayer?.remove();polygonLayer=null;info('Tap the boundary points of the actual vehicle closure area on the map.');};
+$('saveRule').onclick=safe(async()=>{if(!$('token').value.trim())throw new Error('Enter an admin token first.');if(!$('ruleStarts').value||!$('ruleEnds').value)throw new Error('Enter both confirmed closure start and end times.');const body={kind:$('ruleKind').value,gate:$('ruleGate').value,starts:$('ruleStarts').value,ends:$('ruleEnds').value,note:$('ruleNote').value};if(body.kind==='road'){if(polygonPoints.length<3)throw new Error('Draw the closure area on the map first.');const ring=polygonPoints.map(p=>[p[1],p[0]]);ring.push(ring[0]);body.geometry={type:'Polygon',coordinates:[ring]};}await api('/api/mobility/rules',{method:'POST',body:JSON.stringify(body)});drawing=false;polygonPoints=[];polygonLayer?.remove();polygonLayer=null;await Promise.all([refresh(),loadRules()]);info('Confirmed vehicle restriction saved.');});
+$('ruleQueue').onclick=safe(async e=>{const b=e.target.closest('[data-rule]');if(!b)return;await api('/api/mobility/rules/'+b.dataset.rule,{method:'DELETE'});await Promise.all([refresh(),loadRules()]);});
+$('queue').onclick=safe(async e=>{const b=e.target.closest('[data-act]');if(!b)return;await api('/api/closures/'+b.dataset.id+'/'+b.dataset.act,{method:'POST'});await refresh();});
+(async()=>{setMode(mode);try{const results=await Promise.all([api('/api/buildings'),api('/api/health')]);buildings=results[0];health=results[1];$('blds').innerHTML=buildings.map(b=>'<option value="'+esc(b.name)+'">').join('');$('statusPill').textContent=health.driving_routes?'Driving + walking ready':'Walking ready';if(!health.driving_routes){$('deploymentNotice').hidden=false;$('deploymentNotice').textContent=health.mobility_migration==='required'?'An update to the database is required. Staff should run the migrations in the update guide.':health.database!=='connected'?'Preview: closure storage is not connected. Driving and reports are unavailable.':'Driving will be available after staff connect the routing service.';}availableReports();if(qs.get('to'))$('to').value=buildings.find(b=>b.id===qs.get('to'))?.name||qs.get('to');await refresh();const at=qs.get('at');if(at){const [lat,lon]=at.split(',').map(Number);if(Number.isFinite(lat)&&Number.isFinite(lon))setStart(lat,lon);}setInterval(()=>refresh().catch(showError),30000);}catch(error){showError(error);}})();
 </script>
-</body>
-</html>
+</body></html>

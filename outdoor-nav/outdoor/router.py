@@ -16,7 +16,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from .geo import haversine_m, point_segment_m, project, walk_seconds
+from .geo import haversine_m, point_segment_m, walk_seconds
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 
@@ -141,8 +141,6 @@ class WalkGraph:
         route ends at the side of the building nearest a path, which may not
         be a door."""
         self.targets = {}
-        self._index()
-        self._segs = None
         for b in self.buildings.values():
             pts = [(e["id"], e["lat"], e["lon"]) for e in b.get("entrances", [])]
             if not pts:
@@ -150,74 +148,15 @@ class WalkGraph:
                        for i, (lat, lon) in enumerate(b.get("outline", [])[:-1])]
             ids = []
             for pid, lat, lon in pts:
+                nid, d = self.nearest(lat, lon)
+                if nid is None or d > SNAP_LIMIT_M:
+                    continue
                 key = "E:" + pid
-                if self._attach(key, lat, lon, SNAP_LIMIT_M) is not None:
-                    ids.append(key)
+                self.nodes[key] = (lat, lon)
+                self._add(key, nid, walk_seconds(d), d)
+                ids.append(key)
             self.targets[b["id"]] = ids
         self._index()
-
-    # ------------------------------------------------------------ snapping
-    def _seg_grid(self):
-        """Path segments by grid cell (every cell their bounding box touches).
-        Built once, before doors are wired, so it holds only real paths."""
-        g = {}
-        for i, (u, v, *_r) in enumerate(self.edges):
-            if u > v or u.startswith(("E:", "O:", "P:")) or v.startswith(("E:", "O:", "P:")):
-                continue
-            (la1, lo1), (la2, lo2) = self.nodes[u], self.nodes[v]
-            for ci in range(int(min(la1, la2) // self.CELL), int(max(la1, la2) // self.CELL) + 1):
-                for cj in range(int(min(lo1, lo2) // self.CELL), int(max(lo1, lo2) // self.CELL) + 1):
-                    g.setdefault((ci, cj), []).append(i)
-        return g
-
-    def _snap_edge(self, lat, lon, radius=150):
-        """Nearest point on any path SEGMENT (not node): (edge index, metres,
-        t along u->v, foot point). Snapping to the nearest node sent a start
-        point on a long footway to the far end of it and back."""
-        if getattr(self, "_segs", None) is None:
-            self._segs = self._seg_grid()
-        ci, cj = int(lat // self.CELL), int(lon // self.CELL)
-        r = max(1, int(radius / (self.CELL * 92000)) + 1)
-        for _grow in range(6):
-            best, seen = None, set()
-            for i in range(ci - r, ci + r + 1):
-                for j in range(cj - r, cj + r + 1):
-                    for ei in self._segs.get((i, j), ()):
-                        if ei in seen:
-                            continue
-                        seen.add(ei)
-                        u, v = self.edges[ei][0], self.edges[ei][1]
-                        d, t, foot = project((lat, lon), self.nodes[u], self.nodes[v])
-                        if best is None or d < best[1]:
-                            best = (ei, d, t, foot)
-            # only trust the answer if nothing outside the searched square could be closer
-            if best is not None and best[1] <= r * self.CELL * 92000:
-                return best
-            r *= 2
-        return best
-
-    def _link(self, u, v, s, m, steps=False, name="", live=False):
-        for a, b in ((u, v), (v, u)):
-            self.edges.append((a, b, s, m, steps, name))
-            if live:
-                self.out.setdefault(a, []).append(len(self.edges) - 1)
-
-    def _attach(self, key, lat, lon, limit=None, live=False):
-        """Put `key` at (lat, lon) and join it to the nearest path segment
-        through a foot point P, walkable towards both ends of that segment.
-        Returns the perpendicular metres, or None if nothing is within limit."""
-        snap = self._snap_edge(lat, lon, radius=limit or 150)
-        if snap is None or (limit is not None and snap[1] > limit):
-            return None
-        ei, d, t, foot = snap
-        u, v, sec, m, steps, name = self.edges[ei]
-        pk = "P:" + key
-        self.nodes[key] = (lat, lon)
-        self.nodes[pk] = foot
-        self._link(key, pk, walk_seconds(d), d, live=live)
-        self._link(pk, u, sec * t, m * t, steps, name, live=live)
-        self._link(pk, v, sec * (1 - t), m * (1 - t), steps, name, live=live)
-        return d
 
     def _index(self):
         self.out = {}
@@ -229,7 +168,7 @@ class WalkGraph:
     def _grid(self):
         g = {}
         for nid, (lat, lon) in self.nodes.items():
-            if not nid.startswith(("E:", "O:", "P:")):
+            if not nid.startswith(("E:", "O:")):
                 g.setdefault((int(lat // self.CELL), int(lon // self.CELL)), []).append(nid)
         return g
 
@@ -378,17 +317,17 @@ class WalkGraph:
                               % (b["name"], SNAP_LIMIT_M))
 
         origin = "O:start"
-        base = len(self.edges)
         if pl:
+            links = [(n, 0.0, 0.0) for n in pl["nodes"]]
             lat, lon = self.nodes[pl["nodes"][0]]
-            self.nodes[origin] = (lat, lon)
-            for n in pl["nodes"]:
-                self._link(origin, n, 0.0, 0.0, live=True)
             snap_m = 0.0
         else:
-            snap_m = self._attach(origin, lat, lon, live=True)
-            if snap_m is None:
-                raise Unreachable("no mapped path anywhere near the start point")
+            snap, snap_m = self.nearest(lat, lon)
+            links = [(snap, walk_seconds(snap_m), snap_m)]
+        self.nodes[origin] = (lat, lon)
+        for n, sec, m in links:
+            self.edges.append((origin, n, sec, m, False, ""))
+            self.out.setdefault(origin, []).append(len(self.edges) - 1)
         try:
             blocked = self._blocked_edges(closures)
             cost, path, eidx, hit = self._dijkstra(origin, targets, blocked,
@@ -414,16 +353,10 @@ class WalkGraph:
                 lat, lon = self.nodes[path[0]]
             coords = [self.nodes[n] for n in path]
         finally:
-            touched = {e[0] for e in self.edges[base:]}
-            del self.edges[base:]
-            for n in touched:
-                kept = [i for i in self.out.get(n, []) if i < base]
-                if kept:
-                    self.out[n] = kept
-                else:
-                    self.out.pop(n, None)
-            for k in (origin, "P:" + origin):
-                self.nodes.pop(k, None)
+            for _ in links:
+                self.edges.pop()
+            del self.out[origin]
+            del self.nodes[origin]
 
         ent_id = path[-1][2:]
         ent = next((e for e in b.get("entrances", []) if e["id"] == ent_id), None)

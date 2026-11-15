@@ -34,33 +34,12 @@ USC_BBOX = (34.0150, -118.2930, 34.0270, -118.2780)
 ATTRIBUTION = ("Map data from OpenStreetMap contributors, ODbL 1.0 "
                "(https://www.openstreetmap.org/copyright)")
 
-# cycleway is in here on purpose: USC's main walks (Childs Way, Watt Way, most
-# of Trousdale) are tagged highway=cycleway + foot=designated -- shared malls,
-# drawn blue-dashed on the OSM map. Leaving cycleway out dropped them and sent
-# people round the outside of campus on the streets.
-WALKABLE = ("footway|path|pedestrian|steps|living_street|corridor|cycleway"
-            "|residential|tertiary|secondary|primary|unclassified|service")
+WALKABLE = "footway|path|pedestrian|steps|living_street|corridor|residential|tertiary|secondary|primary|unclassified"
 
-# Fetch broadly; who may walk it is decided in walkable() below, because
-# Overpass filters cannot express "foot= overrides access=".
 Q_WALK = ('[out:json][timeout:90];('
-          'way({bbox})["highway"~"^(' + WALKABLE + ')$"];'
+          'way({bbox})["highway"~"^(' + WALKABLE + ')$"]["foot"!="no"]["access"!="private"];'
+          'way({bbox})["highway"="service"]["foot"!="no"]["access"!="private"];'
           ');out geom;')
-
-FOOT_OK = {"yes", "designated", "permissive"}
-
-
-def walkable(tags):
-    """OSM access rules for a pedestrian: an explicit foot= tag wins over the
-    general access= tag (campus walks are often access=private, foot=designated)."""
-    foot = tags.get("foot")
-    if foot == "no":
-        return False
-    if foot in FOOT_OK:
-        return True
-    if tags.get("highway") == "cycleway":
-        return False      # bike-only unless foot is stated
-    return tags.get("access") not in ("private", "no")
 Q_BUILDINGS = ('[out:json][timeout:90];('
                'way({bbox})["building"]["name"];'
                'relation({bbox})["building"]["name"]["type"="multipolygon"];'
@@ -108,8 +87,6 @@ def build_walk(payload):
 
     for w in payload.get("elements", []):
         geom, tags = w.get("geometry") or [], w.get("tags") or {}
-        if not walkable(tags):
-            continue
         for p in geom:
             k = key(p)
             if k not in nodes:
@@ -204,20 +181,13 @@ def main():
 
     print("walk network ...")
     nodes, edges = build_walk(fetch(Q_WALK, bbox))
-    # A busy mirror can answer 200 with nothing in it. Never overwrite good
-    # data with an empty network.
-    if len(nodes) < 100:
-        raise SystemExit("only %d walk nodes came back -- mirror problem? "
-                         "data/ left unchanged" % len(nodes))
+    (out / "walk.json").write_text(json.dumps(
+        {"attribution": ATTRIBUTION, "bbox": bbox, "nodes": nodes, "edges": edges},
+        separators=(",", ":")), encoding="utf-8")
     print("  %d nodes, %d edges" % (len(nodes), len(edges)))
 
     print("buildings and entrances ...")
     blds = build_buildings(fetch(Q_BUILDINGS, bbox))
-    if not blds:
-        raise SystemExit("no buildings came back -- data/buildings.json left unchanged")
-    (out / "walk.json").write_text(json.dumps(
-        {"attribution": ATTRIBUTION, "bbox": bbox, "nodes": nodes, "edges": edges},
-        separators=(",", ":")), encoding="utf-8")
     (out / "buildings.json").write_text(json.dumps(
         {"attribution": ATTRIBUTION, "bbox": bbox, "buildings": blds},
         separators=(",", ":")), encoding="utf-8")

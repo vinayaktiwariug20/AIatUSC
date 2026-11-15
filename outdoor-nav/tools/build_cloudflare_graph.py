@@ -12,10 +12,7 @@ sys.path.insert(0, str(ROOT))
 def main():
     from outdoor.router import WalkGraph
     g = WalkGraph()
-    cells = {"%d,%d" % key: value for key, value in (g._cells or g._grid()).items()}
-    # The real path segments only, as router.py indexed them before wiring
-    # doors: what a start point may snap onto.
-    seg_cells = {"%d,%d" % key: value for key, value in (g._segs or g._seg_grid()).items()}
+    cells = {"%d,%d" % key: value for key, value in g._cells.items()}
     edge_cells = {}
     for index, (u, v, *_rest) in enumerate(g.edges):
         a, b = g.nodes[u], g.nodes[v]
@@ -28,7 +25,7 @@ def main():
                for path in data_files if path.name != "closures.json"}
     graph = {"attribution": g.attribution, "nodes": g.nodes, "edges": g.edges,
              "buildings": g.buildings, "places": g.places, "targets": g.targets,
-             "out": g.out, "cells": cells, "edgeCells": edge_cells, "segCells": seg_cells,
+             "out": g.out, "cells": cells, "edgeCells": edge_cells,
              "bounds": [min(latitudes), min(longitudes), max(latitudes), max(longitudes)],
              "source_sha256": sources}
     output = ROOT / "cloudflare/graph.json"
