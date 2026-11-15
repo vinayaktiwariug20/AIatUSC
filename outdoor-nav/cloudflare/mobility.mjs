@@ -28,14 +28,26 @@ export function footballContext(data,when) {
     policy:game?'precaution_all_day':'none',next:data.home_games.find(g=>g.date>=date)||null,
     home_games:data.home_games};
 }
+// USC parking permits (from people who park there):
+//  - a permit for a structure always lets its holder drive in and park there, even when
+//    the public gate hours or game-day rules keep other visitors out;
+//  - on weekends a permit for any structure is valid at every structure.
+// A permit never overrides a closure that staff confirmed.
+export const permitId=(context,value)=>typeof value==='string'&&context.mobilityData.parking.some(p=>p.id===value)?value:null;
+export function permitCovers(context,credentials,p,column){
+  const permit=permitId(context,credentials.permit);
+  return permit!==null&&(permit===p.id||column==='weekend');
+}
 export function gateState(context,when,rules=[],credentials={}) {
   const {gateData,mobilityData,time}=context;
   return time.gateStatus(gateData,when).map(g=>{
+    const byPermit=mobilityData.parking.some(p=>p.gate===g.id&&permitCovers(context,credentials,p,g.vehicle.column));
     const location=mobilityData.gates.find(p=>p.id===g.id);
     const overrides=rules.filter(r=>r.kind==='gate'&&r.gate===g.id&&forCars(r)&&r.starts_ms<=when&&when<r.ends_ms);
     // Only restrictive overrides exist. A staff action must never silently open a gate.
     const vehicle=overrides.length?{...g.vehicle,status:'closed',reason:overrides.map(r=>r.note||'Staff closure').join('; ')}:g.vehicle;
-    return {...g,...location,vehicle,eligible:!!allowed(vehicle.status,credentials),schedule:gateData.gates.find(p=>p.id===g.id),
+    const open=!!allowed(vehicle.status,credentials),permitAccess=!open&&!overrides.length&&byPermit;
+    return {...g,...location,vehicle,eligible:open||permitAccess,permit_access:permitAccess,schedule:gateData.gates.find(p=>p.id===g.id),
       basis:overrides.length?'staff_confirmed':'published_schedule'};
   });
 }
@@ -43,12 +55,16 @@ export function parkingState(context,when,rules=[],credentials={}) {
   const gates=gateState(context,when,rules,credentials),football=footballContext(context.footballData,when);
   return context.mobilityData.parking.map(p=>{
     const gate=gates.find(g=>g.id===p.gate), entrance=context.survey.nodes.find(n=>n.id===p.entrance),exit=context.survey.nodes.find(n=>n.id===p.exit);
-    let reason=null;
-    if(!gate?.eligible) reason='Gate is closed or requires access credentials.';
-    if(football.game&&p.game_access==='unconfirmed') reason='Game-day parking access is unconfirmed.';
-    if(football.game&&p.game_access==='parking_pass'&&!credentials.parking_pass) reason='Game-day prepaid parking pass required.';
+    const permit=permitCovers(context,credentials,p,gate?.vehicle.column);
+    let reason=null,gameRule=null;
+    if(!gate?.eligible) reason=gate?.basis==='staff_confirmed'?'Gate closed by staff.':'Gate is closed or requires access credentials.';
+    if(football.game&&p.game_access==='unconfirmed') gameRule='Game-day parking access is unconfirmed.';
+    if(football.game&&p.game_access==='parking_pass'&&!credentials.parking_pass) gameRule='Game-day prepaid parking pass required.';
+    if(gameRule&&!permit) reason=gameRule;
+    // True only when the permit is what lets this driver in (not when the structure is open to everyone).
+    const byPermit=permit&&(gate?.permit_access===true||gameRule!==null);
     if(!entrance||!exit) reason='Surveyed entrance or pedestrian exit is missing.';
-    return {...p,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,occupancy:'unknown',availability_basis:'gate hours and published access; spaces are not guaranteed'};
+    return {...p,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:'unknown',availability_basis:'gate hours and published access; spaces are not guaranteed'};
   });
 }
 export function circlePolygon(lat,lon,radius=35) {
@@ -198,7 +214,8 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
   if(!env.ORS_API_KEY)throw new MobilityError(503,'Driving needs an openrouteservice API key. Staff: run npm run secret:routing, then npm run deploy.');
   if(!env.DB)throw new MobilityError(503,'Connect D1 before using driving routes and live gate restrictions.');
   if(!footballContext(context.footballData,when).known_season)throw new MobilityError(503,'Football schedule for this year is not registered. Staff must update the schedule before driving routes are offered.');
-  const credentials={usc_id:body.usc_id===true,parking_pass:body.parking_pass===true,reservation:body.reservation===true};
+  if(body.permit!==undefined&&body.permit!==null&&body.permit!==''&&permitId(context,body.permit)===null)throw new MobilityError(400,'Unknown parking permit.');
+  const credentials={usc_id:body.usc_id===true,parking_pass:body.parking_pass===true,reservation:body.reservation===true,permit:permitId(context,body.permit)};
   const origin=body.from;if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon)||Math.abs(origin.lat)>90||Math.abs(origin.lon)>180)throw new MobilityError(400,'Driving requires a numeric GPS/map origin.');
   if(haversine(ll(origin),[34.021,-118.285])>90000)throw new MobilityError(400,'Driving preview supports starts within 90 km of USC.');
   const building=context.router.findBuilding(body.to);

@@ -44,6 +44,8 @@ details>summary{color:var(--cardinal-2)}
 <div id="driveOptions" class="stack" hidden>
 <label class="fieldLabel">Parking<select id="parking"><option value="auto">Auto · gate access and walking distance</option></select></label>
 <div class="row wrap"><label class="check"><input type="checkbox" id="uscId">I have a USC ID</label><label class="check"><input type="checkbox" id="parkingPass">I have a prepaid pass for this structure</label></div>
+<label class="fieldLabel">USC parking permit<select id="permit"><option value="">No permit</option></select></label>
+<div class="dim">A permit always lets you park in its own structure. On weekends it is valid at every structure.</div>
 </div>
 <details><summary class="dim">Departure time · Los Angeles</summary><div class="row" style="margin-top:8px"><input id="departAt" class="grow" type="datetime-local" aria-label="Departure time in Los Angeles"><button id="nowBtn" class="small">Now</button></div><div class="dim">Leave blank for now. Check official notices and staff updates for holiday or special access.</div></details>
 <div id="deploymentNotice" class="notice" hidden></div><div id="hint" class="dim" role="status" style="margin-top:9px">Tap the map to set your start, or use your location.</div>
@@ -74,7 +76,7 @@ function addBasemap(){const want=qs.get('basemap')||'positron',styles=['positron
  try{L.maplibreGL({style:'https://tiles.openfreemap.org/styles/'+(styles.includes(want)?want:'positron'),attribution:'<a href="https://openfreemap.org">OpenFreeMap</a> '+OSM_ATTR}).addTo(map);}catch{raster();}}
 addBasemap();
 for(const layer of [gateLayer,closureLayer,avoidLayer,parkingLayer])layer.addTo(map);
-function query(){const p=new URLSearchParams();if($('departAt').value)p.set('at',$('departAt').value);p.set('usc_id',$('uscId').checked);p.set('parking_pass',$('parkingPass').checked);return '?'+p;}
+function query(){const p=new URLSearchParams();if($('departAt').value)p.set('at',$('departAt').value);p.set('usc_id',$('uscId').checked);p.set('parking_pass',$('parkingPass').checked);if($('permit').value)p.set('permit',$('permit').value);return '?'+p;}
 async function api(path,options={}){const headers={'Content-Type':'application/json'};if($('token').value.trim())headers['X-Admin-Token']=$('token').value.trim();const r=await fetch(path,{...options,headers});let data;try{data=await r.json();}catch{throw new Error('Could not read the server response. Please retry.');}if(!r.ok)throw new Error(data.error||'Request failed ('+r.status+')');return data;}
 function info(text,error=false){$('hint').textContent=text;$('hint').classList.toggle('error',error);}
 // Shade the destination building (its OSM outline; a circle if it has none, e.g. surveyed venues).
@@ -120,7 +122,7 @@ async function route(fit=true){
  const id=++routeVersion;controller?.abort();controller=new AbortController();busy=true;$('goBtn').disabled=true;$('parkedBtn').hidden=true;plan=null;
  if(routeLayer){routeLayer.remove();routeLayer=null;}if(walkingLayer){walkingLayer.remove();walkingLayer=null;}$('result').innerHTML='';info('Checking access and routes…');
  try{
-  const r=await api('/api/outdoor/route',{method:'POST',signal:controller.signal,body:JSON.stringify({from:start,to:buildingId(),mode,at:$('departAt').value||undefined,parking:$('parking').value,usc_id:$('uscId').checked,parking_pass:$('parkingPass').checked,step_free:$('stepFree').checked})});
+  const r=await api('/api/outdoor/route',{method:'POST',signal:controller.signal,body:JSON.stringify({from:start,to:buildingId(),mode,at:$('departAt').value||undefined,parking:$('parking').value,usc_id:$('uscId').checked,parking_pass:$('parkingPass').checked,permit:$('permit').value||undefined,step_free:$('stepFree').checked})});
   if(id!==routeVersion)return;lastRouted=Date.now();
   if(!r.ok){const choices=(r.choices||[]).map(c=>'<button class="small" data-pick="'+esc(c.id)+'">'+esc(c.name)+'</button>').join(' ');$('result').innerHTML='<div class="card error">'+esc(r.reason||r.error)+(choices?'<div class="row wrap" style="margin-top:8px">'+choices+'</div>':'')+'</div>';info('Choose another start or parking structure.');return;}
   plan=r;drawPlan(r,fit);const s=r.summary;
@@ -166,8 +168,10 @@ async function loadMobility(){
   L.polygon(r.geometry.coordinates[0].map(([lon,lat])=>[lat,lon]),{color:'#b42328',weight:2,dashArray:'2 6',fillOpacity:.15}).bindTooltip(esc(r.note)+' · closed on foot').addTo(avoidLayer);
  for(const a of state.avoid.filter(a=>!a.id.startsWith('gate:')))L.geoJSON({type:'Feature',geometry:a.geometry,properties:{}},{style:{color:a.basis==='precaution_not_confirmed'?'#be8100':'#2459d3',weight:2,dashArray:a.basis==='precaution_not_confirmed'?'6 5':null,fillOpacity:.15}}).bindTooltip(esc(a.name)+(a.basis==='precaution_not_confirmed'?' · Game-day precaution (not a confirmed closure)':' · Closed to cars (staff confirmed)')).addTo(avoidLayer);
  const previous=$('parking').value;
- $('parking').innerHTML='<option value="auto">Auto · gate access and walking distance</option>'+state.parking.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+(p.eligible?'':' · Access requirements not met')+'</option>').join('');if([...$('parking').options].some(o=>o.value===previous))$('parking').value=previous;
- for(const p of state.parking)L.circleMarker([p.entrance.lat,p.entrance.lon],{radius:6,color:p.eligible?'#2459d3':'#7b7f88',fillOpacity:.8}).bindTooltip(esc(p.name)+' · '+(p.eligible?'Access requirements met · Spaces unknown':esc(p.reason))).addTo(parkingLayer);
+ $('parking').innerHTML='<option value="auto">Auto · gate access and walking distance</option>'+state.parking.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+(p.eligible?(p.permit_access?' · With your permit':''):' · '+esc(p.reason||'Access requirements not met'))+'</option>').join('');if([...$('parking').options].some(o=>o.value===previous))$('parking').value=previous;
+ const previousPermit=$('permit').value;
+ $('permit').innerHTML='<option value="">No permit</option>'+state.parking.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('');if([...$('permit').options].some(o=>o.value===previousPermit))$('permit').value=previousPermit;
+ for(const p of state.parking)L.circleMarker([p.entrance.lat,p.entrance.lon],{radius:6,color:p.eligible?'#2459d3':'#7b7f88',fillOpacity:.8}).bindTooltip(esc(p.name)+' · '+(p.eligible?(p.permit_access?'Open to you with your permit':'Access requirements met')+' · Spaces unknown':esc(p.reason))).addTo(parkingLayer);
  const previousGate=$('ruleGate').value;
  $('ruleGate').innerHTML=state.gates.map(g=>'<option value="'+esc(g.id)+'">'+esc(g.name)+'</option>').join('');if([...$('ruleGate').options].some(o=>o.value===previousGate))$('ruleGate').value=previousGate;
  const f=state.football;$('football').hidden=!f.game&&f.known_season;
@@ -189,7 +193,7 @@ async function loadRules(){if(!ruleLayer)ruleLayer=L.layerGroup().addTo(map);rul
 async function refresh(){if(refreshing)return;refreshing=true;try{const results=await Promise.all([loadMobility(),loadClosures()]);if(results.some(Boolean)&&plan&&!busy)await route(false);}finally{refreshing=false;}}
 $('walkMode').onclick=()=>setMode('walking');$('driveMode').onclick=()=>setMode('driving');$('goBtn').onclick=safe(()=>route());
 $('to').onchange=()=>{clearRoute();};$('stepFree').onchange=()=>{clearRoute();};$('parking').onchange=()=>{clearRoute();};
-for(const id of ['departAt','uscId','parkingPass'])$(id).onchange=safe(async()=>{clearRoute();await loadMobility();});
+for(const id of ['departAt','uscId','parkingPass','permit'])$(id).onchange=safe(async()=>{clearRoute();await loadMobility();});
 $('nowBtn').onclick=safe(async()=>{$('departAt').value='';clearRoute();await refresh();});
 // The event link may name a room (?room=...), passed through to indoor directions.
 let arrival='';
