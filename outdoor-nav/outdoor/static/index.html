@@ -102,7 +102,25 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'}).addTo(map);
 
 let buildings = [], start = null, startMk = null, routeLayer = null,
-    closureLayer = L.layerGroup().addTo(map), reporting = false, repPin = null, watchId = null;
+    closureLayer = L.layerGroup().addTo(map), reporting = false, repPin = null, watchId = null,
+    accCircle = null, following = false;
+
+// Every GPS fix: move the dot, show how accurate the fix is, and keep the map
+// on the walker while following. Re-routing happens separately (>=15 m moves).
+function showFix(la, lo, accuracy) {
+  if (!startMk) startMk = L.circleMarker([la, lo], {radius: 8, color: '#fff', weight: 3,
+    fillColor: '#1f4fd8', fillOpacity: 1}).addTo(map);
+  startMk.setLatLng([la, lo]);
+  if (!accCircle) accCircle = L.circle([la, lo], {radius: 1, color: '#1f4fd8', weight: 1,
+    opacity: .4, fillOpacity: .08, interactive: false}).addTo(map);
+  accCircle.setLatLng([la, lo]).setRadius(Math.max(accuracy || 0, 1));
+  if (following) map.panTo([la, lo], {animate: true});
+}
+function stopFollowing() {
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  following = false;
+  if (accCircle) { accCircle.remove(); accCircle = null; }
+}
 
 const headers = () => {
   const h = {'Content-Type': 'application/json'};
@@ -208,13 +226,20 @@ $('queue').addEventListener('click', async e => {
   await loadClosures(); route();
 });
 
+map.on('dragstart', () => {
+  if (watchId !== null && following) {
+    following = false;
+    $('hint').textContent = 'Map moved. Tap "Use my location" to re-centre.';
+  }
+});
+
 map.on('click', e => {
   if (reporting) {
     if (!repPin) repPin = L.marker(e.latlng).addTo(map); else repPin.setLatLng(e.latlng);
     $('reportForm').style.display = 'block'; $('repNote').focus();
     return;
   }
-  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  stopFollowing();
   setStart(e.latlng.lat, e.latlng.lng, false);
 });
 
@@ -238,10 +263,12 @@ $('repSend').onclick = async () => {
 $('locBtn').onclick = () => {
   if (!navigator.geolocation) { $('hint').textContent = 'No location on this device. Tap the map instead.'; return; }
   $('hint').textContent = 'Finding you…';
-  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  stopFollowing();
+  following = true;
   let last = null;
   watchId = navigator.geolocation.watchPosition(p => {
-    const {latitude: la, longitude: lo} = p.coords;
+    const {latitude: la, longitude: lo, accuracy} = p.coords;
+    showFix(la, lo, accuracy);
     // reroute only after a real move, not every GPS jitter
     if (last && map.distance(last, [la, lo]) < 15) return;
     last = [la, lo]; setStart(la, lo, true);
