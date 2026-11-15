@@ -286,3 +286,16 @@ def test_segment_snap_is_cleaned_up(g):
     n, e = len(g.nodes), len(g.edges)
     g.route(*start(), "hall")
     assert (len(g.nodes), len(g.edges)) == (n, e)
+
+
+def test_override_can_add_aliases_and_outline_without_a_door():
+    """Venue metadata: names people type, and an outline for the highlight."""
+    c = ll("C")
+    ov = [{"building": "annex", "aliases": ["The Annex", "TA"],
+           "outline": [[c[0], c[1]], [c[0] + 0.0002, c[1]], [c[0] + 0.0002, c[1] + 0.0002]]}]
+    g = WalkGraph(walk(), buildings(), overrides=ov)
+    b = g.find_building("the annex")
+    assert b["id"] == "annex"
+    assert b["outline"][0] == b["outline"][-1]          # ring closed
+    assert b.get("entrance_source") != "surveyed"        # no door added
+    assert g.find_building("nonexistent-override") is None

@@ -1,1 +1,43 @@
-[]
+[
+ {
+  "building": "dedeaux-field-baseball",
+  "id": "dedeaux-main-gate",
+  "name": "Dedeaux Field main gate",
+  "lat": 34.02276,
+  "lon": -118.289699,
+  "replace_osm": true,
+  "outline": [
+   [
+    34.02444,
+    -118.28988
+   ],
+   [
+    34.024222,
+    -118.289223
+   ],
+   [
+    34.022931,
+    -118.289446
+   ],
+   [
+    34.023564,
+    -118.290871
+   ],
+   [
+    34.024298,
+    -118.290325
+   ]
+  ],
+  "_source": "map pins by Vinayak, 2026-11-14; replaces the earlier approximate surveyed gate 35 m away"
+ },
+ {
+  "building": "dr-joseph-medicine-crow-center-for-international-and-public-affairs",
+  "aliases": [
+   "Joseph Medicine Crow Center",
+   "Medicine Crow",
+   "JMC",
+   "Joseph Crow Medicine Building"
+  ],
+  "_note": "DEMO VENUE. Add the scanned entrance here: id, name, lat, lon (pin standing at the door), indoor_node (the indoor team's entrance anchor), photo."
+ }
+]

@@ -119,20 +119,33 @@ class WalkGraph:
 
     def _apply_overrides(self, overrides):
         """Hand-placed entrances win over OSM. This is where the venue's real
-        door goes -- the same door the indoor graph starts from."""
+        door goes -- the same door the indoor graph starts from.
+
+        An entry may also carry building metadata: `aliases` (names people
+        actually type) and `outline` ([[lat, lon], ...], drawn as the
+        highlight). An entry with no lat/lon is metadata only: no door."""
         for o in overrides:
             b = self.buildings.get(o["building"])
             if b is None:
+                if "lat" not in o:
+                    continue
                 b = self.buildings[o["building"]] = {
                     "id": o["building"], "name": o.get("building_name", o["building"]),
                     "aliases": [], "lat": o["lat"], "lon": o["lon"],
                     "entrances": []}
+            if o.get("aliases"):
+                b["aliases"] = list(dict.fromkeys(list(b.get("aliases", [])) + list(o["aliases"])))
+            if o.get("outline"):
+                ring = [list(map(float, pt)) for pt in o["outline"]]
+                b["outline"] = ring if ring[0] == ring[-1] else ring + [ring[0]]
+            if "lat" not in o or "id" not in o:
+                continue
             if o.get("replace_osm"):
                 b["entrances"] = []
             b["entrances"] = [e for e in b["entrances"] if e["id"] != o["id"]]
             b["entrances"].append({k: o.get(k) for k in
                                    ("id", "lat", "lon", "name", "indoor_node",
-                                    "wheelchair")} | {"kind": "surveyed"})
+                                    "wheelchair", "photo")} | {"kind": "surveyed"})
             b["entrance_source"] = "surveyed"
 
     def _wire_entrances(self):
