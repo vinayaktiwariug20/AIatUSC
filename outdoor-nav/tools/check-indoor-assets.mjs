@@ -46,14 +46,20 @@ function asset(reference,base=page) {
 }
 
 const html=readFileSync(asset('./index.html').file,'utf8');
-for(const match of html.matchAll(/<(?:link|script)\b[^>]*(?:href|src)="([^"]+)"[^>]*>/g))asset(match[1]);
+for(const match of html.matchAll(/<(?:link|script)\b[^>]*(?:href|src)="([^"]+)"[^>]*>/g)) {
+  // An intentionally empty favicon is embedded, not a request to another host.
+  if(/<link\b[^>]*\brel="icon"/.test(match[0])&&match[1]==='data:,')continue;
+  asset(match[1]);
+}
 const importMap=JSON.parse(html.match(/<script type="importmap">\s*([\s\S]*?)<\/script>/)[1]).imports;
 for(const value of Object.values(importMap))assert.ok(value.startsWith('https://')&&value.includes('three@0.180.0/'),'Three.js must use the existing pinned HTTPS version.');
 
 function modules(source,base) {
   assert.ok(!/localhost|127\.0\.0\.1|file:\/\/|dev-indoor\.mjs/.test(source),'Production code references a local development environment.');
-  for(const match of source.matchAll(/\b(?:from\s*|import\s*\(\s*|import\s*)['"]([^'"]+)['"]/g)) {
-    const specifier=match[1];
+  // Match import/export statements and dynamic imports, not ordinary strings
+  // such as the page's 'from' | 'to' selection state.
+  for(const match of source.matchAll(/(?:^|\n)\s*(?:import|export)\s+(?:[^;\n]*?\bfrom\s*)?['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]/g)) {
+    const specifier=match[1]||match[2];
     if(specifier.startsWith('.')||specifier.startsWith('/'))asset(specifier,base);
     else assert.ok(Object.keys(importMap).some(key=>key.endsWith('/')?specifier.startsWith(key):specifier===key),'Unmapped browser import: '+specifier);
   }
@@ -63,7 +69,7 @@ for(const block of html.matchAll(/<script type="module">([\s\S]*?)<\/script>/g))
   const result=spawnSync(process.execPath,['--check','--input-type=module'],{input:block[1],encoding:'utf8'});
   assert.equal(result.status,0,result.error?.message||result.stderr);
 }
-for(const name of readdirSync(indoor).filter(name=>extname(name)==='.js')) {
+for(const name of readdirSync(indoor).filter(name=>['.js','.mjs'].includes(extname(name)))) {
   const {file,url}=asset(name);modules(readFileSync(file,'utf8'),url);
   const result=spawnSync(process.execPath,['--check',file],{encoding:'utf8'});
   assert.equal(result.status,0,result.error?.message||result.stderr);
@@ -71,10 +77,21 @@ for(const name of readdirSync(indoor).filter(name=>extname(name)==='.js')) {
 const venue=JSON.parse(readFileSync(asset('./data/venue.json').file,'utf8'));
 const graph=JSON.parse(readFileSync(asset('./data/graph.json').file,'utf8'));
 assert.equal(Buffer.from(graph.nodes,'base64').length,graph.count*8);
-const model=readFileSync(asset(venue.model).file);
-assert.equal(model.subarray(0,4).toString(),'glTF');assert.equal(model.readUInt32LE(4),2);assert.equal(model.readUInt32LE(8),model.length);
-const gltf=JSON.parse(model.subarray(20,20+model.readUInt32LE(12)).toString());
-for(const item of [...gltf.buffers,...gltf.images])if(item.uri&&!item.uri.startsWith('data:'))asset(item.uri,new URL(venue.model,page));
+function checkModel(reference,base=page) {
+  const {file,url}=asset(reference,base),model=readFileSync(file);
+  assert.equal(model.subarray(0,4).toString(),'glTF');assert.equal(model.readUInt32LE(4),2);assert.equal(model.readUInt32LE(8),model.length);
+  const gltf=JSON.parse(model.subarray(20,20+model.readUInt32LE(12)).toString());
+  for(const item of [...(gltf.buffers||[]),...(gltf.images||[])])if(item.uri&&!item.uri.startsWith('data:'))asset(item.uri,url);
+  return model;
+}
+const model=checkModel(venue.model);
+// The current scanned-building page loads these assets instead of the older
+// single-model controller. Check the actual deployed page's network as well.
+const building=JSON.parse(readFileSync(asset('./building.json').file,'utf8'));
+assert.ok(Object.keys(building.nav.nodes).length>0&&building.nav.edges.length>0,'Current building has no navigation graph.');
+const scene=JSON.parse(readFileSync(asset('./scene/scene.json').file,'utf8'));
+assert.ok(scene.scans.length>0,'Current building has no scans.');
+for(const scan of scene.scans)checkModel(scan.file,new URL('./scene/',page));
 assert.ok(venue.destinations.some(destination=>destination.id==='258'&&destination.isRealRoom===false));
 // Local helper scripts sit outside the asset root; they are never client dependencies.
 assert.ok(!existsSync(resolve(root,'tools/dev-indoor.mjs')));

@@ -226,7 +226,10 @@ for (const p of B.places) p.name = RENAME.places[p.id] || p.name;
 for (const n of Object.values(NAV.nodes)) n.area = RENAME.areas[n.area] || n.area;
 for (const l of B.labels) l.text = RENAME.labels[l.text] || l.text;
 B.labels.push({text: 'Right entrance', x: 50.8, y: 0.3, z: 19.6, floors: [1, 2]});
-if (qs.get('building')) $('back').href = '/?to=' + encodeURIComponent(qs.get('building'));
+const backParams = new URLSearchParams();
+if (qs.get('building')) backParams.set('to', qs.get('building'));
+for (const key of ['room', 'room_label']) if (qs.has(key)) backParams.set(key, qs.get(key));
+$('back').href = '/' + (backParams.size ? '?' + backParams : '');
 
 // ---------------------------------------------------------------- renderer, camera
 const stage = $('stage'), canvas = $('view');
