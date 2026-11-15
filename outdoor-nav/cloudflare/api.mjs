@@ -2,7 +2,7 @@ import {Unreachable, haversine} from './router.mjs';
 import {triage, checkPhoto, configured as triageConfigured} from './triage.mjs';
 import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
-import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota} from './mobility.mjs';
+import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures} from './mobility.mjs';
 
 class ApiError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -158,6 +158,8 @@ export async function handleApi(request, env, context) {
       }
       if (!place && !router.containsStart(lat,lon)) return reply({ok:false,reason:'Start is outside the campus walking map. Choose a campus gate or parking exit.',blocked_by:[]});
       const rows = forMode(await active(db,when),'walking');
+      // Staff rules closed on foot (areas, surveyed gates) apply to walking too.
+      rows.push(...walkingRuleClosures(context, await readRules(db, when), when));
       if(from.exit!==undefined&&(typeof from.exit!=='string'||!place))fail(400,'A parking place is required for a surveyed exit.');
       try {
         const out = router.route({lat,lon,place,exit:from.exit??null,building:body.to,stepFree:Boolean(body.step_free),
