@@ -5,3 +5,8 @@
 # Vehicle routing (optional for walking). Keep the real API key private.
 # ORS_API_KEY=paste-your-openrouteservice-key-here
 # Production: npm run secret:routing, then npm run deploy
+
+# AI triage of reports (optional; see TRIAGE.md). Unset = reports work without AI suggestions.
+# TRIAGE_URL=https://report-triage.<you>.replit.app
+# TRIAGE_SECRET=same-long-random-value-as-the-Replit-secret
+# Production: npm run secret:triage-url and npm run secret:triage-secret
