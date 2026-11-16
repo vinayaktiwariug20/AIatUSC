@@ -139,3 +139,7 @@ test('a report without migration 0002 gets a clear "database needs an update" er
   const r=await call({DB:d,PUBLIC_REPORTS_ENABLED:'true'},'/api/closures','POST',report);
   assert.equal(r.status,503);assert.match(r.data.error,/migration 0002/);
 });
+test('the building list carries official codes, so organizers can search TCC or DMC',async()=>{
+  const rows=(await call({},'/api/buildings?q=tcc')).data;
+  assert.ok(rows.some(b=>b.name==='Ronald Tutor Campus Center'&&b.aliases.includes('TCC')),JSON.stringify(rows.slice(0,2)));
+});
