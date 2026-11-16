@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Make an event link · Doorstep</title>
+<link rel="icon" href="data:,">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+:root{--bg:#f5f1ea;--card:#fff;--cream:#fbf6ec;--ink:#202329;--dim:#59616e;--line:#e5ddd0;--cardinal:#7a1424;--cardinal-2:#5a0e1a;--gold:#f2c14e;--ok:#08734d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{background:linear-gradient(135deg,var(--cardinal),var(--cardinal-2));color:#fff;padding:22px 18px 24px}
+header .in,main{max-width:640px;margin:0 auto}
+header small{color:#f3d9a4;letter-spacing:.08em}
+header h1{margin:4px 0 0;font-size:24px;letter-spacing:-.4px}
+header p{margin:6px 0 0;color:#f3e6e8;font-size:15px}
+main{padding:16px 18px 40px}
+.card{background:var(--cream);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px}
+h2{margin:0 0 10px;font-size:17px}
+label{display:block;font-size:14px;color:var(--dim);margin:12px 0 4px}
+label:first-of-type{margin-top:0}
+input,select,button{font:inherit;color:var(--ink)}
+input,select{width:100%;min-height:46px;border:1px solid var(--line);border-radius:10px;padding:8px 11px;background:#fff}
+.hint{font-size:13px;color:var(--dim);margin-top:4px}
+button,.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;text-decoration:none;color:var(--ink);font-weight:600}
+button.primary{background:var(--cardinal);border-color:var(--cardinal);color:#fff}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grow{flex:1;min-width:0}
+#err{color:#b42328;font-size:14px;margin-top:8px}
+#qr{display:flex;justify-content:center;background:#fff;border-radius:12px;padding:12px;margin:12px 0}
+#qr svg{width:220px;height:220px}
+#link{font-family:ui-monospace,Consolas,monospace;font-size:13px}
+.ok{color:var(--ok);font-size:14px}
+footer{color:var(--dim);font-size:13px;margin-top:22px}
+footer a{color:var(--cardinal)}
+[hidden]{display:none!important}
+/* Print: only the flyer. */
+#flyer{display:none}
+@media print{
+  body{background:#fff}
+  header,main>*:not(#flyer){display:none!important}
+  #flyer{display:block;text-align:center;padding:28px;font-size:18px}
+  #flyer h1{font-size:34px;margin:0 0 6px}
+  #flyer .where{font-size:22px;margin:4px 0 18px}
+  #flyer svg{width:9cm;height:9cm}
+  #flyer .scan{font-size:20px;font-weight:700;margin-top:14px}
+  #flyer .url{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#444;margin-top:10px;word-break:break-all}
+}
+</style>
+</head>
+<body>
+<header><div class="in">
+  <small>DOORSTEP · FOR ORGANIZERS</small>
+  <h1>Make an event link</h1>
+  <p>Attendees scan it and get directions to the right door, and, where the building has an indoor map, to the room.</p>
+</div></header>
+<main>
+  <section class="card">
+    <h2>1. Your event</h2>
+    <label for="event">Event name (optional)</label>
+    <input id="event" maxlength="80" placeholder="e.g. AI@USC Showcase">
+    <label for="building">Building</label>
+    <input id="building" list="blds" placeholder="Name or code, e.g. TCC or Doheny" autocomplete="off">
+    <datalist id="blds"></datalist>
+    <div class="hint" id="buildingHint">Start typing; pick from the list.</div>
+
+    <div id="indoorBox" hidden>
+      <label for="room">Room</label>
+      <select id="room"></select>
+      <label for="anchor">Where indoor directions start</label>
+      <select id="anchor"><option value="">The entrance they arrive at (recommended)</option></select>
+      <div class="hint">This building has an indoor map, so attendees get directions to the room too.</div>
+    </div>
+    <div id="labelBox">
+      <label for="roomLabel">Room or meeting point (optional)</label>
+      <input id="roomLabel" maxlength="40" placeholder="e.g. Room 218, or Lobby">
+      <div class="hint">Shown to attendees next to the building name.</div>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="primary" id="make">Make link</button></div>
+    <div id="err" role="alert"></div>
+  </section>
+
+  <section class="card" id="out" hidden>
+    <h2>2. Share it</h2>
+    <div class="row"><input id="link" class="grow" readonly aria-label="Event link"><button id="copy">Copy</button></div>
+    <div class="ok" id="copied" role="status"></div>
+    <div id="qr" aria-label="QR code for the event link"></div>
+    <div class="row">
+      <button id="png">Download QR (PNG)</button>
+      <button id="print">Print flyer</button>
+      <a class="btn" id="open" target="_blank" rel="noopener">Try the link</a>
+    </div>
+    <div class="hint" style="margin-top:10px">Nothing is stored and there's nothing to sign up for. The link carries everything. Make a new one any time.</div>
+  </section>
+
+  <section id="flyer" aria-hidden="true">
+    <h1 id="fTitle"></h1>
+    <div class="where" id="fWhere"></div>
+    <div id="fQr"></div>
+    <div class="scan">Scan for directions to the right door</div>
+    <div class="url" id="fUrl"></div>
+  </section>
+
+  <footer>Doorstep is a student project; not affiliated with or endorsed by USC. <a href="/">Back to the map</a></footer>
+</main>
+
+<script type="module">
+import {eventLink, buildingLabel, findBuilding} from './link.mjs';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+let buildings = [], indoor = null, link = '';
+
+const getJSON = async url => { const r = await fetch(url); if (!r.ok) throw new Error('Could not load ' + url); return r.json(); };
+try {
+  buildings = await getJSON('/api/buildings');
+  $('blds').innerHTML = buildings.map(b => '<option value="' + esc(buildingLabel(b)) + '">').join('');
+} catch (e) { $('err').textContent = e.message; }
+try { indoor = await getJSON('/indoor/building.json'); } catch { indoor = null; }   // no indoor map: fine
+
+// Prefill from ?to= (e.g. a link from the map)
+const pre = new URLSearchParams(location.search).get('to');
+if (pre) { const b = findBuilding(buildings, pre); if (b) $('building').value = buildingLabel(b); }
+
+function chosen() { return findBuilding(buildings, $('building').value); }
+
+function showRoomFields() {
+  const b = chosen(), hasIndoor = !!(b && indoor && indoor.id === b.id);
+  $('indoorBox').hidden = !hasIndoor;
+  $('labelBox').hidden = hasIndoor;
+  $('buildingHint').textContent = b ? (hasIndoor ? 'Indoor map available.' : 'Directions go to the building entrance.') : 'Start typing; pick from the list.';
+  if (hasIndoor && !$('room').options.length) {
+    $('room').innerHTML = '<option value="">No specific room</option>' + indoor.rooms.map(r => '<option value="' + esc(r.id) + '">' + esc(r.name) + '</option>').join('');
+    $('anchor').innerHTML = '<option value="">The entrance they arrive at (recommended)</option>' + (indoor.places || []).map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('');
+  }
+}
+$('building').addEventListener('input', showRoomFields);
+$('building').addEventListener('change', showRoomFields);
+showRoomFields();
+
+function qrFor(text) { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q; }
+
+$('make').onclick = () => {
+  $('err').textContent = ''; $('copied').textContent = '';
+  const b = chosen();
+  if (!b) { $('err').textContent = 'Pick the building from the list (name or code).'; return; }
+  const hasIndoor = !$('indoorBox').hidden, roomSel = $('room').selectedOptions[0];
+  const roomId = hasIndoor ? $('room').value : '', roomName = hasIndoor && roomId ? roomSel.textContent : $('roomLabel').value;
+  link = eventLink(location.href, {building: b.id, event: $('event').value, room: roomId, roomLabel: roomName, anchor: hasIndoor ? $('anchor').value : ''});
+  $('link').value = link; $('open').href = link; $('out').hidden = false;
+  const svg = qrFor(link).createSvgTag({cellSize: 6, margin: 2, scalable: true});
+  $('qr').innerHTML = svg; $('fQr').innerHTML = svg;
+  $('fTitle').textContent = $('event').value.trim() || b.name;
+  $('fWhere').textContent = [$('event').value.trim() ? b.name : '', roomName].filter(Boolean).join(' · ');
+  $('fUrl').textContent = link;
+  $('out').scrollIntoView({behavior: 'smooth', block: 'start'});
+};
+
+$('copy').onclick = async () => {
+  try { await navigator.clipboard.writeText(link); $('copied').textContent = 'Copied.'; }
+  catch { $('link').select(); $('copied').textContent = 'Select and copy the link above.'; }
+};
+
+$('png').onclick = () => {
+  const q = qrFor(link), n = q.getModuleCount(), cell = 12, pad = 4 * cell, c = document.createElement('canvas');
+  c.width = c.height = n * cell + 2 * pad;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#000';
+  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (q.isDark(r, k)) g.fillRect(pad + k * cell, pad + r * cell, cell, cell);
+  const a = document.createElement('a'); a.href = c.toDataURL('image/png');
+  a.download = (($('event').value.trim() || 'doorstep-event').replace(/[^a-z0-9]+/gi, '-').toLowerCase()) + '-qr.png'; a.click();
+};
+
+$('print').onclick = () => window.print();
+</script>
+</body>
+</html>
