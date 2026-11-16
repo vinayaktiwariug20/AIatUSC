@@ -51,10 +51,16 @@ export function gateState(context,when,rules=[],credentials={}) {
       basis:overrides.length?'staff_confirmed':'published_schedule'};
   });
 }
+// A structure can have several ways in: (gate, entrance, campus leg). Downey is
+// reached through McClintock or through the Downey Way gate on Vermont.
+export const accessOptions=p=>Array.isArray(p.access)&&p.access.length?p.access:[{gate:p.gate,entrance:p.entrance,campus_via:p.campus_via}];
 export function parkingState(context,when,rules=[],credentials={}) {
   const gates=gateState(context,when,rules,credentials),football=footballContext(context.footballData,when);
   return context.mobilityData.parking.map(p=>{
-    const gate=gates.find(g=>g.id===p.gate), entrance=context.survey.nodes.find(n=>n.id===p.entrance),exit=context.survey.nodes.find(n=>n.id===p.exit);
+    const node=id=>context.survey.nodes.find(n=>n.id===id),exit=node(p.exit);
+    const access=accessOptions(p).map(o=>{const g=gates.find(x=>x.id===o.gate);return {gate:o.gate,gate_name:g?.name,eligible:!!g?.eligible,entrance:node(o.entrance),campus_via:o.campus_via||[]};});
+    // The structure is open if ANY way in is; show the first open one.
+    const primary=access.find(o=>o.eligible&&o.entrance)||access[0],gate=gates.find(x=>x.id===primary.gate),entrance=primary.entrance;
     const permit=permitCovers(context,credentials,p,gate?.vehicle.column);
     let reason=null,gameRule=null;
     if(!gate?.eligible) reason=gate?.basis==='staff_confirmed'?'Gate closed by staff.':'Gate is closed or requires access credentials.';
@@ -64,7 +70,7 @@ export function parkingState(context,when,rules=[],credentials={}) {
     // True only when the permit is what lets this driver in (not when the structure is open to everyone).
     const byPermit=permit&&(gate?.permit_access===true||gameRule!==null);
     if(!entrance||!exit) reason='Surveyed entrance or pedestrian exit is missing.';
-    return {...p,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:'unknown',availability_basis:'gate hours and published access; spaces are not guaranteed'};
+    return {...p,gate:primary.gate,campus_via:primary.campus_via,access,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:'unknown',availability_basis:'gate hours and published access; spaces are not guaranteed'};
   });
 }
 export function circlePolygon(lat,lon,radius=35) {
@@ -224,14 +230,20 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
   if(body.parking&&body.parking!=='auto'&&!parking.some(p=>p.id===body.parking))throw new MobilityError(400,'Unknown parking structure.');
   const walking=forMode(closures,'walking'),driving=forMode(closures,'driving').filter(c=>c.status==='approved');
   const candidates=[];
+  // One candidate per open way in (gate + entrance): the router can enter Downey
+  // through the Downey Way gate when it is open and nearer, McClintock otherwise.
+  const gatesNow=gateState(context,when,rules,credentials);
   for(const p of parking.filter(p=>p.eligible&&(!body.parking||body.parking==='auto'||p.id===body.parking))) {
-    const score=haversine(ll(p.exit_node),[building.lat,building.lon])/81+haversine(ll(origin),ll(p.entrance))/500;
-    candidates.push({p,score});
+    for(const o of p.access.filter(o=>o.eligible&&o.entrance)) {
+      const g=gatesNow.find(x=>x.id===o.gate),door=g&&g.lat!==undefined?[g.lat,g.lon]:ll(o.entrance);
+      const score=haversine(ll(p.exit_node),[building.lat,building.lon])/81+haversine(ll(origin),door)/500+haversine(door,ll(o.entrance))/300;
+      candidates.push({p:{...p,gate:o.gate,gate_name:o.gate_name,entrance:o.entrance,campus_via:o.campus_via},score});
+    }
   }
   candidates.sort((a,b)=>a.score-b.score);
   if(!candidates.length)return {ok:false,reason:'No eligible parking route. Check gate hours, access requirements, or choose another structure.',parking};
   const reportAreas=driving.map(c=>({id:c.id,name:c.note||'Approved blockage',basis:'staff_confirmed',geometry:circlePolygon(c.lat,c.lon,c.radius_m||15)}));
-  let attempts=0;const checks=[];const reject=(p,check,extra={})=>checks.push({parking:p.id,check,...extra});
+  let attempts=0;const checks=[],found=[];const reject=(p,check,extra={})=>checks.push({parking:p.id,check,...extra});
   // A bounded number of requests protects the free-tier quota; choose a specific
   // structure to try one outside this shortlist. This is not global optimization.
   for(const {p} of candidates.slice(0,2)) {
@@ -287,7 +299,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     if(campus.length>1)extra.push({type:'Feature',properties:{kind:'campus',metres:Math.round(campusM)},geometry:{type:'LineString',coordinates:[coords.at(-1),...campus.slice(1)]}});
     const steps=(feature.properties.segments||[]).flatMap(seg=>seg.steps||[]).map(st=>({instruction:st.instruction,distance:st.distance,duration:st.duration}));
     if(hasGate)steps.push({instruction:'Enter campus at '+gate.name+', then about '+Math.round(campusM)+' m on campus roads to '+p.name,distance:Math.round(campusM),duration:Math.round(campusS)});
-    return {ok:true,type:'FeatureCollection',mode:'driving',features:[...extra,{...feature,properties:{...feature.properties,kind:'route',mode:'driving'}},
+    found.push({ok:true,type:'FeatureCollection',mode:'driving',features:[...extra,{...feature,properties:{...feature.properties,kind:'route',mode:'driving'}},
       point(xy(target),{kind:'gate',name:gate.name}),point(xy(p.entrance),{kind:'parking',name:p.name})],
       summary:{minutes:Math.round(duration/6)/10,metres:Math.round(feature.properties.summary.distance+campusM),start_to_road_m:Math.round(toRoad),campus_m:Math.round(campusM),walking_minutes:arrivalWalk.summary.minutes,
         building:building.id,building_name:building.name,parking:p,gate,arrival:context.time.campusISO(arrival),storage:'d1',
@@ -296,8 +308,12 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
       steps,
       walking_preview:arrivalWalk,handoff:{action:'parked',parking:p.id,exit:p.exit,lat:p.exit?context.survey.nodes.find(n=>n.id===p.exit).lat:null,
         lon:p.exit?context.survey.nodes.find(n=>n.id===p.exit).lon:null,building:building.id},
-      attribution:'© openrouteservice.org by HeiGIT | © OpenStreetMap contributors (ODbL)'};
+      attribution:'© openrouteservice.org by HeiGIT | © OpenStreetMap contributors (ODbL)'});
   }
+  // Both shortlisted ways in were asked; keep the faster DOOR TO DOOR: drive
+  // (provider time + campus leg) plus the walk from the structure. Comparing the
+  // drive alone picked a structure with a 10-minute walk over one with 1 minute.
+  if(found.length){found.sort((a,b)=>(a.summary.minutes+a.summary.walking_minutes)-(b.summary.minutes+b.summary.walking_minutes));found[0].summary.provider_requests=attempts;return found[0];}
   return {ok:false,reason:'No route passed the gate and closure checks. Try another parking structure or wait for staff access updates.',provider_requests:attempts,checks,parking};
 }
 

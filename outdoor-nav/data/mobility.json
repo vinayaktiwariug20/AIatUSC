@@ -63,6 +63,19 @@
       "note": "Vehicle entrance on McClintock; walking begins at the surveyed pedestrian exit.",
       "campus_via": [
         "ISECT.downey_mcclintock"
+      ],
+      "access": [
+        {
+          "gate": "mcclintock",
+          "entrance": "DOWNEY.veh.mcclintock",
+          "campus_via": [
+            "ISECT.downey_mcclintock"
+          ]
+        },
+        {
+          "gate": "downey-way",
+          "entrance": "DOWNEY.veh.downey"
+        }
       ]
     },
     {

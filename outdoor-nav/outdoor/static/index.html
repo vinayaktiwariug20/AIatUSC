@@ -465,7 +465,7 @@ async function loadQuestions(){
   }
 
   const open=rows.filter(q=>q.status==='open');
-  const done=rows.filter(q=>q.status==='answered').slice(0,8);
+  const done=rows.filter(q=>q.status==='answered');
 
   $('askQueue').innerHTML=
     '<h2 style="margin-top:14px">Questions for organizers ('+open.length+')</h2>'
@@ -478,7 +478,7 @@ async function loadQuestions(){
     ).join('')||'<div class="dim">No open questions.</div>')
     +(done.length
       ?'<details><summary class="dim">Answered ('+done.length+')</summary>'
-        +done.map(q=>'<div class="qitem"><small>'+esc(q.question)+'</small><br>'+esc(q.answer)+'</div>').join('')
+        +done.map(q=>'<div class="qitem"><small>'+esc(q.question)+(q.faq?' · FAQ':'')+'</small><br>'+esc(q.answer)+'<br><button class="small" data-qd="'+q.id+'" title="Stop showing and using this answer">Remove</button></div>').join('')
         +'</details>'
       :'');
 
