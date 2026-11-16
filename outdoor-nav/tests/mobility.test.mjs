@@ -46,7 +46,8 @@ test('segment crossing is detected even when neither vertex lies inside the poly
  assert.equal(intersectsPolygon([[-1,0],[2,0]],poly),true);
 });
 test('a valid driving route drives to the open gate, then the campus leg to the structure, and previews the walk',async()=>{
- const e=env(),mock=provider(),out=await drivingRoute(context,body,monday,[],[],e,mock.fn);
+ // Saturday: the Downey Way gate is closed, so Downey is entered through McClintock.
+ const e=env(),mock=provider(),out=await drivingRoute(context,body,parseTime('2026-11-14T18:00'),[],[],e,mock.fn);
  assert.equal(out.ok,true);assert.equal(out.mode,'driving');assert.equal(out.summary.parking.id,'downey');assert.equal(out.summary.live_traffic,false);
  assert.equal(out.handoff.exit,'DOWNEY.ped.main');assert.equal(out.walking_preview.summary.start_place.exit,'DOWNEY.ped.main');
  // the provider is asked to reach the GATE, never to drive campus roads
@@ -87,7 +88,11 @@ test('staff gate closures apply only during their exact interval',()=>{
 test('scheduled road closures overlapping the trip are enforced before their start time',async()=>{
  const geometry=circlePolygon(34.0250085,-118.2871694,30);
  const rule=validateRule({kind:'road',geometry,starts:'2026-11-16T12:01',ends:'2026-11-16T13:00'},context);
- const out=await drivingRoute(context,body,monday,[rule],[],env(),provider().fn);assert.equal(out.ok,false);
+ // A road closure at McClintock overlapping the trip: Downey is entered via Downey Way instead.
+ const out=await drivingRoute(context,body,monday,[rule],[],env(),provider().fn);assert.equal(out.ok,true);assert.equal(out.summary.gate.id,'downey-way');
+ // On a Saturday (Downey Way closed) there is no other way in, so it is refused.
+ const sat={...rule,starts_ms:parseTime('2026-11-14T17:01'),ends_ms:parseTime('2026-11-14T19:00')};
+ assert.equal((await drivingRoute(context,body,parseTime('2026-11-14T18:00'),[sat],[],env(),provider().fn)).ok,false);
 });
 test('a gate closing before arrival cannot be recommended',async()=>{
  const at=parseTime('2026-11-14T15:29:00'),out=await drivingRoute(context,{...body,parking:'jefferson'},at,[],[],env(),provider().fn);
@@ -96,7 +101,7 @@ test('a gate closing before arrival cannot be recommended',async()=>{
 test('walking-only reports do not block vehicle routing',async()=>{
  const closure={id:'ped',lat:34.0250085,lon:-118.2871694,radius_m:30,status:'approved',starts:'2026-11-16T10:00',ends:'2026-11-16T14:00',modes:['walking']};
  const out=await drivingRoute(context,body,monday,[],[closure],env(),provider().fn);assert.equal(out.ok,true);
- const car=await drivingRoute(context,body,monday,[],[{...closure,modes:['driving']}],env(),provider().fn);assert.equal(car.ok,false);
+ const car=await drivingRoute(context,body,monday,[],[{...closure,modes:['driving']}],env(),provider().fn);assert.equal(car.ok,true);assert.equal(car.summary.gate.id,'downey-way');
 });
 test('missing key, missing D1, out-of-range starts and provider quota fail explicitly',async()=>{
  await assert.rejects(()=>drivingRoute(context,body,monday,[],[],{DB:new D1()},provider().fn),e=>e.status===503);
@@ -167,7 +172,7 @@ test('a failed driving search says which check rejected each candidate',async()=
 // Live: openrouteservice refused with "Could not find routable point within a radius
 // of 25.0 meters of specified coordinate 0" -- the off-road start.
 test('driving request gives the start a wide road-search radius and the gate a tight one',async()=>{
- const mock=provider(),out=await drivingRoute(context,body,monday,[],[],env(),mock.fn);
+ const mock=provider(),out=await drivingRoute(context,body,parseTime('2026-11-14T18:00'),[],[],env(),mock.fn);
  assert.equal(out.ok,true);
  const r=mock.calls[0].body.radiuses;assert.deepEqual(r,[300,30]);           // McClintock pin is surveyed
 });
@@ -251,4 +256,23 @@ test('official USC building codes find their buildings',()=>{
  // No code may point at two buildings.
  const seen=new Map();
  for(const b of Object.values(context.router.data.buildings))for(const a of b.aliases||[])if(/^[A-Z]{2,4}$/.test(a)){assert.ok(!seen.has(a)||seen.get(a)===b.id,a+' is used twice');seen.set(a,b.id);}
+});
+// Reported Monday 15:26: the route went round to McClintock although the Downey Way
+// gate (Vermont at 36th Pl) was open. Downey now has two ways in, and the faster wins.
+test('Downey: through the Downey Way gate when it is open, McClintock when it is not',async()=>{
+ const west={...body,from:{lat:34.0185,lon:-118.3003}};                    // Normandie / 37th Pl
+ const mon=await drivingRoute(context,west,parseTime('2026-11-16T15:26'),[],[],env(),provider().fn);
+ assert.equal(mon.ok,true);assert.equal(mon.summary.gate.id,'downey-way');
+ assert.deepEqual(mon.features.find(f=>f.properties.kind==='campus').geometry.coordinates.at(-1),[-118.29046687186089,34.02155085589507]);
+ const sat=await drivingRoute(context,west,parseTime('2026-11-14T18:00'),[],[],env(),provider().fn);
+ assert.equal(sat.ok,true);assert.equal(sat.summary.gate.id,'mcclintock');
+ const night=await drivingRoute(context,west,parseTime('2026-11-16T21:00'),[],[],env(),provider().fn);
+ assert.equal(night.summary.gate.id,'mcclintock');                          // Downey Way closes at 20:00
+});
+test('the faster way in is chosen door to door (drive + walk), not by drive time alone',async()=>{
+ // Both candidates get the same provider drive time here; the walk decides.
+ const west={...body,from:{lat:34.0185,lon:-118.3003},parking:'auto',to:'Dedeaux'};
+ const out=await drivingRoute(context,west,parseTime('2026-11-16T21:00'),[],[],env(),provider().fn);
+ assert.equal(out.ok,true);
+ if(out.summary.provider_requests>1)assert.equal(out.summary.parking.id,'downey',JSON.stringify(out.summary.parking.id));
 });
