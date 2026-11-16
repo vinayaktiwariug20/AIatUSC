@@ -1,5 +1,6 @@
 import {Unreachable, haversine} from './router.mjs';
 import {triage, checkPhoto, configured as triageConfigured} from './triage.mjs';
+import {USAGE_KINDS, linkKey, usageReady, countUsage, usageTotals, reserveUsageQuota} from './usage.mjs';
 import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
 import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures} from './mobility.mjs';
@@ -105,7 +106,7 @@ export async function handleApi(request, env, context) {
       return reply({ok: true, app: 'AIatUSC', runtime: 'cloudflare-javascript',
         database: db ? 'connected' : 'not_configured', storage: db ? 'd1' : 'read_only_preview',
         timezone: 'America/Los_Angeles', walking_routes: true, driving_routes: Boolean(db && env.ORS_API_KEY && mobilityReady), turn_by_turn: false,
-        parking_handoff:true,mobility_migration:mobilityReady?'ready':'required',ai_service:triageConfigured(env),questions_migration:!db||await questionsReady(db)?'ready':'required',driving_provider:'openrouteservice',live_traffic:false,unverified_report_display_limit:20,
+        parking_handoff:true,mobility_migration:mobilityReady?'ready':'required',ai_service:triageConfigured(env),questions_migration:!db||await questionsReady(db)?'ready':'required',usage_migration:!db||await usageReady(db)?'ready':'required',driving_provider:'openrouteservice',live_traffic:false,unverified_report_display_limit:20,
         public_reports: Boolean(db) && env.PUBLIC_REPORTS_ENABLED === 'true'}, 200, head);
     }
     if (method === 'GET' && path === '/api/buildings') {
@@ -229,6 +230,21 @@ export async function handleApi(request, env, context) {
         const row = await db.prepare("UPDATE closures SET status=?,payload=json_set(payload,'$.status',?) WHERE id=? RETURNING payload").bind(status,status,id).first('payload');
         return row ? reply(JSON.parse(row)) : reply({error:'not found'},404);
       }
+    }
+    // ---- Anonymous usage counts (see /privacy/) ----------------------------
+    if (path === '/api/usage') {
+      const b = method === 'GET' ? Object.fromEntries(url.searchParams) : body;
+      const building = router.findBuilding(String(b.to || ''));
+      if (!building) fail(400, 'Unknown building.');
+      const room = String(b.room || '').slice(0, 40), event = String(b.event || '').slice(0, 80);
+      const key = await linkKey(building.id, room, event);
+      if (!db || !(await usageReady(db))) return method === 'GET' ? reply({link: key, days: 30, totals: null}) : new Response(null, {status: 204});
+      if (method === 'POST') {
+        if (!USAGE_KINDS.includes(b.kind)) fail(400, 'Unknown usage kind.');
+        if (await reserveUsageQuota(db)) await countUsage(db, campusISO(Date.now()).slice(0, 10), key, b.kind);
+        return new Response(null, {status: 204});
+      }
+      if (method === 'GET') return reply({link: key, days: 30, totals: await usageTotals(db, key, campusISO(Date.now() - 30 * 86400000).slice(0, 10))}, 200, head);
     }
     // ---- Ask Doorstep ------------------------------------------------------
     if (method === 'POST' && path === '/api/ask') {

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy · Doorstep</title>
+<link rel="icon" href="data:,">
+<style>
+:root{--bg:#f5f1ea;--ink:#202329;--dim:#59616e;--line:#e5ddd0;--cardinal:#7a1424;--cardinal-2:#5a0e1a}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{background:linear-gradient(135deg,var(--cardinal),var(--cardinal-2));color:#fff;padding:22px 18px}
+header .in,main{max-width:680px;margin:0 auto}
+header small{color:#f3d9a4;letter-spacing:.08em}
+h1{margin:4px 0 0;font-size:24px}
+main{padding:8px 18px 40px}
+h2{font-size:17px;margin:22px 0 4px}
+p,li{color:var(--ink)}
+.dim{color:var(--dim);font-size:14px}
+a{color:var(--cardinal)}
+</style>
+</head>
+<body>
+<header><div class="in"><small>DOORSTEP</small><h1>Privacy</h1></div></header>
+<main>
+<p><b>The short version:</b> no accounts, no cookies, no ads and no tracking. Doorstep uses your location only to draw your route, and keeps nothing that identifies you.</p>
+
+<h2>Your location</h2>
+<p>"Use my location" asks your browser for your position. It is used in your browser and sent to our server only to work out the route. It is not stored.</p>
+<p><b>Drive + park</b> also sends your starting point and the gate you're heading for to <a href="https://openrouteservice.org/">openrouteservice</a>, a mapping service, to get driving directions.</p>
+
+<h2>The map</h2>
+<p>Map images come from OpenFreeMap and OpenStreetMap servers. Like any website you load, they see your IP address.</p>
+
+<h2>Questions you ask</h2>
+<p>Your question is sent, with campus facts such as gate hours and closures, to our AI service (hosted on Replit, using an Anthropic Claude model) to find an answer. If it can't answer from verified information, the question, without any name or contact details, is saved so organizers can reply. Your browser remembers which questions you asked, so the reply can reach you; that list stays on your device.</p>
+
+<h2>Blockage reports</h2>
+<p>A report's location and note are saved and shown on the map for everyone until they expire (a few hours by default). If you add a photo, it is sent to our AI service for a suggestion of what's blocked and <b>is not stored</b>.</p>
+
+<h2>Usage numbers for organizers</h2>
+<p>When you open an organizer's event link, we count, per day, how many visits that link got, and how many showed a route, reached the door, went inside or asked a question. That's all: a date, the link and a number. There is no IP address, device or user ID, or location, and these counts are only made for visits from event links.</p>
+
+<h2>Server logs</h2>
+<p>Doorstep's server does not keep logs of your requests. The site runs on Cloudflare, which processes requests to deliver it.</p>
+
+<h2>Who runs this</h2>
+<p>Doorstep is a student project by USC students; it is not affiliated with or endorsed by USC. Questions or concerns: open an issue on <a href="https://github.com/vinayaktiwariug20/AIatUSC/issues">GitHub</a>.</p>
+
+<p class="dim">Updated 2026-11-16. <a href="/">Back to the map</a></p>
+</main>
+</body>
+</html>
