@@ -99,7 +99,7 @@ details>summary{color:var(--cardinal-2)}
 <details open class="card" id="askBox"><summary><b>Ask Doorstep</b> <small class="dim">AI · answers only from verified info</small></summary><div id="chatLog" aria-live="polite"><div class="msg bot">Ask about gates, parking, game days, closures or getting to the event. I only answer from verified information and show my sources. If I don&#39;t know, your question goes to the organizers.</div></div><div class="row" style="margin-top:8px"><input id="askInput" class="grow" maxlength="300" placeholder="e.g. Is the Watt Way gate open tonight?" aria-label="Ask a question"><button id="askBtn" class="primary">Ask</button></div></details><details open><summary>Gate status <small id="gateModeLabel">Vehicle access</small></summary><div class="legend">● Green: scheduled open · Red: closed · Amber: access requirements<br>Vehicle hours do not determine pedestrian access. Approximate gate pins are labeled.</div><div id="gates"></div></details>
 <details><summary>Official access, schedule and traffic maps</summary><div class="stack dim"><a href="https://transnet.usc.edu/index.php/about-us/entrance-hours/" target="_blank" rel="noopener">USC Entrance Hours</a><a href="https://usctrojans.com/sports/football/schedule" target="_blank" rel="noopener">USC Football Schedule</a><a href="https://gameday.usc.edu/getting-here/post-game-traffic-flow/" target="_blank" rel="noopener">Game Day Traffic Map · official map and traffic directions</a><a href="https://bpb-us-w1.wpmucdn.com/sites.usc.edu/dist/0/639/files/2023/08/image.png" target="_blank" rel="noopener">Traffic map image from the official page</a><div id="sourcesNote"></div></div></details>
 <details id="staffPanel"><summary>Staff / organizer</summary><div class="stack"><input id="token" type="password" placeholder="Admin token" autocomplete="off" aria-label="Admin token"><div class="dim">Approved restrictions affect routes immediately. Choose who each closure applies to: cars, people on foot, or both.</div><div class="row"><select id="ruleKind" class="grow"><option value="gate">Gate closure</option><option value="road">Area closure (draw it)</option></select><button id="drawBtn" class="small" hidden>Draw area</button></div><label class="fieldLabel">Closed to<select id="ruleModes" aria-label="Closed to"><option value="driving">Cars only</option><option value="walking">People on foot only</option><option value="both">Cars and people on foot</option></select></label><select id="ruleGate" aria-label="Gate to close"></select><div id="drawHint" class="dim" hidden>Tap at least three boundary points in order. Check the red closure lines on the official map and current on-site instructions.</div><label class="fieldLabel">Closure starts · Los Angeles<input id="ruleStarts" type="datetime-local"></label><label class="fieldLabel">Closure ends · Los Angeles<input id="ruleEnds" type="datetime-local"></label><input id="ruleNote" placeholder="For example: post-game traffic closure confirmed by staff" aria-label="Reason for restriction"><button id="saveRule" class="primary">Save confirmed closure</button><div id="ruleStatus" class="success" role="status"></div><div class="dim">The end of the third quarter and game end are not predicted. Enter confirmed start and end times. Routes avoid registered road areas; map arrows are not used for parking egress guidance.</div><div id="ruleQueue"></div><div id="queue"></div><div id="askQueue"></div><details style="margin-top:10px"><summary>Add an FAQ answer</summary><div class="stack"><input id="faqQ" maxlength="300" placeholder="Question, e.g. Where is check-in?" aria-label="FAQ question"><input id="faqA" maxlength="600" placeholder="Answer" aria-label="FAQ answer"><button id="faqSave" class="small">Save answer</button></div></details></div></details>
-<footer id="attr" class="dim" style="margin-top:18px"><a href="/create/" style="color:var(--brand);font-weight:600">Organizers: make an event link</a><br>© OpenStreetMap contributors · ODbL<br><span>Driving is a route preview. Live traffic and voice navigation are unavailable.</span><br><span>Driving requests send your starting coordinates to openrouteservice.</span></footer>
+<footer id="attr" class="dim" style="margin-top:18px"><a href="/create/" style="color:var(--brand);font-weight:600">Organizers: make an event link</a><br>Doorstep is a student project; not affiliated with or endorsed by USC. <a href="/privacy/">Privacy</a><br>© OpenStreetMap contributors · ODbL<br><span>Driving is a route preview. Live traffic and voice navigation are unavailable.</span><br><span>Driving requests send your starting coordinates to openrouteservice.</span></footer>
 </main>
 <script>
 'use strict';
@@ -138,6 +138,12 @@ const ROOM=(qs.get('room_label')||qs.get('room')||'').trim().slice(0,40);
 const EVENT=(qs.get('event')||'').replace(/\s+/g,' ').trim().slice(0,80);
 const ROOM_TEXT=ROOM?(/^room\b/i.test(ROOM)?ROOM:'room '+ROOM):'';
 if(EVENT){$('eventLine').hidden=false;$('eventLine').textContent='Event: '+EVENT;document.title=EVENT+' · Doorstep';}
+// Anonymous counts for the organizer of this event link (see /privacy/): only for visits
+// that came from an event link, once per kind per visit, fire-and-forget. Nothing personal is sent.
+const counted=new Set();
+function track(kind){if(!qs.get('to')||counted.has(kind)||!navigator.sendBeacon)return;counted.add(kind);
+ try{navigator.sendBeacon('/api/usage',new Blob([JSON.stringify({kind,to:qs.get('to'),room:qs.get('room')||'',event:EVENT})],{type:'application/json'}));}catch{}}
+track('open');
 function buildingId(){const text=$('to').value.trim().replace(/^\([^)]{1,40}\)\s*/,'');return buildings.find(b=>b.id===text||b.name.toLowerCase()===text.toLowerCase())?.id||text;}
 function marker(lat,lon){if(!startMarker)startMarker=L.circleMarker([lat,lon],{radius:7,color:'#fff',weight:3,fillColor:'#2459d3',fillOpacity:1}).addTo(map);else startMarker.setLatLng([lat,lon]);}
 // Every GPS fix: move the dot, show the fix's accuracy, and keep the map on the walker while following.
@@ -174,7 +180,7 @@ async function route(fit=true){
   const r=await api('/api/outdoor/route',{method:'POST',signal:controller.signal,body:JSON.stringify({from:start,to:buildingId(),mode,at:$('departAt').value||undefined,parking:$('parking').value,usc_id:$('uscId').checked,parking_pass:$('parkingPass').checked,permit:$('permit').value||undefined,step_free:$('stepFree').checked})});
   if(id!==routeVersion)return;lastRouted=Date.now();
   if(!r.ok){const choices=(r.choices||[]).map(c=>'<button class="small" data-pick="'+esc(c.id)+'">'+esc(c.name)+'</button>').join(' ');$('result').innerHTML='<div class="card error">'+esc(r.reason||r.error)+(choices?'<div class="row wrap" style="margin-top:8px">'+choices+'</div>':'')+'</div>';info('Choose another start or parking structure.');return;}
-  plan=r;drawPlan(r,fit);const s=r.summary;updateIndoorView(s,mode==='walking'?r.handoff||{}:{},!!(mode==='walking'?r.handoff:r.walking_preview?.handoff)?.indoor_node);
+  plan=r;drawPlan(r,fit);const s=r.summary;track('route');updateIndoorView(s,mode==='walking'?r.handoff||{}:{},!!(mode==='walking'?r.handoff:r.walking_preview?.handoff)?.indoor_node);
   if(mode==='driving'){
    $('result').innerHTML='<section class="card"><div class="dim">DRIVE → PARK → WALK</div><div class="big">About '+esc(s.minutes)+' min drive + '+esc(s.walking_minutes)+' min walk</div>'+(r.walking_preview?.summary?.step_free?'<div class="success">Walk after parking is step-free: no mapped stairs.</div><div class="dim">Stairs come from OpenStreetMap. Curbs, slopes and doors are not checked.</div>':'')+'<h2 style="margin-top:8px">'+esc(s.parking.name)+'</h2><div>Via '+esc(s.gate.name)+'</div>'+(s.start_to_road_m>10?'<div class="dim">Starts at the nearest road, '+esc(s.start_to_road_m)+' m from you (dotted line).</div>':'')+(s.campus_m>10?'<div class="dim">Enter at '+esc(s.gate.name)+', then about '+esc(s.campus_m)+' m on campus roads to the structure (dashed).</div>':'')+'<div class="dim">'+esc(s.parking.address)+' · Space availability unknown</div><div class="notice">'+(s.gate.location_source==='approximate_intersection'?'The gate pin is approximate. Follow posted signs. ':'')+'Estimated time does not include live traffic.</div><div class="dim">Routes crossing closed gate areas or registered closures are excluded. Auto selection tries up to two candidates and does not guarantee the fastest route.</div>'+(r.steps.length?'<details><summary>Driving directions</summary><ol id="routeSteps">'+r.steps.map(step=>'<li>'+esc(step.instruction)+' <small>'+Math.round(step.distance||0)+' m</small></li>').join('')+'</ol></details>':'')+'</section>';
    $('parkedBtn').hidden=false;info('Blue: driving · dotted green: walking after parking. Select the parking button after you have parked.');
@@ -189,7 +195,7 @@ async function route(fit=true){
    for(const w of s.warnings)h+='<div class="notice">Unverified report: '+esc(w.note)+'</div>';
    // Arrival: near the door (GPS) or the user says so. This is the hand-off to indoor.
    arrival=arrivalCard(s,r.handoff||{});h+=s.near_venue?arrival:'<button class="small" data-arrived="1" style="margin-top:8px">I&#39;m at the building</button>';
-   $('result').innerHTML=h+'</section>';
+   $('result').innerHTML=h+'</section>';if(s.near_venue)track('arrive');
    info(!s.near_venue?'Follow the green route to your destination.':r.handoff?.indoor_node?'You have arrived. Select Indoor View at the top right of the map for directions to the room.':'You have arrived.');
   }
  }catch(error){if(id===routeVersion&&error.name!=='AbortError')showError(error);}finally{if(id===routeVersion){busy=false;$('goBtn').disabled=false;}}
@@ -299,10 +305,11 @@ function arrivalCard(s,ho){
 }
 
 $('result').onclick=safe(async e=>{
+  if(e.target.closest('a.btnlink'))track('inside');
   const a=e.target.closest('button[data-arrived]');
 
   if(a){
-    a.outerHTML=arrival;
+    a.outerHTML=arrival;track('arrive');
     info('Continue inside for directions to the room.');
     return;
   }
@@ -370,6 +377,7 @@ function addMsg(html,who){
 $('askBtn').onclick=safe(async()=>{
   const q=$('askInput').value.trim();
   if(!q)return;
+  track('ask');
 
   $('askInput').value='';
   addMsg(esc(q),'me');

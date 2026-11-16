@@ -91,7 +91,7 @@ footer a{color:var(--cardinal)}
       <button id="print">Print flyer</button>
       <a class="btn" id="open" target="_blank" rel="noopener">Try the link</a>
     </div>
-    <div class="hint" style="margin-top:10px">Nothing is stored and there's nothing to sign up for. The link carries everything. Make a new one any time.</div>
+    <div class="hint" style="margin-top:10px">Nothing is stored and there's nothing to sign up for. The link carries everything. Make a new one any time.</div><div class="card" style="margin-top:12px;background:#fff"><b>How it's being used</b> <span class="hint">(last 30 days, anonymous totals)</span><div id="usage" class="hint" style="font-size:15px;color:var(--ink)">Make the link to see its numbers.</div></div>
   </section>
 
   <section id="flyer" aria-hidden="true">
@@ -102,7 +102,7 @@ footer a{color:var(--cardinal)}
     <div class="url" id="fUrl"></div>
   </section>
 
-  <footer>Doorstep is a student project; not affiliated with or endorsed by USC. <a href="/">Back to the map</a></footer>
+  <footer>Doorstep is a student project; not affiliated with or endorsed by USC. <a href="/privacy/">Privacy</a> · <a href="/">Back to the map</a></footer>
 </main>
 
 <script type="module">
@@ -154,7 +154,19 @@ $('make').onclick = () => {
   $('fWhere').textContent = [$('event').value.trim() ? b.name : '', roomName].filter(Boolean).join(' · ');
   $('fUrl').textContent = link;
   $('out').scrollIntoView({behavior: 'smooth', block: 'start'});
+  showUsage(new URL(link));
 };
+
+// The same link (building + room + event name) always has the same numbers, so an
+// organizer can come back, make the link again, and see how it's doing.
+async function showUsage(u) {
+  const q = new URLSearchParams({to: u.searchParams.get('to') || '', room: u.searchParams.get('room') || '', event: u.searchParams.get('event') || ''});
+  try {
+    const r = await (await fetch('/api/usage?' + q)).json(), t = r.totals;
+    if (!t) { $('usage').textContent = 'Usage numbers are not set up yet.'; return; }
+    $('usage').textContent = t.open ? `Opened ${t.open} · Route shown ${t.route} · Reached the door ${t.arrive} · Went inside ${t.inside} · Questions ${t.ask}` : 'No visits yet. Numbers appear here once people use the link.';
+  } catch { $('usage').textContent = 'Could not load usage numbers.'; }
+}
 
 $('copy').onclick = async () => {
   try { await navigator.clipboard.writeText(link); $('copied').textContent = 'Copied.'; }
