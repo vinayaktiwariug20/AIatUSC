@@ -59,6 +59,7 @@ header{display:flex;justify-content:space-between;align-items:center;gap:8px;mar
 .modes{display:flex;padding:3px;background:#e9e9e5;border-radius:12px;gap:3px;margin-bottom:10px}.modes button{flex:1;border:0;background:transparent}.modes button.active{background:var(--card);color:var(--brand);box-shadow:0 1px 4px #0001;font-weight:700}
 .card{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:13px}.notice{padding:9px 11px;background:#fff4d8;border-radius:9px;color:var(--warn);font-size:13px;margin:8px 0}.error{color:var(--stop)}.success{color:var(--ok)}.big{font-size:23px;font-weight:700}.pill{font-size:11px;border-radius:20px;background:#edf0f2;padding:4px 8px;white-space:nowrap}.gate{padding:9px 0;border-bottom:1px solid var(--line)}.gate:last-child{border:0}.closed{color:var(--stop)}.restricted{color:var(--warn)}
 label.check{display:flex;align-items:center;gap:5px;font-size:13px}input[type=checkbox]{min-height:16px;flex:none}details{margin-top:12px}summary{cursor:pointer;font-weight:600}.stack{display:grid;gap:8px;margin-top:10px}.hidden,[hidden]{display:none!important}#parkedBtn{width:100%;background:var(--ok);color:#fff;border:0;margin-top:12px;font-weight:700}#routeSteps{padding-left:24px;font-size:13px}.rep{display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--line);padding:7px 0}.rep span{flex:1}.legend{font-size:11px;color:var(--dim);margin-top:7px}.fieldLabel{display:grid;gap:4px;color:var(--dim);font-size:12px}.fieldLabel input{font-size:14px;width:100%}
+@media(max-width:849px){body.typing #map{flex:0 0 0;min-height:0;height:0;overflow:hidden}body.typing #panel{flex:1;max-height:none}body.typing header{display:none}}
 @media(min-width:850px){body{flex-direction:row-reverse}#panel{width:440px;max-height:100vh;border-top:0;border-right:1px solid var(--line);flex-shrink:0}#map{height:100vh}header{margin-bottom:18px}}
 
 /* 60-30-10 colour: 60 warm neutral (background), 30 cardinal + cream (header band,
@@ -142,7 +143,8 @@ if(EVENT){$('eventLine').hidden=false;$('eventLine').textContent='Event: '+EVENT
 // Anonymous counts for the organizer of this event link (see /privacy/): only for visits
 // that came from an event link, once per kind per visit, fire-and-forget. Nothing personal is sent.
 const counted=new Set();
-function track(kind){if(kind==='arrive'||kind==='inside')stat(kind);if(!qs.get('to')||counted.has(kind)||!navigator.sendBeacon)return;counted.add(kind);
+function track(kind){if(kind==='arrive'||kind==='inside')stat(kind);if(!qs.get('to')||counted.has(kind)||!navigator.sendBeacon)return;
+ if(kind!=='open'&&kind!=='ask'&&!atEvent(plan?.summary?.building))return;   // a detour to another building isn't this event'scounted.add(kind);
  try{navigator.sendBeacon('/api/usage',new Blob([JSON.stringify({kind,to:qs.get('to'),room:qs.get('room')||'',event:EVENT})],{type:'application/json'}));}catch{}}
 track('open');
 // Site-wide counts for the team: what this visit used, each kind once. Nothing personal is sent (see /privacy/).
@@ -214,7 +216,7 @@ async function route(fit=true){
    // Arrival: near the door (GPS) or the user says so. This is the hand-off to indoor.
    arrival=arrivalCard(s,r.handoff||{});h+=s.near_venue?arrival:'<button class="small" data-arrived="1" style="margin-top:8px">I&#39;m at the building</button>';
    $('result').innerHTML=h+'</section>';if(s.near_venue)track('arrive');
-   info(!s.near_venue?'Follow the green route to your destination.':r.handoff?.indoor_node?'You have arrived. Select Indoor View at the top right of the map for directions to the room.':'You have arrived.');
+   info(!s.near_venue?'Follow the green route to your destination.':!atEvent(s.building)?'You have arrived. Your event is in another building.':r.handoff?.indoor_node?'You have arrived. Select Indoor View at the top right of the map for directions to the room.':'You have arrived.');
   }
  }catch(error){if(id===routeVersion&&error.name!=='AbortError')showError(error);}finally{if(id===routeVersion){busy=false;$('goBtn').disabled=false;}}
 }
@@ -283,6 +285,12 @@ $('nowBtn').onclick=safe(async()=>{
 
 // Preserve room parameters for Outdoor → Indoor navigation.
 let arrival='';
+// The building the event link points at (id, code or name), or null. The link's room,
+// indoor start and "Your event" apply only there: people may route somewhere else first.
+function findId(text){const t=String(text||'').trim().replace(/^\([^)]{1,40}\)\s*/,'').toLowerCase();if(!t)return null;
+ return buildings.find(b=>b.id.toLowerCase()===t||b.name.toLowerCase()===t||(b.aliases||[]).some(a=>a.toLowerCase()===t))?.id||null;}
+function eventBuilding(){return findId(qs.get('to'));}
+const atEvent=id=>!qs.get('to')||!eventBuilding()||!id||(findId(id)||id)===eventBuilding();
 
 function indoorHref(s={},ho={}){
   const p=new URLSearchParams();
@@ -292,9 +300,10 @@ function indoorHref(s={},ho={}){
   if(ho.entrance_id)p.set('entrance',ho.entrance_id);
   // Where indoor directions start: the event link may name an indoor place (anchor=...),
   // e.g. the stair the organizers send people to; otherwise it is the door the route ended at.
-  const anchor=(qs.get('anchor')||'').trim().slice(0,60)||ho.indoor_node;
+  const here=atEvent(building);
+  const anchor=(here&&(qs.get('anchor')||'').trim().slice(0,60))||ho.indoor_node;
   if(anchor)p.set('anchor',anchor);
-  if(qs.get('room'))p.set('room',qs.get('room'));
+  if(here&&qs.get('room'))p.set('room',qs.get('room'));
 
   const query=p.toString();   // not p.size: Safari before 17 has no URLSearchParams.size and the link lost its parameters
   return '/indoor/'+(query?'?'+query:'');
@@ -306,6 +315,7 @@ function updateIndoorView(s={},ho={},mapped=true){
   $('indoorView').hidden=!mapped;
 }
 
+function eventName(){const b=buildings.find(x=>x.id===eventBuilding());if(!b)return '';const code=(b.aliases||[]).find(a=>/^[A-Z]{2,4}$/.test(a));return b.name+(code?' ('+code+')':'');}
 function arrivalCard(s,ho){
   const room=qs.get('room');
   const href=indoorHref(s,ho);
@@ -313,7 +323,9 @@ function arrivalCard(s,ho){
   return '<div class="arrival">'
     +'<div class="dim">YOU&#39;VE ARRIVED</div>'
     +'<h2 style="margin:4px 0">'+esc(s.building_name)+'</h2>'
-    +((EVENT||ROOM)?'<div>Your event: <b>'+esc([EVENT,ROOM_TEXT].filter(Boolean).join(' · '))+'</b></div>':'')
+    +((EVENT||ROOM)&&atEvent(s.building)?'<div>Your event: <b>'+esc([EVENT,ROOM_TEXT].filter(Boolean).join(' · '))+'</b></div>':'')
+    +((EVENT||ROOM)&&!atEvent(s.building)?'<div class="notice">Your event'+((EVENT||ROOM_TEXT)?' ('+esc([EVENT,ROOM_TEXT].filter(Boolean).join(' · '))+')':'')+' is at <b>'+esc(eventName())+'</b>, not here.'
+      +'<div style="margin-top:6px"><button class="small" data-pick="'+esc(eventBuilding())+'">Route to the event</button></div></div>':'')
     +(ho.entrance_name?'<div>Go in at: <b>'+esc(ho.entrance_name)+'</b></div>':'')
     +(ho.photo?'<img class="doorphoto" src="'+esc(ho.photo)+'" alt="Photo of the entrance to use">':'')
     +(ho.indoor_node
@@ -329,7 +341,7 @@ $('result').onclick=safe(async e=>{
 
   if(a){
     a.outerHTML=arrival;track('arrive');
-    info('Continue inside for directions to the room.');
+    info(atEvent(plan?.summary?.building)?'Continue inside for directions to the room.':'You have arrived. Your event is in another building.');
     return;
   }
 
@@ -579,7 +591,7 @@ $('faqSave').onclick=safe(async()=>{
 setInterval(()=>loadQuestions(),20000);
 
 // "From" box: campus places from our data, then street addresses (openrouteservice, via our server).
-const FROM_KIND={building:'Campus building',parking:'Parking structure (walk starts at its exit)',address:'Address'};
+const FROM_KIND={building:'Campus building',parking:'Parking structure (walk starts at its exit)',address:'Address',street:'Whole street: approximate point, add the house number'};
 let fromItems=[],fromActive=-1,fromTimer=null,fromSeq=0,fromCtl=null;
 function fromShow(items,note){
   const ul=$('fromList');fromItems=items;fromActive=-1;ul.innerHTML='';
@@ -592,7 +604,7 @@ function fromShow(items,note){
 function fromHide(){fromShow([],'');}
 function fromMark(i){fromActive=i;[...$('fromList').querySelectorAll('li[role=option]')].forEach((li,j)=>li.setAttribute('aria-selected',String(j===i)));
   if(i>=0){$('from').setAttribute('aria-activedescendant','fromOpt'+i);$('fromOpt'+i).scrollIntoView({block:'nearest'});}}
-function fromPick(i){const it=fromItems[i];if(!it)return;stat(it.kind==='address'?'start_address':'start_place');fromHide();stopGps();clearRoute();$('from').blur();
+function fromPick(i){const it=fromItems[i];if(!it)return;stat(it.kind==='address'||it.kind==='street'?'start_address':'start_place');fromHide();stopGps();clearRoute();$('from').blur();
   setStart(it.lat,it.lon,false,it.label);if(!$('to').value)map.setView([it.lat,it.lon],Math.max(map.getZoom(),16));}
 async function fromSearch(q){
   const seq=++fromSeq;fromCtl?.abort();fromCtl=new AbortController();
@@ -609,8 +621,16 @@ $('from').onkeydown=e=>{const n=fromItems.length;
   else if(e.key==='ArrowUp'&&n){e.preventDefault();fromMark((fromActive-1+n)%n);}
   else if(e.key==='Enter'&&n){e.preventDefault();fromPick(fromActive>=0?fromActive:0);}
   else if(e.key==='Escape'){fromHide();}};
-$('from').onfocus=()=>$('from').select();
-$('from').onblur=()=>setTimeout(fromHide,150);
+// Phones: the form sits under the map, so the keyboard covered it. While typing in
+// From or the destination, fold the map away and bring the box to the top.
+let typingTimer=null;
+function searchMode(on,box){clearTimeout(typingTimer);
+ if(on){if(!matchMedia('(max-width:849px)').matches)return;document.body.classList.add('typing');setTimeout(()=>box.scrollIntoView({block:'start'}),60);return;}
+ typingTimer=setTimeout(()=>{if(!document.body.classList.contains('typing'))return;document.body.classList.remove('typing');map.invalidateSize?.();},180);}
+$('from').onfocus=()=>{$('from').select();searchMode(true,$('from').parentElement);};
+$('from').onblur=()=>{setTimeout(fromHide,150);searchMode(false);};
+$('to').onfocus=()=>searchMode(true,$('to').parentElement);
+$('to').onblur=()=>searchMode(false);
 
 // Initialize Outdoor navigation and Indoor View.
 (async()=>{

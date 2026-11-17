@@ -46,7 +46,7 @@ export async function addressSearch(env, q, fetcher = fetch) {
     const d = await r.json();
     return (d.features || [])
       .filter(f => f?.geometry?.type === 'Point' && Array.isArray(f.geometry.coordinates))
-      .map(f => ({kind: 'address', label: String(f.properties?.label || f.properties?.name || '').slice(0, 120),
+      .map(f => ({kind: f.properties?.layer === 'street' ? 'street' : 'address', label: String(f.properties?.label || f.properties?.name || '').slice(0, 120),
         lat: Number(f.geometry.coordinates[1]), lon: Number(f.geometry.coordinates[0])}))
       .filter(x => x.label && Number.isFinite(x.lat) && Number.isFinite(x.lon)
         && x.lat >= LA.min_lat && x.lat <= LA.max_lat && x.lon >= LA.min_lon && x.lon <= LA.max_lon)
@@ -68,5 +68,34 @@ export async function reserveGeocodeQuota(db, now = Date.now()) {
     return true;
   } catch {
     return true;     // no usage table yet: don't block search
+  }
+}
+
+// openrouteservice misses many house numbers near USC (OpenStreetMap doesn't have
+// them yet). The US Census Bureau's geocoder covers practically every US street
+// address by interpolating along each block's house-number range. Free, no key.
+export const hasHouseNumber = q => /^\s*\d+[a-z]?\s+\S/i.test(q);
+const STATES = /^[A-Z]{2}$/;
+function tidy(addr) {                  // "1200 W 36TH PL, LOS ANGELES, CA, 90007" -> "1200 W 36th Pl, Los Angeles, CA, 90007"
+  return String(addr).split(', ').map(part => STATES.test(part) || /^\d{5}/.test(part) ? part
+    : part.toLowerCase().replace(/\b([a-z])/g, (m, c, i, w) => /\d/.test(w[i - 1] || '') ? c : c.toUpperCase())).join(', ');
+}
+export async function censusSearch(q, fetcher = fetch) {
+  const text = /los angeles|\bca\b|\d{5}\s*$/i.test(q) ? q : q + ', Los Angeles, CA';
+  const u = new URL('https://geocoding.geo.census.gov/geocoder/locations/onelineaddress');
+  u.searchParams.set('address', text);
+  u.searchParams.set('benchmark', 'Public_AR_Current');
+  u.searchParams.set('format', 'json');
+  try {
+    const r = await fetcher(u.toString(), {headers: {Accept: 'application/json'}, signal: AbortSignal.timeout(5000)});
+    if (!r.ok) return null;
+    const d = await r.json();
+    return (d?.result?.addressMatches || [])
+      .map(m => ({kind: 'address', label: tidy(m.matchedAddress).slice(0, 120), lat: Number(m.coordinates?.y), lon: Number(m.coordinates?.x)}))
+      .filter(x => x.label && Number.isFinite(x.lat) && Number.isFinite(x.lon)
+        && x.lat >= LA.min_lat && x.lat <= LA.max_lat && x.lon >= LA.min_lon && x.lon <= LA.max_lon)
+      .slice(0, 3);
+  } catch {
+    return null;
   }
 }

@@ -1,7 +1,7 @@
 import {Unreachable, haversine} from './router.mjs';
 import {triage, checkPhoto, configured as triageConfigured} from './triage.mjs';
 import {USAGE_KINDS, linkKey, usageReady, countUsage, usageTotals, reserveUsageQuota, SITE, SITE_KINDS, siteStats} from './usage.mjs';
-import {campusPlaces, addressSearch, reserveGeocodeQuota} from './geocode.mjs';
+import {campusPlaces, addressSearch, reserveGeocodeQuota, hasHouseNumber, censusSearch} from './geocode.mjs';
 import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
 import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures} from './mobility.mjs';
@@ -241,7 +241,17 @@ export async function handleApi(request, env, context) {
       if (q.length >= 4) {
         if (!env.ORS_API_KEY) address = 'unavailable';
         else if (db && !(await reserveGeocodeQuota(db))) address = 'busy';
-        else { const found = await addressSearch(env, q); address = found ? 'ok' : 'unavailable'; if (found) results.push(...found); }
+        else {
+          let found = await addressSearch(env, q);
+          // A house number openrouteservice doesn't know: ask the Census geocoder, and
+          // put its exact matches before any whole-street guesses.
+          if (hasHouseNumber(q) && !(found || []).some(r => r.kind === 'address')) {
+            const census = await censusSearch(q);
+            if (census?.length) found = [...census, ...(found || [])];
+          }
+          address = found ? 'ok' : 'unavailable';
+          if (found) results.push(...found);
+        }
       }
       return reply({results, address}, 200, head);
     }
