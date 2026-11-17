@@ -299,3 +299,15 @@ def test_override_can_add_aliases_and_outline_without_a_door():
     assert b["outline"][0] == b["outline"][-1]          # ring closed
     assert b.get("entrance_source") != "surveyed"        # no door added
     assert g.find_building("nonexistent-override") is None
+
+
+def test_pedestrian_hours_from_the_gate_schedule():
+    g = Gates()                                        # the shipped data
+    def ped(gid, when):
+        return next(s for s in g.status(when) if s["id"] == gid)["pedestrian"]
+    assert ped("downey-way", datetime(2026, 11, 21, 12, 0))["status"] == "closed"   # Saturday
+    tue = ped("downey-way", datetime(2026, 11, 17, 12, 0))
+    assert tue["status"] == "open" and tue["until"] == "23:00"
+    assert ped("pardee", datetime(2026, 11, 17, 5, 30))["status"] == "varies"
+    assert ped("watt", datetime(2026, 11, 21, 3, 0))["status"] == "open"
+    assert ped("royal", datetime(2026, 11, 21, 12, 0))["status"] == "not_stated"

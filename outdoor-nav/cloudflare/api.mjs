@@ -53,6 +53,18 @@ function isAdmin(headers, env) {
   const token = String(env.ADMIN_TOKEN || ''), supplied = headers.get('X-Admin-Token') || '';
   return token.length > 0 && supplied === token;
 }
+// On foot, from Transportation's gate schedule where we have it. DPS opens and closes
+// some gates within an hour, so that hour is 'varies' rather than open or closed.
+function pedestrianStatus(g, column, minute, source) {
+  const h = g.pedestrian_hours; if (!h) return null;
+  if (!Array.isArray(h[column])) return {status: 'not_stated', column};
+  const mins = t => { const [hh, mm] = t.split(':').map(Number); return hh * 60 + mm; };
+  const inside = s => { const a = mins(s.from), b = mins(s.to); return a < b ? a <= minute && minute < b : minute >= a || minute < b; };
+  const base = {column, source: source || 'USC Transportation gate schedule'};
+  const open = h[column].find(inside); if (open) return {...base, status: 'open', until: open.to};
+  const edge = (h.uncertain?.[column] || []).find(inside); if (edge) return {...base, status: 'varies', note: edge.note || null, until: edge.to};
+  return {...base, status: 'closed'};
+}
 export function gateStatus(data, when) {
   const p = parts(when), date = `${p.year}-${p.month}-${p.day}`;
   const column = (data.holidays || []).includes(date) ? 'holiday' : ['Sat', 'Sun'].includes(p.weekday) ? 'weekend' : 'weekday';
@@ -67,7 +79,7 @@ export function gateStatus(data, when) {
       }
     }
     return {id: g.id, name: g.name, where: g.where ?? null, place: g.place ?? null, note: g.note ?? null,
-      vehicle, pedestrian: g.pedestrian || {status: 'not_stated'}};
+      vehicle, pedestrian: pedestrianStatus(g, column, minute, data.pedestrian_source) || g.pedestrian || {status: 'not_stated'}};
   });
 }
 async function active(db, when, until = when + 1) {
@@ -125,7 +137,7 @@ export async function handleApi(request, env, context) {
     if (method === 'GET' && ['/api/gates','/api/mobility'].includes(path)) {
       const when=parseTime(url.searchParams.get('at')),rules=await readRules(db,when),credentials={usc_id:url.searchParams.get('usc_id')==='true',parking_pass:url.searchParams.get('parking_pass')==='true',permit:url.searchParams.get('permit')||null};
       if(path==='/api/mobility')return reply(mobilityState(context,when,rules,credentials),200,head);
-      return reply({source:gateData.source||'',scope:'vehicle hours; pedestrian access is not stated by the source',timezone:'America/Los_Angeles',gates:gateState(context,when,rules,credentials)},200,head);
+      return reply({source:gateData.source||'',scope:'vehicle hours from the public page; pedestrian hours from the Transportation gate schedule where known',timezone:'America/Los_Angeles',gates:gateState(context,when,rules,credentials)},200,head);
     }
     if (path === '/api/mobility/rules' && method === 'GET') {
       requireAdmin();

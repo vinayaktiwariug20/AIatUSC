@@ -228,12 +228,12 @@ async function loadMobility(){
  $('gateModeLabel').textContent=mode==='walking'?'On foot':'Vehicle access';
  $('gates').innerHTML=state.gates.map(g=>{
   const status=g.vehicle.status;
-  // Walking tab: what matters is access on foot. Published hours are car hours, so
-  // "not stated" is shown as such, never as closed (Downey Way: closed to cars, open on foot).
-  if(mode==='walking'){const ped=g.pedestrian||{},open=ped.status==='open',shut=ped.status==='closed';
-   const pcolor=open?'#08734d':shut?'#b42328':'#8a8f98',ptext=open?'Open on foot':shut?'Closed on foot':'On foot: not stated';
+  // Walking tab: what matters is access on foot. Pedestrian hours come from Transportation's
+  // gate schedule where we have them; elsewhere "not stated" is shown as such, never as closed.
+  if(mode==='walking'){const ped=g.pedestrian||{},open=ped.status==='open',shut=ped.status==='closed',varies=ped.status==='varies';
+   const pcolor=open?'#08734d':shut?'#b42328':varies?'#be8100':'#8a8f98',ptext=open?'Open on foot'+(ped.until&&ped.until!=='24:00'?' until '+ped.until:''):shut?'Closed on foot':varies?'May be closed on foot':'On foot: not stated';
    if(g.lat!==undefined)L.circleMarker([g.lat,g.lon],{radius:7,color:pcolor,weight:2,fillOpacity:.8,dashArray:g.location_source==='approximate_intersection'?'3 3':null}).bindTooltip(esc(g.name)+': '+esc(ptext)).addTo(gateLayer);
-   return '<div class="gate"><div class="row"><span class="grow">'+esc(g.name)+'</span><strong class="'+(open?'success':shut?'closed':'dim')+'">'+esc(ptext)+'</strong></div><div class="dim">'+(ped.observed?'Observed '+esc(ped.observed)+(ped.note?': '+esc(ped.note):'')+' · ':'')+'Cars: '+esc(labels[status]||status)+(g.basis==='staff_confirmed'?' (staff: '+esc(g.vehicle.reason)+')':'')+'</div></div>';}
+   return '<div class="gate"><div class="row"><span class="grow">'+esc(g.name)+'</span><strong class="'+(open?'success':shut?'closed':varies?'restricted':'dim')+'">'+esc(ptext)+'</strong></div><div class="dim">'+(ped.observed?'Observed '+esc(ped.observed)+(ped.note?': '+esc(ped.note):'')+' · ':varies&&ped.note?esc(ped.note)+' · ':'')+'Cars: '+esc(labels[status]||status)+(g.basis==='staff_confirmed'?' (staff: '+esc(g.vehicle.reason)+')':'')+'</div></div>';}
   const color=status==='closed'?'#b42328':g.eligible?'#08734d':'#8c5e00';
   if(g.lat!==undefined)L.circleMarker([g.lat,g.lon],{radius:7,color,weight:2,fillOpacity:.8,dashArray:g.location_source==='approximate_intersection'?'3 3':null}).bindTooltip(esc(g.name)+': '+esc(labels[status]||status)).addTo(gateLayer);
   const schedule=g.schedule,col=g.vehicle.column,spans=(schedule[col]||[]).map(s=>s.from+'–'+s.to+(s.access?' ('+(labels[s.access]||s.access)+')':'')).join(', ')||'Closed';
