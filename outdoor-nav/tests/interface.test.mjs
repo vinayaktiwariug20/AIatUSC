@@ -23,6 +23,8 @@ test('page sends driving mode, then switches to walking from the selected pedest
   assert.equal(elements.repBtn.disabled,false);assert.equal(elements.driveOptions.hidden,false);
   elements.parking.value='downey';await elements.goBtn.click();
   assert.equal(calls.at(-1).mode,'driving');assert.equal(elements.parkedBtn.hidden,false);assert.match(elements.result.innerHTML,/Downey/);
+  // the drive can be handed to the phone's maps app, to the gate
+  assert.match(elements.result.innerHTML,/google\.com\/maps\/dir\/\?api=1&amp;destination=34\.\d+,-118\.\d+&amp;travelmode=driving/);assert.match(elements.result.innerHTML,/maps\.apple\.com/);
   await elements.parkedBtn.click();assert.equal(calls.at(-1).mode,'walking');assert.equal(calls.at(-1).from.exit,'DOWNEY.ped.main');assert.equal(calls.at(-1).from.place,'downey');assert.equal(elements.driveOptions.hidden,true);assert.equal(elements.parkedBtn.hidden,true);assert.match(elements.result.innerHTML,/pedestrian exit/);
   // Regression: entering a staff token threw "loadQuestions is not defined" (it was
   // trapped inside the startup block). The handler must run without a ReferenceError.

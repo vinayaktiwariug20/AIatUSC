@@ -25,7 +25,7 @@
 
 .arrival{border:2px solid var(--ok);border-radius:12px;padding:12px;margin-top:10px;background:#eef7f2}
 .doorphoto{width:100%;border-radius:10px;margin:8px 0;display:block}
-.btnlink{display:block;text-align:center;padding:12px;border-radius:10px;background:var(--brand);color:#fff;font-weight:700;text-decoration:none;margin-top:8px}
+.maplink{flex:1;display:block;text-align:center;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-weight:700;text-decoration:none}.btnlink{display:block;text-align:center;padding:12px;border-radius:10px;background:var(--brand);color:#fff;font-weight:700;text-decoration:none;margin-top:8px}
 .maphint{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:1000;pointer-events:none;background:#202329e6;color:#fff;padding:8px 14px;border-radius:999px;font-size:14px;font-weight:600;box-shadow:0 2px 10px #0003;white-space:nowrap;max-width:calc(100% - 90px);overflow:hidden;text-overflow:ellipsis}
 .maphint[hidden]{display:none}
 #panel{padding:16px 18px calc(18px + env(safe-area-inset-bottom));max-height:58vh;overflow:auto;border-top:1px solid var(--line)}
@@ -142,9 +142,14 @@ if(EVENT){$('eventLine').hidden=false;$('eventLine').textContent='Event: '+EVENT
 // Anonymous counts for the organizer of this event link (see /privacy/): only for visits
 // that came from an event link, once per kind per visit, fire-and-forget. Nothing personal is sent.
 const counted=new Set();
-function track(kind){if(!qs.get('to')||counted.has(kind)||!navigator.sendBeacon)return;counted.add(kind);
+function track(kind){if(kind==='arrive'||kind==='inside')stat(kind);if(!qs.get('to')||counted.has(kind)||!navigator.sendBeacon)return;counted.add(kind);
  try{navigator.sendBeacon('/api/usage',new Blob([JSON.stringify({kind,to:qs.get('to'),room:qs.get('room')||'',event:EVENT})],{type:'application/json'}));}catch{}}
 track('open');
+// Site-wide counts for the team: what this visit used, each kind once. Nothing personal is sent (see /privacy/).
+const stated=new Set();
+function stat(kind){if(stated.has(kind)||!navigator.sendBeacon)return;stated.add(kind);
+ try{navigator.sendBeacon('/api/stats',new Blob([JSON.stringify({kind})],{type:'application/json'}));}catch{}}
+stat('visit');if(qs.get('to'))stat('visit_event_link');
 function buildingId(){const text=$('to').value.trim().replace(/^\([^)]{1,40}\)\s*/,'');return buildings.find(b=>b.id===text||b.name.toLowerCase()===text.toLowerCase())?.id||text;}
 function marker(lat,lon){if(!startMarker)startMarker=L.circleMarker([lat,lon],{radius:7,color:'#fff',weight:3,fillColor:'#2459d3',fillOpacity:1}).addTo(map);else startMarker.setLatLng([lat,lon]);}
 // Every GPS fix: move the dot, show the fix's accuracy, and keep the map on the walker while following.
@@ -154,7 +159,7 @@ function stopGps(){if(watchId!==null){navigator.geolocation.clearWatch(watchId);
 const pill=L.DomUtil.create('div','maphint',map.getContainer());
 function mapHint(text){pill.textContent=text||'';pill.hidden=!text;}
 mapHint('📍 Tap the map or type where you’re starting');
-function setStart(lat,lon,gps=false,label=null){start={lat,lon};if(!reporting)mapHint('');marker(lat,lon);if(document.activeElement!==$('from'))$('from').value=label||(gps?'My location':'Point on the map');info(label?'Starting from '+label+'.':gps?'Using your current location.':'Start set on the map.');if(mode==='walking'&&$('to').value)route(!routeLayer);else if(mode==='driving'&&plan&&Date.now()-lastRouted>45000)route(false);}
+function setStart(lat,lon,gps=false,label=null){start={lat,lon};if(!reporting)mapHint('');marker(lat,lon);if(document.activeElement!==$('from'))$('from').value=label||(gps?'My location':'Point on the map');if(gps)stat('start_gps');info(label?'Starting from '+label+'.':gps?'Using your current location.':'Start set on the map.');if(mode==='walking'&&$('to').value)route(!routeLayer);else if(mode==='driving'&&plan&&Date.now()-lastRouted>45000)route(false);}
 function setMode(next){clearRoute();mode=next;$('walkMode').classList.toggle('active',mode==='walking');$('driveMode').classList.toggle('active',mode==='driving');$('walkMode').setAttribute('aria-pressed',mode==='walking');$('driveMode').setAttribute('aria-pressed',mode==='driving');$('driveOptions').hidden=mode!=='driving';if(start?.place)start=null;info(mode==='driving'?'Choose a start and destination, then select Find route.':'Walking routes cover campus and the surrounding area.');loadMobility().catch(showError);}
 function availableReports(){const enabled=health?.database==='connected'&&(health.public_reports||$('token').value.trim());$('repBtn').disabled=!enabled;}
 // Draw the route simplified (Douglas-Peucker, ~6 m): the path is the same, it just
@@ -169,10 +174,16 @@ function smoothed(r){return {...r,features:(r.features||[]).map(f=>f.geometry?.t
 function drawPlan(r,fit){r=smoothed(r);
  // Route = white outline underneath + coloured line on top, rounded, like modern map apps.
 const lineColor=mode==='driving'?'#2459d3':'#08734d',round={lineCap:'round',lineJoin:'round'};
-routeLayer=L.featureGroup([L.geoJSON(r,{filter:f=>f.geometry.type!=='Point'&&!['to_road','to_entrance'].includes(f.properties?.kind),style:{color:'#fff',weight:11,opacity:.95,...round}}),L.geoJSON(r,{style:f=>f.properties?.kind==='campus'?{color:lineColor,weight:5,dashArray:'9 7',opacity:.95,...round}:['to_road','to_entrance'].includes(f.properties?.kind)?{color:lineColor,weight:4,dashArray:'1 8',opacity:.9,...round}:{color:lineColor,weight:6,opacity:.95,...round},pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:f.properties.kind==='start'?0:8,color:'#fff',weight:3,fillColor:lineColor,fillOpacity:1})})]).addTo(map);highlightBuilding(r.summary?.building,fit);
+routeLayer=L.featureGroup([L.geoJSON(r,{filter:f=>f.geometry.type!=='Point'&&!['to_road','to_entrance'].includes(f.properties?.kind),style:{color:'#fff',weight:11,opacity:.95,...round}}),L.geoJSON(r,{style:f=>f.properties?.kind==='campus'?{color:lineColor,weight:5,dashArray:'9 7',opacity:.95,...round}:['to_road','to_entrance'].includes(f.properties?.kind)?{color:lineColor,weight:4,dashArray:'1 8',opacity:.9,...round}:{color:lineColor,weight:6,opacity:.95,...round},pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:f.properties.kind==='start'?0:8,color:'#fff',weight:3,fillColor:lineColor,fillOpacity:1})})]).addTo(map);highlightBuilding(r.summary?.building,fit&&!r.handoff_only);
  if(r.walking_preview)walkingLayer=L.geoJSON(r.walking_preview,{style:{color:'#08734d',weight:4,dashArray:'1 9',opacity:.85,lineCap:'round'},pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:0,opacity:0})}).addTo(map);
- if(fit)map.fitBounds(routeLayer.getBounds(),{padding:[25,25]});
+ // No driving line (maps-app plan): show the whole trip, from the start through the walk.
+ if(fit&&r.handoff_only&&start){const b=routeLayer.getBounds().extend([start.lat,start.lon]);if(walkingLayer)b.extend(walkingLayer.getBounds());map.fitBounds(b,{padding:[25,25]});}
+ else if(fit)map.fitBounds(routeLayer.getBounds(),{padding:[25,25]});
 }
+// The phone's maps app drives to the gate (live traffic, no limits for us); Doorstep does the walk.
+function mapsButtons(dt){if(!dt||!Number.isFinite(dt.lat))return '';const at=dt.lat.toFixed(6)+','+dt.lon.toFixed(6);
+ return '<div class="row" style="margin-top:8px"><a class="maplink" data-handoff target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&amp;destination='+at+'&amp;travelmode=driving">Google Maps</a>'
+  +'<a class="maplink" data-handoff target="_blank" rel="noopener" href="https://maps.apple.com/?daddr='+at+'&amp;dirflg=d">Apple Maps</a></div><div class="dim">Drives you to '+esc(dt.name)+'.</div>';}
 async function route(fit=true){
  if(!start||!$('to').value.trim()){info('Choose a start and destination first.');return;}
  const id=++routeVersion;controller?.abort();controller=new AbortController();busy=true;$('goBtn').disabled=true;$('parkedBtn').hidden=true;plan=null;updateIndoorView();
@@ -181,10 +192,16 @@ async function route(fit=true){
   const r=await api('/api/outdoor/route',{method:'POST',signal:controller.signal,body:JSON.stringify({from:start,to:buildingId(),mode,at:$('departAt').value||undefined,parking:$('parking').value,usc_id:$('uscId').checked,parking_pass:$('parkingPass').checked,permit:$('permit').value||undefined,step_free:$('stepFree').checked})});
   if(id!==routeVersion)return;lastRouted=Date.now();
   if(!r.ok){const choices=(r.choices||[]).map(c=>'<button class="small" data-pick="'+esc(c.id)+'">'+esc(c.name)+'</button>').join(' ');$('result').innerHTML='<div class="card error">'+esc(r.reason||r.error)+(choices?'<div class="row wrap" style="margin-top:8px">'+choices+'</div>':'')+'</div>';info('Choose another start or parking structure.');return;}
-  plan=r;drawPlan(r,fit);const s=r.summary;track('route');updateIndoorView(s,mode==='walking'?r.handoff||{}:{},!!(mode==='walking'?r.handoff:r.walking_preview?.handoff)?.indoor_node);
+  plan=r;drawPlan(r,fit);const s=r.summary;track('route');stat(mode==='driving'?'route_drive':'route_walk');if(mode==='walking'&&s.step_free)stat('step_free');if(r.handoff_only)stat('drive_fallback');updateIndoorView(s,mode==='walking'?r.handoff||{}:{},!!(mode==='walking'?r.handoff:r.walking_preview?.handoff)?.indoor_node);
   if(mode==='driving'){
-   $('result').innerHTML='<section class="card"><div class="dim">DRIVE → PARK → WALK</div><div class="big">About '+esc(s.minutes)+' min drive + '+esc(s.walking_minutes)+' min walk</div>'+(r.walking_preview?.summary?.step_free?'<div class="success">Walk after parking is step-free: no mapped stairs.</div><div class="dim">Stairs come from OpenStreetMap. Curbs, slopes and doors are not checked.</div>':'')+'<h2 style="margin-top:8px">'+esc(s.parking.name)+'</h2><div>Via '+esc(s.gate.name)+'</div>'+(s.start_to_road_m>10?'<div class="dim">Starts at the nearest road, '+esc(s.start_to_road_m)+' m from you (dotted line).</div>':'')+(s.campus_m>10?'<div class="dim">Enter at '+esc(s.gate.name)+', then about '+esc(s.campus_m)+' m on campus roads to the structure (dashed).</div>':'')+'<div class="dim">'+esc(s.parking.address)+' · Space availability unknown</div><div class="notice">'+(s.gate.location_source==='approximate_intersection'?'The gate pin is approximate. Follow posted signs. ':'')+'Estimated time does not include live traffic.</div><div class="dim">Routes crossing closed gate areas or registered closures are excluded. Auto selection tries up to two candidates and does not guarantee the fastest route.</div>'+(r.steps.length?'<details><summary>Driving directions</summary><ol id="routeSteps">'+r.steps.map(step=>'<li>'+esc(step.instruction)+' <small>'+Math.round(step.distance||0)+' m</small></li>').join('')+'</ol></details>':'')+'</section>';
+   const dt=s.drive_to,apps=mapsButtons(dt);
+   if(r.handoff_only){
+    $('result').innerHTML='<section class="card"><div class="dim">DRIVE → PARK → WALK</div><div class="big">Drive to '+esc(dt.name)+', then '+esc(s.walking_minutes)+' min walk</div>'+'<div class="notice">Doorstep\'s driving directions are '+(r.why==='busy'?'busy right now':'unavailable right now')+'. Use your maps app for the drive; Doorstep shows the rest.</div>'+apps+'<h2 style="margin-top:10px">'+esc(s.parking.name)+'</h2>'+(s.campus_m>10?'<div class="dim">Enter at '+esc(s.gate.name)+', then about '+esc(s.campus_m)+' m on campus roads to the structure (dashed).</div>':'')+'<div class="dim">'+esc(s.parking.address)+' · Space availability unknown</div>'+(dt.approximate?'<div class="notice">The gate pin is approximate. Follow posted signs.</div>':'')+'</section>';
+    $('parkedBtn').hidden=false;info('Open your maps app for the drive. Select the parking button after you have parked.');
+   }else{
+   $('result').innerHTML='<section class="card"><div class="dim">DRIVE → PARK → WALK</div><div class="big">About '+esc(s.minutes)+' min drive + '+esc(s.walking_minutes)+' min walk</div>'+apps+(r.walking_preview?.summary?.step_free?'<div class="success">Walk after parking is step-free: no mapped stairs.</div><div class="dim">Stairs come from OpenStreetMap. Curbs, slopes and doors are not checked.</div>':'')+'<h2 style="margin-top:8px">'+esc(s.parking.name)+'</h2><div>Via '+esc(s.gate.name)+'</div>'+(s.start_to_road_m>10?'<div class="dim">Starts at the nearest road, '+esc(s.start_to_road_m)+' m from you (dotted line).</div>':'')+(s.campus_m>10?'<div class="dim">Enter at '+esc(s.gate.name)+', then about '+esc(s.campus_m)+' m on campus roads to the structure (dashed).</div>':'')+'<div class="dim">'+esc(s.parking.address)+' · Space availability unknown</div><div class="notice">'+(s.gate.location_source==='approximate_intersection'?'The gate pin is approximate. Follow posted signs. ':'')+'Estimated time does not include live traffic.</div><div class="dim">Routes crossing closed gate areas or registered closures are excluded. Auto selection tries up to two candidates and does not guarantee the fastest route.</div>'+(r.steps.length?'<details><summary>Driving directions</summary><ol id="routeSteps">'+r.steps.map(step=>'<li>'+esc(step.instruction)+' <small>'+Math.round(step.distance||0)+' m</small></li>').join('')+'</ol></details>':'')+'</section>';
    $('parkedBtn').hidden=false;info('Blue: driving · dotted green: walking after parking. Select the parking button after you have parked.');
+   }
   }else{
    let h='<section class="card"><div class="big">About '+esc(s.minutes)+' min walk</div><div>'+esc(s.building_name)+' · '+esc(s.metres)+' m</div>';
    // "Avoid stairs" took effect: say so, and say what it does and doesn't cover.
@@ -307,6 +324,7 @@ function arrivalCard(s,ho){
 
 $('result').onclick=safe(async e=>{
   if(e.target.closest('a.btnlink'))track('inside');
+  if(e.target.closest('a[data-handoff]'))stat('drive_handoff');
   const a=e.target.closest('button[data-arrived]');
 
   if(a){
@@ -327,12 +345,12 @@ $('result').onclick=safe(async e=>{
 $('parkedBtn').onclick=safe(async()=>{if(!plan||mode!=='driving')return;const h=plan.handoff;stopGps();setMode('walking');$('departAt').value='';start={place:h.parking,exit:h.exit};marker(h.lat,h.lon);await loadMobility();await route();});
 $('locBtn').onclick=()=>{if(!navigator.geolocation){info('Location is unavailable on this device. Tap the map to choose your start.',true);return;}info('Finding your location…');stopGps();following=true;let last=null;watchId=navigator.geolocation.watchPosition(p=>{const {latitude:lat,longitude:lon,accuracy}=p.coords;if(accuracy>100){info('GPS accuracy is low. Check your starting point on the map.',true);return;}showFix(lat,lon,accuracy);if(last&&map.distance(last,[lat,lon])<(mode==='driving'?60:15))return;last=[lat,lon];setStart(lat,lon,true);},e=>info('Location failed: '+e.message+'. Tap the map to choose your start.',true),{enableHighAccuracy:true,maximumAge:5000});};
 map.on('dragstart',()=>{if(watchId!==null&&following){following=false;info('Map moved. Tap "Use my location" to re-centre.');}});
-map.on('click',safe(async e=>{if(drawing){polygonPoints.push([e.latlng.lat,e.latlng.lng]);if(polygonLayer)polygonLayer.remove();polygonLayer=L.polygon(polygonPoints,{color:'#b42328'}).addTo(map);$('drawHint').textContent='Boundary points selected: '+polygonPoints.length+'. Select Save confirmed closure to close and save the area.';return;}if(reporting){if(reportPin)reportPin.setLatLng(e.latlng);else reportPin=L.marker(e.latlng).addTo(map);$('reportForm').hidden=false;return;}stopGps();clearRoute();setStart(e.latlng.lat,e.latlng.lng);}));
+map.on('click',safe(async e=>{if(drawing){polygonPoints.push([e.latlng.lat,e.latlng.lng]);if(polygonLayer)polygonLayer.remove();polygonLayer=L.polygon(polygonPoints,{color:'#b42328'}).addTo(map);$('drawHint').textContent='Boundary points selected: '+polygonPoints.length+'. Select Save confirmed closure to close and save the area.';return;}if(reporting){if(reportPin)reportPin.setLatLng(e.latlng);else reportPin=L.marker(e.latlng).addTo(map);$('reportForm').hidden=false;return;}stopGps();clearRoute();stat('start_tap');setStart(e.latlng.lat,e.latlng.lng);}));
 $('repBtn').onclick=()=>{reporting=!reporting;drawing=false;$('repBtn').setAttribute('aria-pressed',reporting);mapHint(reporting?'📍 Tap where the blockage is':(start?'':'📍 Tap the map to set your starting point'));if(!reporting){$('reportForm').hidden=true;reportPin?.remove();reportPin=null;}info(reporting?'Tap the blockage location on the map.':'You can select your starting point on the map.');};
 // Shrink the photo on the phone (max 768 px, JPEG): fast to upload, enough for the AI to read a sign or fence.
 async function photoData(){const f=$('repPhoto').files[0];if(!f)return null;const img=await createImageBitmap(f),k=Math.min(1,768/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.6);}
 const AI_LABEL={construction:'construction',event_setup:'event setup',crowd:'crowd',spill_or_flooding:'spill or flooding',vehicle_blocking:'vehicle blocking the way',other_blockage:'a blockage',not_a_blockage:'not a blockage',unclear:'unclear'};
-$('repSend').onclick=safe(async()=>{if(!reportPin)return;const p=reportPin.getLatLng(),value=$('repModes').value;info('Sending report…');const c=await api('/api/closures',{method:'POST',body:JSON.stringify({lat:p.lat,lon:p.lng,note:$('repNote').value,photo:await photoData(),modes:value==='both'?['walking','driving']:[value]})});$('repNote').value='';$('repPhoto').value='';$('repBtn').click();await refresh();info(c.ai&&c.ai.status==='ok'?'Report saved. AI read it as '+(AI_LABEL[c.ai.category]||c.ai.category)+(c.ai.summary?': '+c.ai.summary:'')+'. Staff will check it before any route changes.':'Report saved. Public reports affect routes after staff approval. The map shows up to 20 recent unverified reports.');});
+$('repSend').onclick=safe(async()=>{if(!reportPin)return;const p=reportPin.getLatLng(),value=$('repModes').value;info('Sending report…');const c=await api('/api/closures',{method:'POST',body:JSON.stringify({lat:p.lat,lon:p.lng,note:$('repNote').value,photo:await photoData(),modes:value==='both'?['walking','driving']:[value]})});stat('report');$('repNote').value='';$('repPhoto').value='';$('repBtn').click();await refresh();info(c.ai&&c.ai.status==='ok'?'Report saved. AI read it as '+(AI_LABEL[c.ai.category]||c.ai.category)+(c.ai.summary?': '+c.ai.summary:'')+'. Staff will check it before any route changes.':'Report saved. Public reports affect routes after staff approval. The map shows up to 20 recent unverified reports.');});
 $('token').onchange=safe(async()=>{availableReports();await Promise.all([loadClosures(),loadRules(),loadQuestions()]);});
 $('ruleKind').onchange=()=>{prefillTimes();const road=$('ruleKind').value==='road';$('drawBtn').hidden=!road;$('drawHint').hidden=!road;$('ruleGate').hidden=road;drawing=false;};
 $('drawBtn').onclick=()=>{drawing=true;reporting=false;polygonPoints=[];polygonLayer?.remove();polygonLayer=null;info('Tap the corners of the closed area on the map, in order.');};
@@ -396,6 +414,7 @@ $('askBtn').onclick=safe(async()=>{
     return;
   }
 
+  stat(r.answered?'ask_answered':'ask_escalated');
   if(r.answered){
     const src=[...new Set(r.sources.map(s=>s.source))].map(esc).join(' · ');
     m.innerHTML=esc(r.answer)
@@ -573,7 +592,7 @@ function fromShow(items,note){
 function fromHide(){fromShow([],'');}
 function fromMark(i){fromActive=i;[...$('fromList').querySelectorAll('li[role=option]')].forEach((li,j)=>li.setAttribute('aria-selected',String(j===i)));
   if(i>=0){$('from').setAttribute('aria-activedescendant','fromOpt'+i);$('fromOpt'+i).scrollIntoView({block:'nearest'});}}
-function fromPick(i){const it=fromItems[i];if(!it)return;fromHide();stopGps();clearRoute();$('from').blur();
+function fromPick(i){const it=fromItems[i];if(!it)return;stat(it.kind==='address'?'start_address':'start_place');fromHide();stopGps();clearRoute();$('from').blur();
   setStart(it.lat,it.lon,false,it.label);if(!$('to').value)map.setView([it.lat,it.lon],Math.max(map.getZoom(),16));}
 async function fromSearch(q){
   const seq=++fromSeq;fromCtl?.abort();fromCtl=new AbortController();

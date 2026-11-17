@@ -103,15 +103,18 @@ test('walking-only reports do not block vehicle routing',async()=>{
  const out=await drivingRoute(context,body,monday,[],[closure],env(),provider().fn);assert.equal(out.ok,true);
  const car=await drivingRoute(context,body,monday,[],[{...closure,modes:['driving']}],env(),provider().fn);assert.equal(car.ok,true);assert.equal(car.summary.gate.id,'downey-way');
 });
-test('missing key, missing D1, out-of-range starts and provider quota fail explicitly',async()=>{
+test('missing key, missing D1 and out-of-range starts fail explicitly; provider quota hands off to a maps app',async()=>{
  await assert.rejects(()=>drivingRoute(context,body,monday,[],[],{DB:new D1()},provider().fn),e=>e.status===503);
  await assert.rejects(()=>drivingRoute(context,body,monday,[],[],{ORS_API_KEY:'key'},provider().fn),e=>e.status===503);
  await assert.rejects(()=>drivingRoute(context,{...body,from:{lat:0,lon:0}},monday,[],[],env(),provider().fn),e=>e.status===400);
- await assert.rejects(()=>drivingRoute(context,body,monday,[],[],env(),provider(undefined,429).fn),e=>e.status===429);
+ // openrouteservice says 429: no error, a plan for the phone's maps app instead
+ const busy=await drivingRoute(context,body,monday,[],[],env(),provider(undefined,429).fn);
+ assert.equal(busy.ok,true);assert.equal(busy.handoff_only,true);assert.equal(busy.why,'busy');
+ assert.ok(Number.isFinite(busy.summary.drive_to.lat));assert.ok(busy.walking_preview.summary.minutes>0);
 });
-test('global quota counts upstream requests and refuses before hitting the provider',async()=>{
+test('global quota counts upstream requests; when it is used up, no provider call and a maps-app plan',async()=>{
  const e=env(),slot='minute:'+Math.floor(Date.now()/60000);e.DB.db.prepare('INSERT INTO routing_usage VALUES(?,?,?)').run(slot,10,Date.now()+120000);
- const mock=provider();await assert.rejects(()=>drivingRoute(context,body,monday,[],[],e,mock.fn),e=>e.status===429);assert.equal(mock.calls.length,0);
+ const mock=provider();const out=await drivingRoute(context,body,monday,[],[],e,mock.fn);assert.equal(out.handoff_only,true);assert.equal(mock.calls.length,0);
 });
 test('gate and road changes require admin authorization and persist in real SQL',async()=>{
  const e=env(),b={kind:'gate',gate:'watt',starts:'2026-11-16T10:00',ends:'2026-11-16T14:00',note:'staff traffic control'};
