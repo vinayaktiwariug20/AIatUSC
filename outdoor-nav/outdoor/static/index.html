@@ -152,7 +152,7 @@ const stated=new Set();
 function stat(kind){if(stated.has(kind)||!navigator.sendBeacon)return;stated.add(kind);
  try{navigator.sendBeacon('/api/stats',new Blob([JSON.stringify({kind})],{type:'application/json'}));}catch{}}
 stat('visit');if(qs.get('to'))stat('visit_event_link');
-function buildingId(){const text=$('to').value.trim().replace(/^\([^)]{1,40}\)\s*/,'');return buildings.find(b=>b.id===text||b.name.toLowerCase()===text.toLowerCase())?.id||text;}
+function buildingId(){const text=$('to').value.trim().replace(/^\([^)]{1,40}\)\s*/,'');return findId(text)||text;}
 function marker(lat,lon){if(!startMarker)startMarker=L.circleMarker([lat,lon],{radius:7,color:'#fff',weight:3,fillColor:'#2459d3',fillOpacity:1}).addTo(map);else startMarker.setLatLng([lat,lon]);}
 // Every GPS fix: move the dot, show the fix's accuracy, and keep the map on the walker while following.
 function showFix(lat,lon,accuracy){marker(lat,lon);if(!accCircle)accCircle=L.circle([lat,lon],{radius:1,color:'#2459d3',weight:1,opacity:.4,fillOpacity:.08,interactive:false}).addTo(map);accCircle.setLatLng([lat,lon]).setRadius(Math.max(accuracy||0,1));if(following)map.panTo([lat,lon],{animate:true});}
@@ -287,8 +287,10 @@ $('nowBtn').onclick=safe(async()=>{
 let arrival='';
 // The building the event link points at (id, code or name), or null. The link's room,
 // indoor start and "Your event" apply only there: people may route somewhere else first.
+// "Ronald Tutor Campus Center (TCC)": the name plus the official code, as the From box shows it.
+function bLabel(b){if(!b)return '';const code=(b.aliases||[]).find(a=>/^[A-Z]{2,4}$/.test(a));return b.name+(code?' ('+code+')':'');}
 function findId(text){const t=String(text||'').trim().replace(/^\([^)]{1,40}\)\s*/,'').toLowerCase();if(!t)return null;
- return buildings.find(b=>b.id.toLowerCase()===t||b.name.toLowerCase()===t||(b.aliases||[]).some(a=>a.toLowerCase()===t))?.id||null;}
+ return buildings.find(b=>b.id.toLowerCase()===t||b.name.toLowerCase()===t||bLabel(b).toLowerCase()===t||(b.aliases||[]).some(a=>a.toLowerCase()===t))?.id||null;}
 function eventBuilding(){return findId(qs.get('to'));}
 const atEvent=id=>!qs.get('to')||!eventBuilding()||!id||(findId(id)||id)===eventBuilding();
 
@@ -315,7 +317,7 @@ function updateIndoorView(s={},ho={},mapped=true){
   $('indoorView').hidden=!mapped;
 }
 
-function eventName(){const b=buildings.find(x=>x.id===eventBuilding());if(!b)return '';const code=(b.aliases||[]).find(a=>/^[A-Z]{2,4}$/.test(a));return b.name+(code?' ('+code+')':'');}
+function eventName(){return bLabel(buildings.find(x=>x.id===eventBuilding()));}
 function arrivalCard(s,ho){
   const room=qs.get('room');
   const href=indoorHref(s,ho);
@@ -348,7 +350,7 @@ $('result').onclick=safe(async e=>{
   const b=e.target.closest('button[data-pick]');
 
   if(b){
-    $('to').value=buildings.find(x=>x.id===b.dataset.pick)?.name||b.dataset.pick;
+    $('to').value=bLabel(buildings.find(x=>x.id===b.dataset.pick))||b.dataset.pick;
     updateIndoorView();
     await route();
   }
@@ -646,7 +648,7 @@ $('to').onblur=()=>searchMode(false);
     health=results[1];
 
     $('blds').innerHTML=buildings
-      .map(b=>'<option value="'+esc(b.name)+'">')
+      .map(b=>'<option value="'+esc(bLabel(b))+'">')
       .join('');
 
     $('statusPill').textContent=health.driving_routes
@@ -666,7 +668,7 @@ $('to').onblur=()=>searchMode(false);
     availableReports();
 
     if(qs.get('to')){
-      const name=buildings.find(b=>b.id===qs.get('to'))?.name||qs.get('to');
+      const name=bLabel(buildings.find(b=>b.id===findId(qs.get('to'))))||qs.get('to');
       $('to').value=(ROOM?'('+ROOM+') ':'')+name;
     }
 

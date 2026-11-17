@@ -12,7 +12,7 @@ const html=read('../outdoor/static/index.html');
 const B=JSON.parse(read('../outdoor/static/indoor/building.json'));
 // The page's own link builder, run outside the page.
 // (with the helpers that decide whether a building is the event's)
-const indoorHref=html.slice(html.indexOf('function findId('),html.indexOf('function updateIndoorView('));
+const indoorHref=html.slice(html.indexOf("// \"Ronald Tutor"),html.indexOf('function updateIndoorView('));
 const buildings=[{id:B.id,name:'Dr. Joseph Medicine Crow Center for International and Public Affairs',aliases:['DMC']},{id:'rtcc',name:'Ronald Tutor Campus Center',aliases:['TCC']}];
 
 test('the event link reaches the indoor viewer with a door and a room it knows, and a route between them',async()=>{
@@ -88,4 +88,15 @@ test('local preview serves the real API, the indoor viewer and its files, redire
     const head=await fetch(base+'/indoor/scene/entrance.glb',{method:'HEAD'});assert.equal(head.headers.get('content-type'),'model/gltf-binary');assert.equal((await head.arrayBuffer()).byteLength,0);
     assert.equal((await fetch(base+'/api/health').then(r=>r.json())).walking_routes,true);
   }finally{await new Promise(resolve=>server.close(resolve));}
+});
+
+test('the destination list shows building codes, and a picked "Name (CODE)" still finds the building',()=>{
+  const sandbox=vm.createContext({URLSearchParams,buildings,qs:new URLSearchParams()});
+  vm.runInContext(indoorHref,sandbox);const run=code=>vm.runInContext(code,sandbox);
+  assert.equal(run("bLabel(buildings[1])"),'Ronald Tutor Campus Center (TCC)');
+  assert.equal(run("findId('Ronald Tutor Campus Center (TCC)')"),'rtcc');
+  assert.equal(run("findId('(258) Ronald Tutor Campus Center (TCC)')"),'rtcc');   // a room prefix from an event link
+  assert.equal(run("findId('tcc')"),'rtcc');
+  assert.equal(run("findId('Ronald Tutor Campus Center')"),'rtcc');
+  assert.equal(run("bLabel({name:'No Code Hall',aliases:[]})"),'No Code Hall');
 });
