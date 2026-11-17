@@ -4,6 +4,7 @@ import {USAGE_KINDS, linkKey, usageReady, countUsage, usageTotals, reserveUsageQ
 import {campusPlaces, addressSearch, reserveGeocodeQuota, hasHouseNumber, censusSearch, GEOCODE_LIMITS} from './geocode.mjs';
 import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
+import {adminGuard} from './adminguard.mjs';
 import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures, orsUsage} from './mobility.mjs';
 
 class ApiError extends Error {
@@ -101,6 +102,9 @@ export async function handleApi(request, env, context) {
       if (!body || typeof body !== 'object' || Array.isArray(body)) fail(400, 'JSON body must be an object.');
     }
     const path = url.pathname, db = env.DB, data = router.data;
+    // Wrong-token lockout applies to staff actions only; routes and search keep working.
+    const locked = await adminGuard(request, env, db);
+    const requireAdmin = () => { if (locked) fail(429, locked); if (!isAdmin(request.headers, env)) fail(403, 'admin token required'); };
     if (method === 'GET' && path === '/api/health') {
       if (db && await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='closures'").first('name') !== 'closures') return reply({ok: false, database: 'migration_required'}, 503, head);
       const mobilityReady=!db||await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mobility_rules'").first('name')==='mobility_rules';
@@ -124,12 +128,12 @@ export async function handleApi(request, env, context) {
       return reply({source:gateData.source||'',scope:'vehicle hours; pedestrian access is not stated by the source',timezone:'America/Los_Angeles',gates:gateState(context,when,rules,credentials)},200,head);
     }
     if (path === '/api/mobility/rules' && method === 'GET') {
-      if(!isAdmin(request.headers,env))fail(403,'admin token required');
+      requireAdmin();
       const when=parseTime(url.searchParams.get('at'));
       return reply(await readRules(db,when,when+7*86400000),200,head);
     }
     if (path === '/api/mobility/rules' && method === 'POST') {
-      if(!isAdmin(request.headers,env))fail(403,'admin token required');
+      requireAdmin();
       if(!db)fail(503,'Connect D1 before posting gate or road closures.');
       const rule=validateRule(body,context);
       await db.prepare('INSERT INTO mobility_rules(id,kind,starts_ms,ends_ms,created_ms,payload) VALUES(?,?,?,?,?,?)').bind(rule.id,rule.kind,rule.starts_ms,rule.ends_ms,rule.created_ms,JSON.stringify(rule)).run();
@@ -137,7 +141,7 @@ export async function handleApi(request, env, context) {
     }
     const mobilityRule=/^\/api\/mobility\/rules\/([0-9a-f]+)$/.exec(path);
     if(mobilityRule&&method==='DELETE') {
-      if(!isAdmin(request.headers,env))fail(403,'admin token required');if(!db)fail(503,'D1 is not connected.');
+      requireAdmin();if(!db)fail(503,'D1 is not connected.');
       const deleted=await db.prepare('DELETE FROM mobility_rules WHERE id=? RETURNING id').bind(mobilityRule[1]).first('id');
       return deleted?reply({deleted}):reply({error:'not found'},404);
     }
@@ -177,7 +181,7 @@ export async function handleApi(request, env, context) {
     }
     if (method === 'POST' && path === '/api/closures') {
       if (!db) fail(503,'Connect D1 and apply the migration before posting reports.');
-      const official = isAdmin(request.headers,env);
+      const official = !locked && isAdmin(request.headers,env);
       if (!official && env.PUBLIC_REPORTS_ENABLED !== 'true') fail(403,'Public reports are not enabled. Staff can use an admin token.');
       const [lat,lon] = ll(body.lat,body.lon), radius = body.radius_m ?? 15;
       if (!router.containsStart(lat,lon) || typeof radius !== 'number' || !Number.isFinite(radius) || radius <= 0 || radius > 200) fail(400,'Invalid campus location or radius.');
@@ -209,7 +213,7 @@ export async function handleApi(request, env, context) {
     }
     const closure = /^\/api\/closures\/([0-9a-f]+)(?:\/(approve|reject))?$/.exec(path);
     if (closure && ['POST','DELETE'].includes(method)) {
-      if (!isAdmin(request.headers,env)) fail(403,'admin token required');
+      requireAdmin();
       if (!db) fail(503,'D1 is not connected.');
       const [,id,action] = closure;
       if (method === 'DELETE' && !action) {
@@ -264,7 +268,7 @@ export async function handleApi(request, env, context) {
         return new Response(null, {status: 204});
       }
       if (method === 'GET') {
-        if (!isAdmin(request.headers, env)) fail(403, 'admin token required');
+        requireAdmin();
         const days = Math.min(Math.max(parseInt(url.searchParams.get('days') || '30', 10) || 30, 1), 365);
         const openrouteservice = db ? await orsUsage(db, GEOCODE_LIMITS) : null;
         if (!ready) return reply({days, kinds: SITE_KINDS, stats: null, openrouteservice});
@@ -314,7 +318,7 @@ export async function handleApi(request, env, context) {
       return reply({id: q.id, status: q.status, question: q.question, answer: q.answer ?? null, answered: q.answered ?? null}, 200, head);
     }
     if (path === '/api/questions' || (qMatch && qMatch[2])) {
-      if (!isAdmin(request.headers, env)) fail(403, 'admin token required');
+      requireAdmin();
       if (!db) fail(503, 'D1 is not connected.');
       if (!(await questionsReady(db))) fail(503, 'The database needs an update (migration 0003). Run npm run db:remote.');
       const now = Date.now(), text = v => String(v ?? '').trim();
