@@ -57,9 +57,10 @@ export async function addressSearch(env, q, fetcher = fetch) {
 }
 
 /** Address search is a shared, limited resource: 30 a minute and 900 a day overall (under the free plan's geocoding allowance). */
+export const GEOCODE_LIMITS = {minute: 30, day: 900};
 export async function reserveGeocodeQuota(db, now = Date.now()) {
   try {
-    for (const [prefix, size, limit] of [['day', 86400000, 900], ['minute', 60000, 30]]) {
+    for (const [prefix, size, limit] of [['day', 86400000, GEOCODE_LIMITS.day], ['minute', 60000, GEOCODE_LIMITS.minute]]) {
       const slot = 'geocode:' + prefix + ':' + Math.floor(now / size);
       const n = await db.prepare('INSERT INTO routing_usage(slot,count,expires_ms) VALUES(?,1,?) ON CONFLICT(slot) DO UPDATE SET count=count+1 WHERE count<? RETURNING count')
         .bind(slot, now + size * 2, limit).first('count');

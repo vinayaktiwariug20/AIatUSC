@@ -36,6 +36,17 @@ test('site counts add up per kind; reading them needs the admin token', async ()
   assert.equal(data.stats.totals.start_address, 1);
   assert.equal(data.stats.totals.route_drive, 0);
   assert.equal(data.stats.days.length, 1);
+  // shared openrouteservice allowance, for the team to keep an eye on
+  assert.deepEqual(Object.keys(data.openrouteservice).sort(), ['day_basis', 'directions', 'geocode']);
+  assert.equal(data.openrouteservice.directions.minute.used, 0);
+  assert.equal(data.openrouteservice.directions.minute.limit, 20);
+  assert.equal(data.openrouteservice.directions.day.limit, 1000);
+  assert.equal(data.openrouteservice.geocode.minute.limit, 30);
+  env.DB.db.prepare('INSERT INTO routing_usage VALUES(?,?,?)').run('minute:' + Math.floor(Date.now() / 60000), 7, Date.now() + 120000);
+  env.DB.db.prepare('INSERT INTO routing_usage VALUES(?,?,?)').run('geocode:day:' + Math.floor(Date.now() / 86400000), 41, Date.now() + 172800000);
+  const again = (await call(env, '/api/stats?days=7', 'GET', null, 'secret-token')).data.openrouteservice;
+  assert.equal(again.directions.minute.used, 7);
+  assert.equal(again.geocode.day.used, 41);
 });
 
 test('unknown kinds are refused; site counts never mix with event-link counts', async () => {
