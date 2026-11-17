@@ -110,8 +110,8 @@ export function intersectsPolygon(coords,polygon) {
   });
 }
 // Closed gates become no-go areas only where we know where the gate is.
-// Approximate pins sit in the middle of public intersections (Exposition/Pardee,
-// Vermont/36th Pl...): a 35 m circle there closed the PUBLIC street, so on
+// Approximate pins sit in the middle of public intersections (Jefferson/Royal,
+// Vermont/36th Pl before it was pinned...): a 35 m circle there closed the PUBLIC street, so on
 // evenings and weekends no driving route survived. A closed campus gate must stop
 // you entering campus through it, not driving past it.
 export const GATE_AVOID_RADIUS_M=12;
