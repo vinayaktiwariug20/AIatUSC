@@ -5,7 +5,7 @@ import {campusPlaces, addressSearch, reserveGeocodeQuota, hasHouseNumber, census
 import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
 import {adminGuard} from './adminguard.mjs';
-import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures, orsUsage} from './mobility.mjs';
+import {MobilityError, readRules, mobilityState, gateState, validateRule, validateParkingStatus, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures, orsUsage} from './mobility.mjs';
 
 class ApiError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -123,7 +123,7 @@ export async function handleApi(request, env, context) {
       return reply({ok: true, app: 'AIatUSC', runtime: 'cloudflare-javascript',
         database: db ? 'connected' : 'not_configured', storage: db ? 'd1' : 'read_only_preview',
         timezone: 'America/Los_Angeles', walking_routes: true, driving_routes: Boolean(db && env.ORS_API_KEY && mobilityReady), turn_by_turn: false,
-        parking_handoff:true,mobility_migration:mobilityReady?'ready':'required',ai_service:triageConfigured(env),questions_migration:!db||await questionsReady(db)?'ready':'required',usage_migration:!db||await usageReady(db)?'ready':'required',driving_provider:'openrouteservice',live_traffic:false,unverified_report_display_limit:20,
+        parking_handoff:true,mobility_migration:mobilityReady?'ready':'required',ai_service:triageConfigured(env),questions_migration:!db||await questionsReady(db)?'ready':'required',usage_migration:!db||await usageReady(db)?'ready':'required',parking_status_migration:!db||await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='parking_status'").first('name')==='parking_status'?'ready':'required',driving_provider:'openrouteservice',live_traffic:false,unverified_report_display_limit:20,
         public_reports: Boolean(db) && env.PUBLIC_REPORTS_ENABLED === 'true'}, 200, head);
     }
     if (method === 'GET' && path === '/api/buildings') {
@@ -147,6 +147,12 @@ export async function handleApi(request, env, context) {
     if (path === '/api/mobility/rules' && method === 'POST') {
       requireAdmin();
       if(!db)fail(503,'Connect D1 before posting gate or road closures.');
+      if(body.kind==='parking'){
+        const status=validateParkingStatus(body,context);
+        try{await db.prepare('INSERT INTO parking_status(id,parking,starts_ms,ends_ms,created_ms,payload) VALUES(?,?,?,?,?,?)').bind(status.id,status.parking,status.starts_ms,status.ends_ms,status.created_ms,JSON.stringify(status)).run();}
+        catch{fail(503,'Parking status needs database migration 0005. It is applied on the next deploy, or run npm run db:remote.');}
+        return reply(status,201);
+      }
       const rule=validateRule(body,context);
       await db.prepare('INSERT INTO mobility_rules(id,kind,starts_ms,ends_ms,created_ms,payload) VALUES(?,?,?,?,?,?)').bind(rule.id,rule.kind,rule.starts_ms,rule.ends_ms,rule.created_ms,JSON.stringify(rule)).run();
       return reply(rule,201);
@@ -154,7 +160,8 @@ export async function handleApi(request, env, context) {
     const mobilityRule=/^\/api\/mobility\/rules\/([0-9a-f]+)$/.exec(path);
     if(mobilityRule&&method==='DELETE') {
       requireAdmin();if(!db)fail(503,'D1 is not connected.');
-      const deleted=await db.prepare('DELETE FROM mobility_rules WHERE id=? RETURNING id').bind(mobilityRule[1]).first('id');
+      let deleted=await db.prepare('DELETE FROM mobility_rules WHERE id=? RETURNING id').bind(mobilityRule[1]).first('id');
+      if(!deleted)try{deleted=await db.prepare('DELETE FROM parking_status WHERE id=? RETURNING id').bind(mobilityRule[1]).first('id');}catch{}
       return deleted?reply({deleted}):reply({error:'not found'},404);
     }
     const building = /^\/api\/buildings\/([^/]+)$/.exec(path);

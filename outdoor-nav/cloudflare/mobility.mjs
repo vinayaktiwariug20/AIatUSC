@@ -18,8 +18,69 @@ export async function readRules(db,from,to=from+1) {
     const value = await db.prepare("SELECT COALESCE(json_group_array(json(payload)), '[]') AS data FROM (SELECT payload FROM mobility_rules WHERE starts_ms<? AND ends_ms>? ORDER BY created_ms,id LIMIT 101)").bind(to,from).first('data');
     const rows=JSON.parse(value);
     if (rows.length>100) throw new Error('limit');
-    return rows;
-  } catch { throw new MobilityError(503,'Mobility storage is unavailable. Run npm run db:local and npm run db:remote for the new migration.'); }
+    return [...rows,...await readParkingStatus(db,from,to)];
+  } catch(error) { if(error instanceof MobilityError)throw error; throw new MobilityError(503,'Mobility storage is unavailable. Run npm run db:local and npm run db:remote for the new migration.'); }
+}
+// Parking statuses ride along with the gate and road rules as kind 'parking'; every
+// other reader filters by kind. Before migration 0005 there are none.
+async function readParkingStatus(db,from,to) {
+  let value;
+  try { value=await db.prepare("SELECT COALESCE(json_group_array(json(payload)), '[]') AS data FROM (SELECT payload FROM parking_status WHERE starts_ms<? AND ends_ms>? ORDER BY created_ms,id LIMIT 201)").bind(to,from).first('data'); }
+  catch { return []; }
+  const rows=JSON.parse(value);
+  if(rows.length>200)throw new MobilityError(503,'Too many parking statuses. Lift old ones on the Staff screen.');
+  return rows;
+}
+
+// ---- Parking structure status (staff) ----
+// "closed": a structure doesn't take these parkers (e.g. no Text2Park Mon-Thu 6 am-4 pm).
+// "open" / "filling" / "full": live occupancy, e.g. from radio calls on game days;
+// the newest one wins. "daily" = drivers without a permit for that structure.
+export const PARKING_STATUSES=['open','filling','full','closed'];
+export const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const STALE_MS=2*3600000;
+const clockFormat=new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+function clock(ms){const p=Object.fromEntries(clockFormat.formatToParts(ms).map(x=>[x.type,x.value]));return {day:p.weekday,minute:+p.hour*60+ +p.minute};}
+const hhmm=t=>{const m=/^(\d{2}):(\d{2})$/.exec(t||'');if(!m)return null;const v=+m[1]*60+ +m[2];return +m[1]<=24&&+m[2]<60&&v<=1440?v:null;};
+export function validateParkingStatus(body,context,now=Date.now()) {
+  const p=context.mobilityData.parking.find(x=>x.id===body.parking);
+  if(!p)throw new MobilityError(400,'Unknown parking structure.');
+  if(!['daily','everyone'].includes(body.applies))throw new MobilityError(400,'Choose who this applies to: daily (Text2Park) parkers or everyone.');
+  if(!PARKING_STATUSES.includes(body.status))throw new MobilityError(400,'Choose open, filling, full or closed.');
+  const starts=context.time.parseTime(body.starts,now),ends=context.time.parseTime(body.ends,starts+3*3600000);
+  if(ends<=starts||ends-starts>120*86400000)throw new MobilityError(400,'Use an end after the start, at most 120 days later.');
+  let spaces=null;
+  if(body.spaces!==undefined&&body.spaces!==null&&body.spaces!==''){spaces=Number(body.spaces);if(!Number.isInteger(spaces)||spaces<0||spaces>20000)throw new MobilityError(400,'Spaces left must be a whole number.');}
+  const rule={id:crypto.randomUUID().replaceAll('-',''),kind:'parking',parking:p.id,parking_name:p.name,applies:body.applies,status:body.status,spaces,
+    starts_ms:starts,ends_ms:ends,created_ms:now,starts:context.time.campusISO(starts),ends:context.time.campusISO(ends),updated:context.time.campusISO(now),
+    note:String(body.note||'').slice(0,280),source:'staff_confirmed'};
+  if(body.days!==undefined&&body.days!==null){
+    if(!Array.isArray(body.days)||!body.days.length||body.days.some(d=>!DAYS.includes(d)))throw new MobilityError(400,'Choose at least one day of the week.');
+    const from=hhmm(body.from),to=hhmm(body.to);
+    if(from===null||to===null||from>=to)throw new MobilityError(400,'Use daily times like 06:00 to 16:00 (start before end).');
+    rule.days=DAYS.filter(d=>body.days.includes(d));rule.from=body.from;rule.to=body.to;
+  }
+  return rule;
+}
+export function parkingRuleActive(r,when){
+  if(!(r.starts_ms<=when&&when<r.ends_ms))return false;
+  if(!r.days)return true;
+  const c=clock(when);return r.days.includes(c.day)&&hhmm(r.from)<=c.minute&&c.minute<hhmm(r.to);
+}
+const time12=t=>{const [h,m]=t.split(':').map(Number),hh=h%12||12;return hh+(m?':'+String(m).padStart(2,'0'):'')+(h<12||h===24?' am':' pm');};
+// What staff said about this structure for this driver, at this time.
+export function parkingSpace(rules,p,when,permit){
+  const mine=rules.filter(r=>r.kind==='parking'&&r.parking===p.id&&(r.applies==='everyone'||!permit)&&parkingRuleActive(r,when));
+  const closed=mine.filter(r=>r.status==='closed').sort((a,b)=>b.created_ms-a.created_ms)[0];
+  const live=mine.filter(r=>r.status!=='closed').sort((a,b)=>b.created_ms-a.created_ms)[0];
+  if(!closed&&!live)return null;
+  const r=closed||live,endDay=r.ends.slice(0,10)!==localDate(when)?new Date(r.ends.slice(0,10)+'T12:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})+', ':'';
+  const until=r.days?time12(r.to):endDay+time12(r.ends.slice(11,16));
+  const who=r.applies==='daily'?'daily (Text2Park) parking':'parking';
+  const reason=closed?`No ${who} until ${until}${r.note?': '+r.note:''}.`
+    :live.status==='full'?`Full (staff update ${time12(live.updated.slice(11,16))})${live.note?': '+live.note:''}.`:null;
+  return {status:closed?'closed':live.status,applies:r.applies,spaces:live?.spaces??null,updated:(live||closed).updated,
+    stale:!!live&&live.status!=='closed'&&when-live.created_ms>STALE_MS,until:r.days?r.to:r.ends,note:r.note||null,reason};
 }
 export function footballContext(data,when) {
   const date=localDate(when), game=data.home_games.find(g=>g.date===date);
@@ -67,10 +128,12 @@ export function parkingState(context,when,rules=[],credentials={}) {
     if(football.game&&p.game_access==='unconfirmed') gameRule='Game-day parking access is unconfirmed.';
     if(football.game&&p.game_access==='parking_pass'&&!credentials.parking_pass) gameRule='Game-day prepaid parking pass required.';
     if(gameRule&&!permit) reason=gameRule;
+    const space=parkingSpace(rules,p,when,permit);
+    if(!reason&&space?.reason) reason=space.reason;
     // True only when the permit is what lets this driver in (not when the structure is open to everyone).
     const byPermit=permit&&(gate?.permit_access===true||gameRule!==null);
     if(!entrance||!exit) reason='Surveyed entrance or pedestrian exit is missing.';
-    return {...p,gate:primary.gate,campus_via:primary.campus_via,access,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:'unknown',availability_basis:'gate hours and published access; spaces are not guaranteed'};
+    return {...p,gate:primary.gate,campus_via:primary.campus_via,access,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:space?.status||'unknown',space,availability_basis:space?'staff update; spaces are not guaranteed':'gate hours and published access; spaces are not guaranteed'};
   });
 }
 export function circlePolygon(lat,lon,radius=35) {
@@ -292,7 +355,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
   for(const p of parking.filter(p=>p.eligible&&(!body.parking||body.parking==='auto'||p.id===body.parking))) {
     for(const o of p.access.filter(o=>o.eligible&&o.entrance)) {
       const g=gatesNow.find(x=>x.id===o.gate),door=g&&g.lat!==undefined?[g.lat,g.lon]:ll(o.entrance);
-      const score=haversine(ll(p.exit_node),[building.lat,building.lon])/81+haversine(ll(origin),door)/500+haversine(door,ll(o.entrance))/300;
+      const score=haversine(ll(p.exit_node),[building.lat,building.lon])/81+haversine(ll(origin),door)/500+haversine(door,ll(o.entrance))/300+(p.occupancy==='filling'?5:0);
       candidates.push({p:{...p,gate:o.gate,gate_name:o.gate_name,entrance:o.entrance,campus_via:o.campus_via},score});
     }
   }
