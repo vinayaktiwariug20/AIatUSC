@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
 import {WalkRouter, haversine} from '../cloudflare/router.mjs';
 import {parseTime,campusISO,gateStatus,handleApi} from '../cloudflare/api.mjs';
-import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M,walkingRuleClosures} from '../cloudflare/mobility.mjs';
+import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M,walkingRuleClosures,DIRECTIONS_LIMITS}from '../cloudflare/mobility.mjs';
 const json=name=>JSON.parse(readFileSync(new URL('../'+name,import.meta.url),'utf8'));
 const context={router:new WalkRouter(json('cloudflare/graph.json')),gateData:json('data/gates.json'),mobilityData:json('data/mobility.json'),footballData:json('data/football.json'),survey:json('data/surveyed.json'),time:{parseTime,campusISO,gateStatus}};
 class D1{constructor(){this.db=new DatabaseSync(':memory:');for(const f of ['0001_closures.sql','0002_mobility.sql'])this.db.exec(readFileSync(new URL('../migrations/'+f,import.meta.url),'utf8'));}prepare(sql){let params=[];const db=this.db;return{bind(...values){params=values;return this;},async first(column){const row=db.prepare(sql).get(...params);return row?column?row[column]:row:null;},async run(){return db.prepare(sql).run(...params);}};}}
@@ -113,8 +113,19 @@ test('missing key, missing D1 and out-of-range starts fail explicitly; provider 
  assert.ok(Number.isFinite(busy.summary.drive_to.lat));assert.ok(busy.walking_preview.summary.minutes>0);
 });
 test('global quota counts upstream requests; when it is used up, no provider call and a maps-app plan',async()=>{
- const e=env(),slot='minute:'+Math.floor(Date.now()/60000);e.DB.db.prepare('INSERT INTO routing_usage VALUES(?,?,?)').run(slot,10,Date.now()+120000);
+ // Caps stay at or under openrouteservice's free plan even across a minute/day boundary (40/min sliding, 2,000/day).
+ assert.ok(DIRECTIONS_LIMITS.minute*2<=40&&DIRECTIONS_LIMITS.day*2<=2000);
+ const e=env(),slot='minute:'+Math.floor(Date.now()/60000);e.DB.db.prepare('INSERT INTO routing_usage VALUES(?,?,?)').run(slot,DIRECTIONS_LIMITS.minute-1,Date.now()+120000);
+ // one request left this minute: it is used, then the next search gets the maps-app plan without calling the provider
+ const first=provider();assert.equal((await drivingRoute(context,body,monday,[],[],e,first.fn)).ok,true);assert.equal(first.calls.length,1);
  const mock=provider();const out=await drivingRoute(context,body,monday,[],[],e,mock.fn);assert.equal(out.handoff_only,true);assert.equal(mock.calls.length,0);
+});
+test('openrouteservice 403 for a used-up daily quota falls back to the maps-app plan; a bad key is still an error',async()=>{
+ const quota=async()=>new Response(JSON.stringify({error:'Quota exceeded'}),{status:403});
+ const out=await drivingRoute(context,body,monday,[],[],env(),quota);
+ assert.equal(out.handoff_only,true);assert.equal(out.why,'busy');
+ const badKey=async()=>new Response(JSON.stringify({error:'Access to this API has been disallowed'}),{status:403});
+ await assert.rejects(()=>drivingRoute(context,body,monday,[],[],env(),badKey),e=>e.status===503);
 });
 test('gate and road changes require admin authorization and persist in real SQL',async()=>{
  const e=env(),b={kind:'gate',gate:'watt',starts:'2026-11-16T10:00',ends:'2026-11-16T14:00',note:'staff traffic control'};

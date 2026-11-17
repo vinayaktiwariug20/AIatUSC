@@ -94,7 +94,7 @@ The model does not guarantee compliance with special event-day one-way or exit-o
 - McClintock and Watt gate coordinates, parking entrances, and pedestrian exits come from the supplied field data. Other gate pins approximate the intersections described by USC. All gate positions and vehicle connections have not been verified on site.
 - The entrance-hours source does not specify a holiday date calendar. Unregistered holidays may use ordinary weekday hours; staff should register temporary gate restrictions.
 - Live congestion, parking occupancy, voice/continuous turn-by-turn navigation, automatic parking detection, long-distance walking outside the campus map, and photo-based indoor navigation are unavailable.
-- The app limits upstream driving requests to **10 per minute and 500 per UTC day**, shared across all visitors. A route search can use up to two provider requests. GPS-based driving recalculation waits at least 45 seconds. Provider quotas and conditions apply separately.
+- The app limits upstream driving requests to **20 per minute and 1,000 per UTC day**, shared across all visitors. A route search can use up to two provider requests. GPS-based driving recalculation waits at least 45 seconds. Provider quotas and conditions apply separately.
 - Public reports are limited to **10 per minute and 100 per UTC day** across the app. They do not change routes before approval.
 - Cloudflare CPU, D1, and request limits apply separately. Actual Workers CPU use and real provider responses require deployment verification.
 

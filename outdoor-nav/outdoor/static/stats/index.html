@@ -44,6 +44,7 @@ a{color:var(--cardinal)}
 <select id="days" aria-label="Period"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select>
 <button>Show</button></form>
 <p id="msg" class="dim"></p>
+<div id="ors" hidden><h2>openrouteservice right now <span class="dim">(shared by all visitors)</span></h2><div class="card"><table id="orsTable"></table><p class="dim" id="orsNote"></p></div></div>
 <div id="out" hidden>
 <div class="tiles" id="tiles"></div>
 <h2>Visits per day</h2>
@@ -77,11 +78,20 @@ function chart(days,from){
   if(i===0||i===all.length-1||(i%7===0&&all.length-1-i>=4))g+='<text x="'+(x+bw/2)+'" y="'+(H-6)+'" text-anchor="middle">'+d.day.slice(5)+'</text>';});
  $('chart').innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Visits per day">'+g+'</svg>';
 }
+// When a cap is used up, drivers are sent to Google or Apple Maps for the drive and Doorstep still guides the walk.
+function showOrs(o){
+ $('ors').hidden=!o;if(!o)return;
+ const cell=u=>{const p=u.limit?u.used/u.limit:0;return '<td class="n'+(p>=.8?' error':'')+'">'+u.used+' / '+u.limit+'</td>';};
+ $('orsTable').innerHTML='<tr><th></th><th class="n">This minute</th><th class="n">Today</th></tr>'
+  +[['Driving routes',o.directions],['Address search',o.geocode]].map(([l,x])=>'<tr><td>'+esc(l)+'<br><span class="dim">'+esc(x.note)+'</span></td>'+cell(x.minute)+cell(x.day)+'</tr>').join('');
+ $('orsNote').textContent='Today = '+o.day_basis+'. When a limit is reached, drivers are sent to Google or Apple Maps for the drive and Doorstep still guides the walk.';
+}
 $('f').onsubmit=async e=>{
  e.preventDefault();$('msg').className='dim';$('msg').textContent='Loading…';
  try{
   const r=await fetch('/api/stats?days='+$('days').value,{headers:{'X-Admin-Token':$('token').value.trim()}});
   const d=await r.json();if(!r.ok)throw new Error(r.status===403?'That token is not right.':(d.error||'Request failed'));
+  showOrs(d.openrouteservice);
   if(!d.stats){$('msg').textContent='Counting has not started: the database needs migration 0004.';$('out').hidden=true;return;}
   const t=d.stats.totals,v=t.visit;
   $('msg').textContent='Last '+d.days+' days (Los Angeles dates).';

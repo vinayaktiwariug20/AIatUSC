@@ -172,11 +172,17 @@ export function validateRule(body,context,now=Date.now()) {
   return rule;
 }
 
+// App-wide caps on openrouteservice Directions, set so we never trip the provider's own
+// limits on its free Standard plan (40 a minute in any sliding 60 s, 2,000 a day counted
+// from the first request). Our counters use fixed clock minutes and UTC days, so a burst
+// across a boundary can count twice: 20 a minute and 1,000 a day keep us at or under the
+// provider's numbers in every case. Raise both only with a larger openrouteservice plan.
+export const DIRECTIONS_LIMITS={minute:20,day:1000};
 async function reserveQuota(db,kind='driving') {
   const now=Date.now();
-  // Atomic, account-wide limits: at most 10 upstream requests/minute and 500/day.
+  // Atomic, account-wide limits (driving: DIRECTIONS_LIMITS; public reports: 10/minute, 100/day).
   // Limits apply to the upstream calls, including candidate retries, not page views.
-  for(const [prefix,size,limit] of [['day',86400000,kind==='report'?100:500],['minute',60000,10]]) {
+  for(const [prefix,size,limit] of [['day',86400000,kind==='report'?100:DIRECTIONS_LIMITS.day],['minute',60000,kind==='report'?10:DIRECTIONS_LIMITS.minute]]) {
     const slot=(kind==='report'?'report:':'')+prefix+':'+Math.floor(now/size);
     const count=await db.prepare('INSERT INTO routing_usage(slot,count,expires_ms) VALUES(?,1,?) ON CONFLICT(slot) DO UPDATE SET count=count+1 WHERE count<? RETURNING count').bind(slot,now+size*2,limit).first('count');
     if(!count)throw new MobilityError(429,kind==='report'?'Public report limit reached. Staff can still post.':'App driving request limit reached. Try later; walking is still available.');
@@ -184,6 +190,17 @@ async function reserveQuota(db,kind='driving') {
   await db.prepare('DELETE FROM routing_usage WHERE expires_ms<?').bind(now).run();
 }
 export const reserveReportQuota=db=>reserveQuota(db,'report');
+/** How much of the shared openrouteservice allowance is used now (staff stats page). */
+export async function orsUsage(db,geocodeLimits,now=Date.now()){
+  const minute=Math.floor(now/60000),day=Math.floor(now/86400000);
+  const used=async slot=>{try{return (await db.prepare('SELECT count FROM routing_usage WHERE slot=?').bind(slot).first('count'))||0;}catch{return 0;}};
+  return {
+    directions:{minute:{used:await used('minute:'+minute),limit:DIRECTIONS_LIMITS.minute},day:{used:await used('day:'+day),limit:DIRECTIONS_LIMITS.day},
+      note:'Drive + park. One route search uses 1 request, 2 if the first parking choice fails. A moving driver re-routes at most every 45 s.'},
+    geocode:{minute:{used:await used('geocode:minute:'+minute),limit:geocodeLimits.minute},day:{used:await used('geocode:day:'+day),limit:geocodeLimits.day},
+      note:'Typed street addresses in the start box.'},
+    day_basis:'UTC day; openrouteservice counts its day from the first request'};
+}
 async function directions(coordinates,areas,key,fetcher,db,radiuses=coordinates.map(()=>25)) {
   const body={coordinates,radiuses,instructions:true,geometry_simplify:false,units:'m',language:'en',
     options:{avoid_polygons:{type:'MultiPolygon',coordinates:areas.map(a=>a.geometry.coordinates)}}};
@@ -193,7 +210,12 @@ async function directions(coordinates,areas,key,fetcher,db,radiuses=coordinates.
   try { response=await fetcher('https://api.openrouteservice.org/v2/directions/driving-car/geojson',{method:'POST',headers:{Authorization:key,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(14000)}); }
   catch {throw new MobilityError(502,'Driving provider is unavailable. Retry later.');}
   if(response.status===429)throw new MobilityError(429,'Driving API quota reached. Wait before retrying.');
-  if(response.status===401||response.status===403)throw new MobilityError(503,'Driving API key is missing or not authorized. Staff should check ORS_API_KEY.');
+  if(response.status===401||response.status===403){
+    // openrouteservice answers 403 when the DAILY quota is used up, not only for a bad key.
+    let text='';try{text=await response.text();}catch{}
+    if(response.status===403&&/quota|limit/i.test(text))throw new MobilityError(429,'Driving API daily quota reached. Try again tomorrow.');
+    throw new MobilityError(503,'Driving API key is missing or not authorized. Staff should check ORS_API_KEY.');
+  }
   if(!response.ok) { if(response.status>=500)throw new MobilityError(502,'Driving provider is unavailable.');
     let detail='';try{const e=await response.json();detail=String(e?.error?.message||e?.error||'').slice(0,200);}catch{}
     return {failed:response.status,detail}; }

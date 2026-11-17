@@ -1,10 +1,10 @@
 import {Unreachable, haversine} from './router.mjs';
 import {triage, checkPhoto, configured as triageConfigured} from './triage.mjs';
 import {USAGE_KINDS, linkKey, usageReady, countUsage, usageTotals, reserveUsageQuota, SITE, SITE_KINDS, siteStats} from './usage.mjs';
-import {campusPlaces, addressSearch, reserveGeocodeQuota, hasHouseNumber, censusSearch} from './geocode.mjs';
+import {campusPlaces, addressSearch, reserveGeocodeQuota, hasHouseNumber, censusSearch, GEOCODE_LIMITS} from './geocode.mjs';
 import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
-import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures} from './mobility.mjs';
+import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures, orsUsage} from './mobility.mjs';
 
 class ApiError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -266,8 +266,9 @@ export async function handleApi(request, env, context) {
       if (method === 'GET') {
         if (!isAdmin(request.headers, env)) fail(403, 'admin token required');
         const days = Math.min(Math.max(parseInt(url.searchParams.get('days') || '30', 10) || 30, 1), 365);
-        if (!ready) return reply({days, kinds: SITE_KINDS, stats: null});
-        return reply({days, kinds: SITE_KINDS, stats: await siteStats(db, campusISO(Date.now() - (days - 1) * 86400000).slice(0, 10))});
+        const openrouteservice = db ? await orsUsage(db, GEOCODE_LIMITS) : null;
+        if (!ready) return reply({days, kinds: SITE_KINDS, stats: null, openrouteservice});
+        return reply({days, kinds: SITE_KINDS, stats: await siteStats(db, campusISO(Date.now() - (days - 1) * 86400000).slice(0, 10)), openrouteservice});
       }
     }
     // ---- Anonymous usage counts (see /privacy/) ----------------------------
