@@ -5,6 +5,7 @@ import {campusPlaces, addressSearch, reserveGeocodeQuota, hasHouseNumber, census
 import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
 import {adminGuard} from './adminguard.mjs';
+import {findStaff, createStaffKey, listStaffKeys, revokeStaffKey} from './staffkeys.mjs';
 import {MobilityError, readRules, mobilityState, gateState, validateRule, validateParkingStatus, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures, orsUsage} from './mobility.mjs';
 
 class ApiError extends Error {
@@ -115,8 +116,16 @@ export async function handleApi(request, env, context) {
     }
     const path = url.pathname, db = env.DB, data = router.data;
     // Wrong-token lockout applies to staff actions only; routes and search keep working.
-    const locked = await adminGuard(request, env, db);
-    const requireAdmin = () => { if (locked) fail(429, locked); if (!isAdmin(request.headers, env)) fail(403, 'admin token required'); };
+    let staff = null, staffChecked = false;
+    const isStaffKey = async supplied => { staffChecked = true; staff = await findStaff(db, supplied); return staff !== null; };
+    const locked = await adminGuard(request, env, db, Date.now(), isStaffKey);
+    const admin = !locked && isAdmin(request.headers, env);
+    if (!locked && !admin && !staffChecked && request.headers.get('X-Admin-Token')) await isStaffKey(request.headers.get('X-Admin-Token'));
+    if (locked) staff = null;
+    // Team admin: everything. Staff key: closures, parking statuses and report review only.
+    const requireAdmin = () => { if (locked) fail(429, locked); if (!admin) fail(403, 'admin token required'); };
+    const requireStaff = () => { if (locked) fail(429, locked); if (!admin && !staff) fail(403, 'staff key or admin token required'); };
+    const actor = () => admin ? 'Team admin' : staff?.name;
     if (method === 'GET' && path === '/api/health') {
       if (db && await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='closures'").first('name') !== 'closures') return reply({ok: false, database: 'migration_required'}, 503, head);
       const mobilityReady=!db||await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mobility_rules'").first('name')==='mobility_rules';
@@ -139,27 +148,44 @@ export async function handleApi(request, env, context) {
       if(path==='/api/mobility')return reply(mobilityState(context,when,rules,credentials),200,head);
       return reply({source:gateData.source||'',scope:'vehicle hours from the public page; pedestrian hours from the Transportation gate schedule where known',timezone:'America/Los_Angeles',gates:gateState(context,when,rules,credentials)},200,head);
     }
+    if (path === '/api/whoami' && method === 'GET') {
+      if (locked) fail(429, locked);
+      return reply({role: admin ? 'admin' : staff ? 'staff' : null, name: actor() || null}, 200, head);
+    }
+    if (path === '/api/staff-keys') {
+      requireAdmin(); if (!db) fail(503, 'D1 is not connected.');
+      try {
+        if (method === 'GET') return reply(await listStaffKeys(db), 200, head);
+        if (method === 'POST') { const made = await createStaffKey(db, body.name); return made.error ? reply({error: made.error}, 400) : reply(made, 201); }
+      } catch { fail(503, 'Staff keys need database migration 0006. It is applied on the next deploy, or run npm run db:remote.'); }
+    }
+    const staffKey = /^\/api\/staff-keys\/([0-9a-f]+)$/.exec(path);
+    if (staffKey && method === 'DELETE') {
+      requireAdmin(); if (!db) fail(503, 'D1 is not connected.');
+      let revoked = null; try { revoked = await revokeStaffKey(db, staffKey[1]); } catch {}
+      return revoked ? reply({revoked}) : reply({error: 'not found'}, 404);
+    }
     if (path === '/api/mobility/rules' && method === 'GET') {
-      requireAdmin();
+      requireStaff();
       const when=parseTime(url.searchParams.get('at'));
       return reply(await readRules(db,when,when+7*86400000),200,head);
     }
     if (path === '/api/mobility/rules' && method === 'POST') {
-      requireAdmin();
+      requireStaff();
       if(!db)fail(503,'Connect D1 before posting gate or road closures.');
       if(body.kind==='parking'){
-        const status=validateParkingStatus(body,context);
+        const status={...validateParkingStatus(body,context),by:actor()};
         try{await db.prepare('INSERT INTO parking_status(id,parking,starts_ms,ends_ms,created_ms,payload) VALUES(?,?,?,?,?,?)').bind(status.id,status.parking,status.starts_ms,status.ends_ms,status.created_ms,JSON.stringify(status)).run();}
         catch{fail(503,'Parking status needs database migration 0005. It is applied on the next deploy, or run npm run db:remote.');}
         return reply(status,201);
       }
-      const rule=validateRule(body,context);
+      const rule={...validateRule(body,context),by:actor()};
       await db.prepare('INSERT INTO mobility_rules(id,kind,starts_ms,ends_ms,created_ms,payload) VALUES(?,?,?,?,?,?)').bind(rule.id,rule.kind,rule.starts_ms,rule.ends_ms,rule.created_ms,JSON.stringify(rule)).run();
       return reply(rule,201);
     }
     const mobilityRule=/^\/api\/mobility\/rules\/([0-9a-f]+)$/.exec(path);
     if(mobilityRule&&method==='DELETE') {
-      requireAdmin();if(!db)fail(503,'D1 is not connected.');
+      requireStaff();if(!db)fail(503,'D1 is not connected.');
       let deleted=await db.prepare('DELETE FROM mobility_rules WHERE id=? RETURNING id').bind(mobilityRule[1]).first('id');
       if(!deleted)try{deleted=await db.prepare('DELETE FROM parking_status WHERE id=? RETURNING id').bind(mobilityRule[1]).first('id');}catch{}
       return deleted?reply({deleted}):reply({error:'not found'},404);
@@ -200,7 +226,7 @@ export async function handleApi(request, env, context) {
     }
     if (method === 'POST' && path === '/api/closures') {
       if (!db) fail(503,'Connect D1 and apply the migration before posting reports.');
-      const official = !locked && isAdmin(request.headers,env);
+      const official = admin || !!staff;
       if (!official && env.PUBLIC_REPORTS_ENABLED !== 'true') fail(403,'Public reports are not enabled. Staff can use an admin token.');
       const [lat,lon] = ll(body.lat,body.lon), radius = body.radius_m ?? 15;
       if (!router.containsStart(lat,lon) || typeof radius !== 'number' || !Number.isFinite(radius) || radius <= 0 || radius > 200) fail(400,'Invalid campus location or radius.');
@@ -232,7 +258,7 @@ export async function handleApi(request, env, context) {
     }
     const closure = /^\/api\/closures\/([0-9a-f]+)(?:\/(approve|reject))?$/.exec(path);
     if (closure && ['POST','DELETE'].includes(method)) {
-      requireAdmin();
+      requireStaff();
       if (!db) fail(503,'D1 is not connected.');
       const [,id,action] = closure;
       if (method === 'DELETE' && !action) {
