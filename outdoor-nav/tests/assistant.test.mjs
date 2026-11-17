@@ -62,7 +62,7 @@ test('an answer that cites nothing real is NOT shown; the question goes to organ
   assert.equal(q.answer, null);
 });
 
-test('an organizer answer reaches the asker and becomes a fact for the next person', async t => {
+test('a team answer reaches the asker and becomes a fact for the next person', async t => {
   const calls = fakeAi(t, ({body}) => {
     const a = body.facts.find(f => f.id.startsWith('answer:'));
     return a ? {answered: true, answer: 'Yes, pizza at 7 pm.', citations: [a.id]} : {answered: false};
@@ -78,7 +78,7 @@ test('an organizer answer reaches the asker and becomes a fact for the next pers
   assert.equal(polled.answer, 'Pizza at 7 pm in the lobby.');
   const second = (await call(e, '/api/ask', 'POST', {question: 'Will there be food?'})).data;
   assert.equal(second.answered, true);
-  assert.equal(second.sources[0].source.startsWith('organizer answer'), true);
+  assert.equal(second.sources[0].source.startsWith('Doorstep team answer'), true);
   assert.ok(calls.at(-1).body.facts.some(f => f.text.includes('Pizza at 7 pm')));
 });
 
