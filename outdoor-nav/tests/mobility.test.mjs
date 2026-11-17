@@ -251,7 +251,7 @@ test('official USC building codes find their buildings',()=>{
  assert.equal(find('JFF'),'Jill & Frank Fertitta Hall');assert.equal(find('jff'),'Jill & Frank Fertitta Hall');
  assert.equal(find('HOH'),'Hoffman Hall');assert.equal(find('DML'),'Edward L Doheny Junior Memorial Library');
  assert.equal(find('DMC'),'Dr. Joseph Medicine Crow Center for International and Public Affairs');
- assert.equal(find('JMC'),'Dr. Joseph Medicine Crow Center for International and Public Affairs');   // the name used for the demo venue
+ assert.equal(find('JMC'),'John Mckay Center');            // official code; DMC is the Medicine Crow Center
  assert.equal(find('TCC'),'Ronald Tutor Campus Center');
  // No code may point at two buildings.
  const seen=new Map();

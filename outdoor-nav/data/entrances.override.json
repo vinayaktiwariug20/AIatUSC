@@ -35,7 +35,6 @@
   "aliases": [
    "Joseph Medicine Crow Center",
    "Medicine Crow",
-   "JMC",
    "Joseph Crow Medicine Building",
    "DMC"
   ],
@@ -425,5 +424,12 @@
    "WTO"
   ],
   "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
+ },
+ {
+  "building": "john-mckay-center",
+  "aliases": [
+   "JMC"
+  ],
+  "_source": "official building code (USC maps); JMC is the John McKay Center, DMC the Medicine Crow Center"
  }
 ]

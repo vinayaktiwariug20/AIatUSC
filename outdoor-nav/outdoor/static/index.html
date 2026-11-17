@@ -131,8 +131,8 @@ function clearRoute(){routeVersion++;controller?.abort();if(routeLayer)routeLaye
 function showError(error){if(error.name==='AbortError')return;clearRoute();info(error.message,true);}
 function safe(fn){return(...args)=>Promise.resolve().then(()=>fn(...args)).catch(showError);}
 window.addEventListener('unhandledrejection',e=>{showError(e.reason);e.preventDefault();});
-// The event link may name a room (?room=JMC-218, or ?room_label= for what the flyer says).
-// Shown in front of the building name, "(JMC-218) Dr. Joseph Medicine Crow ...", and stripped before lookup.
+// The event link may name a room (?room=DMC-218, or ?room_label= for what the flyer says).
+// Shown in front of the building name, "(DMC-218) Dr. Joseph Medicine Crow ...", and stripped before lookup.
 const ROOM=(qs.get('room_label')||qs.get('room')||'').trim().slice(0,40);
 // Event name from an organizer's link (/create/): shown under the destination and on arrival.
 const EVENT=(qs.get('event')||'').replace(/\s+/g,' ').trim().slice(0,80);

@@ -23,8 +23,8 @@ async function call(env, path, method = 'GET', body) {
     headers: body ? {'Content-Type': 'application/json'} : {}, body: body ? JSON.stringify(body) : undefined}), env);
   return {status: r.status, data: r.status === 204 ? null : await r.json()};
 }
-const JMC = 'dr-joseph-medicine-crow-center-for-international-and-public-affairs';
-const link = {to: JMC, room: '258', event: 'AI@USC Showcase'};
+const DMC_ID = 'dr-joseph-medicine-crow-center-for-international-and-public-affairs';
+const link = {to: DMC_ID, room: '258', event: 'AI@USC Showcase'};
 
 test('counts accumulate per event link and kind', async () => {
   const env = {DB: new D1()};
@@ -38,9 +38,9 @@ test('counts accumulate per event link and kind', async () => {
   assert.equal(other.open, 0);
 });
 
-test('the same link counts together whether it says JMC or the full building id', async () => {
+test('the same link counts together whether it says DMC or the full building id', async () => {
   const env = {DB: new D1()};
-  await call(env, '/api/usage', 'POST', {...link, to: 'JMC', kind: 'open'});
+  await call(env, '/api/usage', 'POST', {...link, to: 'DMC', kind: 'open'});
   await call(env, '/api/usage', 'POST', {...link, kind: 'open'});
   assert.equal((await call(env, '/api/usage?' + new URLSearchParams(link))).data.totals.open, 2);
 });
