@@ -53,3 +53,31 @@ test('a failing address service still returns campus places', async () => {
     assert.ok(data.results.some(r => /Doheny/.test(r.label)));
   } finally { globalThis.fetch = real; }
 });
+
+test('a house number openrouteservice lacks comes from the Census geocoder, first; the bare street is marked approximate', async () => {
+  const real = globalThis.fetch; const hosts = [];
+  globalThis.fetch = async (url) => {
+    const u = new URL(url); hosts.push(u.host);
+    if (u.host === 'api.openrouteservice.org')
+      return new Response(JSON.stringify({features: [{geometry: {type: 'Point', coordinates: [-118.3039, 34.0237]}, properties: {layer: 'street', label: 'West 36th Place, Los Angeles, CA, USA'}}]}));
+    assert.equal(u.searchParams.get('address'), '1200 W 36th Pl, Los Angeles, CA');
+    return new Response(JSON.stringify({result: {addressMatches: [{matchedAddress: '1200 W 36TH PL, LOS ANGELES, CA, 90007', coordinates: {x: -118.2905, y: 34.0219}}]}}));
+  };
+  try {
+    const {data} = await geocode('1200 W 36th Pl', {ORS_API_KEY: 'k'});
+    assert.deepEqual(hosts, ['api.openrouteservice.org', 'geocoding.geo.census.gov']);
+    const addr = data.results.filter(r => r.kind === 'address' || r.kind === 'street');
+    assert.deepEqual(addr.map(r => [r.kind, r.label]), [['address', '1200 W 36th Pl, Los Angeles, CA, 90007'], ['street', 'West 36th Place, Los Angeles, CA, USA']]);
+  } finally { globalThis.fetch = real; }
+});
+
+test('no Census call without a house number, or when openrouteservice already found the address', async () => {
+  const real = globalThis.fetch; const hosts = [];
+  globalThis.fetch = async (url) => { hosts.push(new URL(url).host);
+    return new Response(JSON.stringify({features: [{geometry: {type: 'Point', coordinates: [-118.2827, 34.0256]}, properties: {layer: 'address', label: '3500 S Figueroa St, Los Angeles, CA, USA'}}]})); };
+  try {
+    await geocode('3500 Figueroa', {ORS_API_KEY: 'k'});
+    await geocode('Figueroa Street', {ORS_API_KEY: 'k'});
+    assert.deepEqual(hosts, ['api.openrouteservice.org', 'api.openrouteservice.org']);
+  } finally { globalThis.fetch = real; }
+});

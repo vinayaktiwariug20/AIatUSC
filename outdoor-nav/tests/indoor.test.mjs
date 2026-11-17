@@ -11,13 +11,15 @@ const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 const html=read('../outdoor/static/index.html');
 const B=JSON.parse(read('../outdoor/static/indoor/building.json'));
 // The page's own link builder, run outside the page.
-const indoorHref=html.slice(html.indexOf('function indoorHref('),html.indexOf('function updateIndoorView('));
+// (with the helpers that decide whether a building is the event's)
+const indoorHref=html.slice(html.indexOf('function findId('),html.indexOf('function updateIndoorView('));
+const buildings=[{id:B.id,name:'Dr. Joseph Medicine Crow Center for International and Public Affairs',aliases:['DMC']},{id:'rtcc',name:'Ronald Tutor Campus Center',aliases:['TCC']}];
 
 test('the event link reaches the indoor viewer with a door and a room it knows, and a route between them',async()=>{
   const event=new URL('https://example.test/?to=DMC&room=258');
   const response=await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.0215019,lon:-118.2840557},to:event.searchParams.get('to')})}),{});
   const result=await response.json();assert.equal(result.ok,true);assert.equal(result.handoff.indoor_node,'entrance');
-  const sandbox=vm.createContext({URLSearchParams,qs:event.searchParams,summary:result.summary,handoff:result.handoff});
+  const sandbox=vm.createContext({URLSearchParams,buildings,qs:event.searchParams,summary:result.summary,handoff:result.handoff});
   const link=new URL(vm.runInContext(indoorHref+'\nindoorHref(summary,handoff)',sandbox),'http://test');
   assert.equal(link.pathname,'/indoor/');
   assert.equal(link.searchParams.get('building'),B.id);assert.equal(link.searchParams.get('entrance'),'jmc-main');
@@ -31,7 +33,7 @@ test('the event link can name where indoor directions start (anchor=), instead o
   const event=new URL('https://example.test/?to=DMC&room=258&anchor=left-stair-1');
   const response=await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.0215019,lon:-118.2840557},to:event.searchParams.get('to')})}),{});
   const result=await response.json();assert.equal(result.handoff.indoor_node,'entrance');
-  const sandbox=vm.createContext({URLSearchParams,qs:event.searchParams,summary:result.summary,handoff:result.handoff});
+  const sandbox=vm.createContext({URLSearchParams,buildings,qs:event.searchParams,summary:result.summary,handoff:result.handoff});
   const link=new URL(vm.runInContext(indoorHref+'\nindoorHref(summary,handoff)',sandbox),'http://test');
   assert.equal(link.searchParams.get('anchor'),'left-stair-1');assert.equal(link.searchParams.get('room'),'258');
   assert.equal(link.searchParams.get('building'),B.id);assert.equal(link.searchParams.get('entrance'),'jmc-main');   // the door is still reported
@@ -39,8 +41,19 @@ test('the event link can name where indoor directions start (anchor=), instead o
   assert.equal(from.id,'left-stair-1');assert.equal(to.id,'258');
   const r=route(B.nav,placeEnd(B,from),placeEnd(B,to));assert.ok(r);assert.equal(r.points.at(-1).floor,2);
   // The Indoor View button carries it too, before any route exists.
-  const early=new URL(vm.runInContext(indoorHref+"\nindoorHref({building:'DMC'})",vm.createContext({URLSearchParams,qs:event.searchParams})),'http://test');
+  const early=new URL(vm.runInContext(indoorHref+"\nindoorHref({building:'DMC'})",vm.createContext({URLSearchParams,buildings,qs:event.searchParams})),'http://test');
   assert.equal(early.searchParams.get('anchor'),'left-stair-1');
+});
+
+test('routed to another building, the event link room and indoor start stay behind',()=>{
+  const event=new URLSearchParams({to:'DMC',room:'258',anchor:'left-stair-1',event:'AI@USC Showcase'});
+  const ctx=vm.createContext({URLSearchParams,buildings,qs:event});
+  const other=new URL(vm.runInContext(indoorHref+"\nindoorHref({building:'rtcc'},{building:'rtcc',indoor_node:'door'})",ctx),'http://test');
+  assert.equal(other.searchParams.get('building'),'rtcc');assert.equal(other.searchParams.has('room'),false);
+  assert.equal(other.searchParams.get('anchor'),'door');                     // its own door, not the event's stair
+  const home=new URL(vm.runInContext("indoorHref({building:'"+B.id+"'})",ctx),'http://test');
+  assert.equal(home.searchParams.get('room'),'258');assert.equal(home.searchParams.get('anchor'),'left-stair-1');
+  assert.equal(vm.runInContext("atEvent('rtcc')",ctx),false);assert.equal(vm.runInContext("atEvent('"+B.id+"')",ctx),true);
 });
 
 test('Indoor View floats at the map top-right without changing its handoff URL',()=>{
