@@ -308,6 +308,6 @@ def test_pedestrian_hours_from_the_gate_schedule():
     assert ped("downey-way", datetime(2026, 11, 21, 12, 0))["status"] == "closed"   # Saturday
     tue = ped("downey-way", datetime(2026, 11, 17, 12, 0))
     assert tue["status"] == "open" and tue["until"] == "23:00"
-    assert ped("pardee", datetime(2026, 11, 17, 5, 30))["status"] == "varies"
+    assert ped("downey-way", datetime(2026, 11, 17, 5, 30))["status"] == "varies"
     assert ped("watt", datetime(2026, 11, 21, 3, 0))["status"] == "open"
     assert ped("royal", datetime(2026, 11, 21, 12, 0))["status"] == "not_stated"

@@ -18,7 +18,7 @@ test('weekday, weekend, USC-ID and reservation eligibility are separate',()=>{
  const weekday=gateState(context,monday),weekend=gateState(context,saturday);
  assert.equal(weekday.find(g=>g.id==='watt').eligible,true);assert.equal(weekend.find(g=>g.id==='watt').eligible,false);
  assert.equal(weekend.find(g=>g.id==='mcclintock').eligible,true);
- assert.equal(weekday.find(g=>g.id==='pardee').eligible,false);
+ assert.equal(weekday.find(g=>g.id==='pardee'),undefined);               // removed: special access only (VIPs, unloading)
  assert.equal(weekend.find(g=>g.id==='flower').eligible,false);
  assert.equal(gateState(context,saturday,[],{usc_id:true}).find(g=>g.id==='flower').eligible,true);
 });
@@ -170,12 +170,13 @@ test('closed gates with approximate pins do not close public streets; surveyed g
  const sat=parseTime('2026-11-14T20:00:00'),areas=avoidance(context,sat,sat+1800000,[],{});
  const ids=areas.map(a=>a.id);
  assert.ok(ids.includes('gate:watt'),ids);                                  // surveyed, closed on weekends
- for(const approx of ['gate:downey-way','gate:pardee','gate:royal'])assert.ok(!ids.includes(approx),approx);
+ assert.ok(ids.includes('gate:downey-way'),ids);                            // pinned on 36th Pl, closed to cars on weekends
+ for(const approx of ['gate:royal','gate:jefferson-blvd'])assert.ok(!ids.includes(approx),approx);
  const watt=areas.find(a=>a.id==='gate:watt').geometry.coordinates[0][0];   // a ring point
  const r=haversine([watt[1],watt[0]],[34.0184081,-118.2889172]);assert.ok(r<=GATE_AVOID_RADIUS_M+1,r);
 });
-test('driving past a closed gate with an approximate pin (Vermont / 36th Pl) is not a rejection',async()=>{
- const past=coords=>[coords[0],[-118.29145,34.02149],...coords.slice(1)];  // via the downey-way pin
+test('driving along Vermont past the closed Downey Way gate is not a rejection',async()=>{
+ const past=coords=>[coords[0],[-118.29145,34.02149],...coords.slice(1)];  // Vermont at 36th Pl, about 50 m from the gate pin
  const out=await drivingRoute(context,body,parseTime('2026-11-14T20:00:00'),[],[],env(),provider(past).fn);
  assert.equal(out.ok,true,JSON.stringify(out.checks));
 });
@@ -197,7 +198,8 @@ test('rule modes: default cars; walking needs a surveyed gate pin; bad modes rej
  assert.deepEqual(validateRule(base,context).modes,['driving']);
  assert.deepEqual(validateRule({...base,modes:['walking','driving']},context).modes,['walking','driving']);
  assert.throws(()=>validateRule({...base,modes:['flying']},context),/Closed to/);
- assert.throws(()=>validateRule({...base,gate:'downey-way',modes:['walking']},context),/approximate/);
+ assert.throws(()=>validateRule({...base,gate:'royal',modes:['walking']},context),/approximate/);
+ assert.deepEqual(validateRule({...base,gate:'downey-way',modes:['walking']},context).modes,['walking']);   // now pinned
 });
 test('a walking-only gate closure leaves car access alone; a cars-only one leaves walking alone',()=>{
  const when=parseTime('2026-11-16T12:30'),walk={...validateRule({kind:'gate',gate:'mcclintock',starts:'2026-11-16T12:00',ends:'2026-11-16T13:00',modes:['walking']},context)};

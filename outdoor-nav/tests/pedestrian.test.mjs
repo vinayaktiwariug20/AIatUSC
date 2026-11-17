@@ -17,11 +17,11 @@ test('Downey Way is closed on foot at weekends, and open until 11 pm on weekdays
   assert.equal((await onFoot('2026-11-17T23:30:00'))['downey-way'].status, 'varies');      // DPS closes it in this hour
 });
 
-test('Pardee: the hour DPS opens or closes it is "varies", not open', async () => {
-  const early = (await onFoot('2026-11-17T05:30:00')).pardee;
+test('the hour DPS opens a gate is "varies", not open', async () => {
+  const early = (await onFoot('2026-11-17T05:30:00'))['downey-way'];
   assert.equal(early.status, 'varies'); assert.match(early.note, /5 and 6 am/);
-  assert.equal((await onFoot('2026-11-17T21:30:00')).pardee.status, 'closed');
-  assert.equal((await onFoot('2026-11-22T10:00:00')).pardee.status, 'closed');             // Sunday
+  assert.equal((await onFoot('2026-11-17T04:30:00'))['downey-way'].status, 'closed');
+  assert.equal((await onFoot('2026-11-17T12:00:00')).pardee, undefined);                  // removed: special access only
 });
 
 test('Watt Way is open on foot around the clock, even when closed to cars', async () => {

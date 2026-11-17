@@ -20,12 +20,6 @@
       "location_source": "field_survey"
     },
     {
-      "id": "pardee",
-      "lat": 34.01848,
-      "lon": -118.28243,
-      "location_source": "approximate_intersection"
-    },
-    {
       "id": "mccarthy-way",
       "lat": 34.0206,
       "lon": -118.28145,
@@ -39,9 +33,10 @@
     },
     {
       "id": "downey-way",
-      "lat": 34.02149,
-      "lon": -118.29145,
-      "location_source": "approximate_intersection"
+      "lat": 34.0219457,
+      "lon": -118.2913191,
+      "location_source": "team_pin",
+      "location_note": "The gate on W 36th Pl, pinned by the team (2026-11-17); about 22 m from Vermont Ave, so a closed-gate area (12 m) never closes Vermont."
     },
     {
       "id": "jefferson-blvd",
