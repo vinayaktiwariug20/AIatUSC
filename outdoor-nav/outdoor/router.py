@@ -133,8 +133,9 @@ class WalkGraph:
                     "id": o["building"], "name": o.get("building_name", o["building"]),
                     "aliases": [], "lat": o["lat"], "lon": o["lon"],
                     "entrances": []}
+            # Ours first: official codes (e.g. TCC) come before OSM's (RTCC), and labels show the first.
             if o.get("aliases"):
-                b["aliases"] = list(dict.fromkeys(list(b.get("aliases", [])) + list(o["aliases"])))
+                b["aliases"] = list(dict.fromkeys(list(o["aliases"]) + list(b.get("aliases", []))))
             if o.get("outline"):
                 ring = [list(map(float, pt)) for pt in o["outline"]]
                 b["outline"] = ring if ring[0] == ring[-1] else ring + [ring[0]]
