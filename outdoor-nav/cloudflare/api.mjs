@@ -1,6 +1,7 @@
 import {Unreachable, haversine} from './router.mjs';
 import {triage, checkPhoto, configured as triageConfigured} from './triage.mjs';
 import {USAGE_KINDS, linkKey, usageReady, countUsage, usageTotals, reserveUsageQuota} from './usage.mjs';
+import {campusPlaces, addressSearch, reserveGeocodeQuota} from './geocode.mjs';
 import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
 import {MobilityError, readRules, mobilityState, gateState, validateRule, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures} from './mobility.mjs';
@@ -230,6 +231,19 @@ export async function handleApi(request, env, context) {
         const row = await db.prepare("UPDATE closures SET status=?,payload=json_set(payload,'$.status',?) WHERE id=? RETURNING payload").bind(status,status,id).first('payload');
         return row ? reply(JSON.parse(row)) : reply({error:'not found'},404);
       }
+    }
+    // ---- "From" box: campus places first, then street addresses ------------
+    if (method === 'GET' && path === '/api/geocode') {
+      const q = String(url.searchParams.get('q') || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+      if (q.length < 2) return reply({results: [], address: 'skipped'}, 200, head);
+      const results = campusPlaces(context, q);
+      let address = 'skipped';
+      if (q.length >= 4) {
+        if (!env.ORS_API_KEY) address = 'unavailable';
+        else if (db && !(await reserveGeocodeQuota(db))) address = 'busy';
+        else { const found = await addressSearch(env, q); address = found ? 'ok' : 'unavailable'; if (found) results.push(...found); }
+      }
+      return reply({results, address}, 200, head);
     }
     // ---- Anonymous usage counts (see /privacy/) ----------------------------
     if (path === '/api/usage') {
