@@ -1,6 +1,6 @@
 import {Unreachable, haversine} from './router.mjs';
 import {triage, checkPhoto, configured as triageConfigured} from './triage.mjs';
-import {USAGE_KINDS, linkKey, usageReady, countUsage, usageTotals, reserveUsageQuota} from './usage.mjs';
+import {USAGE_KINDS, linkKey, usageReady, countUsage, usageTotals, reserveUsageQuota, SITE, SITE_KINDS, siteStats} from './usage.mjs';
 import {campusPlaces, addressSearch, reserveGeocodeQuota} from './geocode.mjs';
 import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
@@ -244,6 +244,21 @@ export async function handleApi(request, env, context) {
         else { const found = await addressSearch(env, q); address = found ? 'ok' : 'unavailable'; if (found) results.push(...found); }
       }
       return reply({results, address}, 200, head);
+    }
+    // ---- Site-wide counts for the team (see /privacy/) ---------------------
+    if (path === '/api/stats') {
+      const ready = db && await usageReady(db);
+      if (method === 'POST') {
+        if (!SITE_KINDS.includes(body.kind)) fail(400, 'Unknown stats kind.');
+        if (ready && await reserveUsageQuota(db)) await countUsage(db, campusISO(Date.now()).slice(0, 10), SITE, body.kind);
+        return new Response(null, {status: 204});
+      }
+      if (method === 'GET') {
+        if (!isAdmin(request.headers, env)) fail(403, 'admin token required');
+        const days = Math.min(Math.max(parseInt(url.searchParams.get('days') || '30', 10) || 30, 1), 365);
+        if (!ready) return reply({days, kinds: SITE_KINDS, stats: null});
+        return reply({days, kinds: SITE_KINDS, stats: await siteStats(db, campusISO(Date.now() - (days - 1) * 86400000).slice(0, 10))});
+      }
     }
     // ---- Anonymous usage counts (see /privacy/) ----------------------------
     if (path === '/api/usage') {
