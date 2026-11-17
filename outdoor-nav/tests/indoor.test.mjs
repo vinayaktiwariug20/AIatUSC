@@ -14,7 +14,7 @@ const B=JSON.parse(read('../outdoor/static/indoor/building.json'));
 const indoorHref=html.slice(html.indexOf('function indoorHref('),html.indexOf('function updateIndoorView('));
 
 test('the event link reaches the indoor viewer with a door and a room it knows, and a route between them',async()=>{
-  const event=new URL('https://example.test/?to=JMC&room=258');
+  const event=new URL('https://example.test/?to=DMC&room=258');
   const response=await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.0215019,lon:-118.2840557},to:event.searchParams.get('to')})}),{});
   const result=await response.json();assert.equal(result.ok,true);assert.equal(result.handoff.indoor_node,'entrance');
   const sandbox=vm.createContext({URLSearchParams,qs:event.searchParams,summary:result.summary,handoff:result.handoff});
@@ -28,7 +28,7 @@ test('the event link reaches the indoor viewer with a door and a room it knows, 
 });
 
 test('the event link can name where indoor directions start (anchor=), instead of the door',async()=>{
-  const event=new URL('https://example.test/?to=JMC&room=258&anchor=left-stair-1');
+  const event=new URL('https://example.test/?to=DMC&room=258&anchor=left-stair-1');
   const response=await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.0215019,lon:-118.2840557},to:event.searchParams.get('to')})}),{});
   const result=await response.json();assert.equal(result.handoff.indoor_node,'entrance');
   const sandbox=vm.createContext({URLSearchParams,qs:event.searchParams,summary:result.summary,handoff:result.handoff});
@@ -39,7 +39,7 @@ test('the event link can name where indoor directions start (anchor=), instead o
   assert.equal(from.id,'left-stair-1');assert.equal(to.id,'258');
   const r=route(B.nav,placeEnd(B,from),placeEnd(B,to));assert.ok(r);assert.equal(r.points.at(-1).floor,2);
   // The Indoor View button carries it too, before any route exists.
-  const early=new URL(vm.runInContext(indoorHref+"\nindoorHref({building:'JMC'})",vm.createContext({URLSearchParams,qs:event.searchParams})),'http://test');
+  const early=new URL(vm.runInContext(indoorHref+"\nindoorHref({building:'DMC'})",vm.createContext({URLSearchParams,qs:event.searchParams})),'http://test');
   assert.equal(early.searchParams.get('anchor'),'left-stair-1');
 });
 
@@ -51,15 +51,15 @@ test('Indoor View floats at the map top-right without changing its handoff URL',
   assert.match(css,/#map\.maphint\{top:max\(78px/);
   assert.match(html,/L\.DomEvent\.disableClickPropagation\(\$\('indoorView'\)\)/);
   const sandbox=vm.createContext({URLSearchParams,qs:new URLSearchParams({room:'258'})});
-  const url=new URL(vm.runInContext(indoorHref+"\nindoorHref({building:'JMC'})",sandbox),'http://test');
-  assert.equal(url.searchParams.get('room'),'258');assert.equal(url.searchParams.get('building'),'JMC');
+  const url=new URL(vm.runInContext(indoorHref+"\nindoorHref({building:'DMC'})",sandbox),'http://test');
+  assert.equal(url.searchParams.get('room'),'258');assert.equal(url.searchParams.get('building'),'DMC');
   assert.equal(url.searchParams.has('anchor'),false);assert.equal(url.searchParams.has('entrance'),false);
 });
 
 test('the indoor link keeps its parameters on browsers without URLSearchParams.size (Safari before 17)',()=>{
   class Old extends URLSearchParams{get size(){return undefined;}}
   const sandbox=vm.createContext({URLSearchParams:Old,qs:new Old({room:'258'})});
-  assert.equal(vm.runInContext(indoorHref+"\nindoorHref({building:'JMC'})",sandbox),'/indoor/?building=JMC&room=258');
+  assert.equal(vm.runInContext(indoorHref+"\nindoorHref({building:'DMC'})",sandbox),'/indoor/?building=DMC&room=258');
   assert.equal(vm.runInContext("qs=new URLSearchParams();buildingId=()=>'';indoorHref()",sandbox),'/indoor/');
 });
 

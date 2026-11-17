@@ -11,12 +11,12 @@ https://aiatusc-outdoor-nav.doorstepusc.workers.dev/?to=<building>&room=<room id
 
 - `to`: a building id or a name people type. For the demo venue:
   `dr-joseph-medicine-crow-center-for-international-and-public-affairs`,
-  or simply `JMC`.
+  or simply `DMC` (its official code).
 - `room`: the indoor team's room id (e.g. `room_205`). The map doesn't use it.
   It's passed straight through to indoor.
 - `anchor` (optional): an indoor place id where indoor directions should start,
   e.g. `left-stair-1`. Without it they start at the door the outdoor route ends
-  at. Example: `/?to=JMC&room=258&anchor=left-stair-1`.
+  at. Example: `/?to=DMC&room=258&anchor=left-stair-1`.
 
 ## 2. Arrival
 
@@ -74,7 +74,7 @@ can tell a link for another building apart; keep them equal to the entry in §4.
  "indoor_node": "entrance",
  "photo": "/doors/jmc-main.jpg",
  "replace_osm": true,
- "aliases": ["Joseph Medicine Crow Center", "Medicine Crow", "JMC", "Joseph Crow Medicine Building"]}
+ "aliases": ["Joseph Medicine Crow Center", "Medicine Crow", "Joseph Crow Medicine Building", "DMC"]}
 ```
 
 - `lat`/`lon`: **drop a pin standing at the door you scanned.** Don't copy it from a map.

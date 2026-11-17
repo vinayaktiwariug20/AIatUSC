@@ -5,7 +5,7 @@ import {eventLink, buildingCode, buildingLabel, findBuilding} from '../outdoor/s
 const BASE = 'https://doorstep.example/create/';
 const buildings = [
   {id: 'ronald-tutor-campus-center', name: 'Ronald Tutor Campus Center', aliases: ['TCC']},
-  {id: 'dr-joseph-medicine-crow-center-for-international-and-public-affairs', name: 'Dr. Joseph Medicine Crow Center for International and Public Affairs', aliases: ['Medicine Crow', 'JMC', 'DMC']},
+  {id: 'dr-joseph-medicine-crow-center-for-international-and-public-affairs', name: 'Dr. Joseph Medicine Crow Center for International and Public Affairs', aliases: ['Medicine Crow', 'DMC']},
   {id: 'edward-l-doheny-junior-memorial-library', name: 'Edward L Doheny Junior Memorial Library', aliases: []},
 ];
 
@@ -33,7 +33,7 @@ test('special characters survive the round trip', () => {
 
 test('codes and labels: "Name (CODE)" when a building has a short code', () => {
   assert.equal(buildingCode(buildings[0]), 'TCC');
-  assert.equal(buildingCode(buildings[1]), 'JMC');                    // first short code
+  assert.equal(buildingCode(buildings[1]), 'DMC');
   assert.equal(buildingLabel(buildings[2]), 'Edward L Doheny Junior Memorial Library');
   assert.equal(buildingLabel(buildings[0]), 'Ronald Tutor Campus Center (TCC)');
 });
