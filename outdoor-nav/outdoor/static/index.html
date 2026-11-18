@@ -212,7 +212,9 @@ async function route(fit=true){
   }else{
    let h='<section class="card"><div class="big">About '+esc(s.minutes)+' min walk</div><div>'+esc(s.building_name)+' · '+esc(s.metres)+' m</div>';
    // "Avoid stairs" took effect: say so, and say what it does and doesn't cover.
-   if(s.step_free)h+='<div class="success">Step-free route: no mapped stairs.</div><div class="dim">Stairs come from OpenStreetMap. Curbs, slopes and doors are not checked.</div>';
+   if(s.step_free){const door=r.handoff?.step_free_door;h+='<div class="success">Step-free route: no mapped stairs'+(door===true?', and the door is step-free (checked on site).':'.')+'</div>'
+    +(door===false?'<div class="notice">This door has steps, and no step-free door is recorded for this building.</div>':'')
+    +'<div class="dim">Stairs come from OpenStreetMap. Curbs and slopes are not checked'+(door===true?'.':', and neither is the door.')+'</div>';};
    if(s.start_place)h+='<div class="dim">Starting at the parking pedestrian exit. Select Use my location to recalculate from your actual position.</div>';
    if(s.entrance_source==='outline')h+='<div class="notice">A door has not been mapped. This route ends at the building outline.</div>';
    if(s.off_network)h+='<div class="notice">You are '+esc(s.snap_m)+' m from the walking map. Check where the route joins the mapped paths.</div>';
