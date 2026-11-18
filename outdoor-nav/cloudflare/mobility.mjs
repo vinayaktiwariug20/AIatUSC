@@ -455,3 +455,38 @@ export function walkingRuleClosures(context,rules,when) {
   }
   return out;
 }
+
+// ---- Gates on a pedestrian schedule (soft) ----
+// The DPS schedule is official but not kept strictly, so a gate scheduled closed
+// on foot is a preference, not a wall: avoid it when the detour is small (bigger
+// detours are worth it at night, when gates really are locked), otherwise walk
+// through it with a note naming the nearest gate scheduled open. Only staff
+// closures block outright. Wording states the schedule, never how it's kept.
+export const SOFT_GATE={day_min:2,night_min:8,varies_min:2,night_from:22*60,night_to:5*60};
+function nearLine(route,lat,lon,radius){
+  const line=route.features?.find(f=>f.geometry?.type==='LineString')?.geometry.coordinates||[];
+  for(let i=1;i<line.length;i++)if(pointSegment([lat,lon],[line[i-1][1],line[i-1][0]],[line[i][1],line[i][0]])<=radius)return true;
+  return false;
+}
+export function softGates(context,when,rules,first,reroute){
+  const status=context.time.gateStatus(context.gateData,when),c=clock(when),night=c.minute>=SOFT_GATE.night_from||c.minute<SOFT_GATE.night_to;
+  const staffClosed=new Set(rules.filter(r=>r.kind==='gate'&&ruleModes(r).includes('walking')&&r.starts_ms<=when&&when<r.ends_ms).map(r=>r.gate));
+  const pin=id=>context.mobilityData.gates.find(g=>g.id===id&&knownGate(g));
+  const scheduled=status.filter(g=>['closed','varies'].includes(g.pedestrian?.status)&&pin(g.id)&&!staffClosed.has(g.id));
+  const crossed=scheduled.filter(g=>{const p=pin(g.id);return nearLine(first,p.lat,p.lon,GATE_WALK_RADIUS_M);});
+  if(!crossed.length)return {route:first,notes:[]};
+  const limit=crossed.some(g=>g.pedestrian.status==='closed')?(night?SOFT_GATE.night_min:SOFT_GATE.day_min):SOFT_GATE.varies_min;
+  const ids=new Set(crossed.map(g=>'schedule:'+g.id));
+  const names=crossed.map(g=>g.name).join(' and ');
+  let alt=null;
+  try{alt=reroute(crossed.map(g=>{const p=pin(g.id);return {id:'schedule:'+g.id,lat:p.lat,lon:p.lon,radius_m:GATE_WALK_RADIUS_M,status:'approved',modes:['walking'],note:g.name+' (scheduled closed on foot)'};}));}catch{}
+  const extra=alt?Math.round((alt.summary.minutes-first.summary.minutes)*10)/10:null;
+  if(alt&&extra<=limit){
+    alt.summary.avoided=alt.summary.avoided.filter(a=>!ids.has(a.closure?.id??a.closure));
+    return {route:alt,notes:[{kind:'avoided',gates:crossed.map(g=>g.id),text:`Avoiding ${names}: scheduled closed on foot now${extra>0?` (about ${extra} extra min)`:''}.`}]};
+  }
+  // Keep the direct route; say where to go if it's locked.
+  const open=status.filter(g=>g.pedestrian?.status==='open'&&context.mobilityData.gates.find(x=>x.id===g.id&&x.lat!==undefined));
+  const from=pin(crossed[0].id),nearest=open.map(g=>{const p=context.mobilityData.gates.find(x=>x.id===g.id);return {g,d:haversine([from.lat,from.lon],[p.lat,p.lon])};}).sort((a,b)=>a.d-b.d)[0]?.g;
+  return {route:first,notes:[{kind:'through',gates:crossed.map(g=>g.id),text:`This route goes through ${names}, which is scheduled closed on foot now. It may be locked${nearest?`; the nearest gate scheduled open is ${nearest.name}`:''}.`}]};
+}
