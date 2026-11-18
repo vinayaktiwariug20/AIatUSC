@@ -12,8 +12,9 @@ async function hash(text) {
   return [...new Uint8Array(d).slice(0, 12)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** null = carry on; otherwise the message for a 429. Never throws. */
-export async function adminGuard(request, env, db, now = Date.now()) {
+/** null = carry on; otherwise the message for a 429. Never throws.
+ * isKnown(supplied): true for a valid staff key, which is never counted as a guess. */
+export async function adminGuard(request, env, db, now = Date.now(), isKnown = null) {
   const token = String(env.ADMIN_TOKEN || ''), supplied = (request.headers.get('X-Admin-Token') || '').trim();
   if (!db || !token || !supplied) return null;
   try {
@@ -23,6 +24,7 @@ export async function adminGuard(request, env, db, now = Date.now()) {
     const wrong = await db.prepare('SELECT count FROM routing_usage WHERE slot=?').bind(counter).first('count') || 0;
     if (wrong >= max_wrong) return 'Too many wrong admin tokens from this connection. Try again in 15 minutes.';
     if (supplied === token) return null;
+    if (isKnown && await isKnown(supplied)) return null;
     const guess = 'adminguess:' + who + ':' + await hash(token + '|' + supplied) + ':' + w;
     const fresh = await db.prepare('INSERT INTO routing_usage(slot,count,expires_ms) VALUES(?,1,?) ON CONFLICT(slot) DO NOTHING RETURNING count')
       .bind(guess, expires).first('count');
