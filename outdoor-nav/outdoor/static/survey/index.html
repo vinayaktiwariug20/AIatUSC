@@ -30,7 +30,7 @@ button:disabled{opacity:.5}
 .pt{border-top:1px solid var(--line);padding:8px 0}
 .pt:first-child{border-top:0}
 .pt b{display:block}
-.pt .row{margin-top:6px}.pt button{min-height:36px;font-size:14px}
+.pt .row{margin-top:6px}.todo{color:var(--warn);font-size:14px}select.unset{color:var(--warn)}.pt button{min-height:36px;font-size:14px}
 a{color:var(--cardinal)}
 </style>
 </head>
@@ -54,13 +54,8 @@ a{color:var(--cardinal)}
     <option value="gate">Campus gate</option>
     <option value="other">Other</option>
   </select></label>
-  <label>Can people walk in or out here?<select id="walk">
-    <option value="unsure">Not sure</option>
-    <option value="yes">Yes</option>
-    <option value="exit_only">Exit only (e.g. push bar)</option>
-    <option value="no">No (locked, card only, staff only)</option>
-  </select></label>
-  <label>Notes<textarea id="notes" placeholder="e.g. double doors, card reader, sign says 'Exit only'"></textarea></label>
+  <div id="checks"></div>
+  <label>Notes<textarea id="notes" placeholder="Anything else: e.g. double doors, blocked by construction"></textarea></label>
   <div class="row">
     <label>Accuracy target<select id="target"><option value="3">±3 m</option><option value="5" selected>±5 m</option><option value="10">±10 m</option></select></label>
     <label>Collect for<select id="secs"><option value="5">5 s</option><option value="8" selected>8 s</option><option value="15">15 s</option></select></label>
@@ -82,7 +77,31 @@ a{color:var(--cardinal)}
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const KEY='doorstep-survey-points',KIND={car_entrance:'Car entrance only',car_exit:'Car exit only',car_both:'Car entrance and exit',door:'Door for people',gate:'Campus gate',other:'Other'};
-const WALK={unsure:'not sure',yes:'people can use',exit_only:'exit only',no:'not for people'};
+// What to check at each kind of point. Every answer starts as "Not checked", so a skipped
+// one shows up in the list instead of being forgotten; the form resets after each point.
+const DOOR=[
+ {id:'access',q:'Who can use it?',o:{anyone:'Anyone',card:'USC ID card reader',staff:'Staff only',exit_only:'Exit only (push bar)',locked:'Locked'}},
+ {id:'step_free',q:'Step-free?',o:{level:'Level, no step',ramp:'Ramp',steps:'Steps only'}},
+ {id:'opener',q:'How does it open?',o:{automatic:'Automatic',button:'Push button',manual:'By hand'}},
+ {id:'sign',q:'Sign or name at the door',text:'e.g. "East Entrance", "Tyler Environmental"'},
+ {id:'hours',q:'Hours posted',text:'e.g. Mon–Fri 7 am–10 pm'}];
+const CAR=[
+ {id:'car_access',q:'Who can drive in here?',o:{anyone:'Anyone (visitors pay)',permit:'Permit holders only',usc_id:'USC ID only',none:'Nobody (exit only)'}},
+ {id:'payment',q:'How do visitors pay?',o:{text2park:'Text2Park sign',station:'Pay station',booth:'Booth with attendant',none:'Nothing seen'}},
+ {id:'walkway',q:'Can people walk in or out here too?',o:{yes:'Yes, sidewalk or walkway',no:'No, cars only'}},
+ {id:'clearance',q:'Height clearance',text:'e.g. 6 ft 8 in'}];
+const PHOTO={id:'photo',q:'Photo taken?',o:{yes:'Yes',no:'No'}};
+const FIELDS={car_entrance:CAR,car_exit:CAR,car_both:CAR,door:DOOR,gate:DOOR,other:[]};
+const fieldsFor=k=>[...(FIELDS[k]||[]),PHOTO];
+function buildChecks(){$('checks').innerHTML=fieldsFor($('kind').value).map(f=>'<label>'+esc(f.q)+(f.text
+  ?'<input id="f_'+f.id+'" autocomplete="off" placeholder="'+esc(f.text)+'">'
+  :'<select id="f_'+f.id+'" class="unset"><option value="">Not checked</option>'+Object.entries(f.o).map(([v,l])=>'<option value="'+v+'">'+esc(l)+'</option>').join('')+'</select>')+'</label>').join('');
+  for(const el of $('checks').querySelectorAll('select'))el.onchange=()=>el.classList.toggle('unset',!el.value);}
+function answers(){const out={};for(const f of fieldsFor($('kind').value)){const v=$('f_'+f.id).value.trim();out[f.id]=v||null;}return out;}
+function describe(p){const fs=fieldsFor(p.kind),a=p.answers||{};
+  const done=fs.filter(f=>a[f.id]).map(f=>f.text?f.q+': '+a[f.id]:f.o[a[f.id]]),todo=fs.filter(f=>!a[f.id]&&!f.text).map(f=>f.q.replace(/\?$/,'').toLowerCase());
+  return (done.length?'<div>'+esc(done.join(' · '))+'</div>':'')+(todo.length?'<div class="todo">Not checked: '+esc(todo.join(', '))+'</div>':'');}
+$('kind').onchange=buildChecks;
 let last=null,points=[],collecting=null;
 function load(){try{points=JSON.parse(localStorage.getItem(KEY)||'[]');}catch{points=[];}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(points));}catch{$('msg').textContent='Could not save on this phone: share or copy the list before closing.';}}
@@ -101,16 +120,16 @@ $('rec').onclick=async()=>{if(collecting)return;const secs=+$('secs').value,targ
   const fixes=collecting;collecting=null;$('rec').textContent='Record';$('rec').disabled=false;
   if(!fixes.length){$('msg').textContent='No GPS readings yet. Try again in a moment.';return;}
   const c=combine(fixes,target);
-  points.unshift({place:$('place').value.trim(),kind:$('kind').value,walk:$('walk').value,notes:$('notes').value.trim(),
+  points.unshift({place:$('place').value.trim(),kind:$('kind').value,answers:answers(),notes:$('notes').value.trim(),
     lat:+c.lat.toFixed(7),lon:+c.lon.toFixed(7),accuracy_m:c.accuracy_m,fixes:c.fixes,met_target:c.met_target,target_m:target,time:new Date().toISOString()});
-  save();render();$('notes').value='';
+  save();render();$('notes').value='';buildChecks();   // fresh "Not checked" for the next point
   $('msg').className=c.met_target?'good':'warn';
   $('msg').textContent=c.met_target?'Recorded: ±'+c.accuracy_m+' m from '+c.fixes+' readings.':'Recorded, but no reading reached ±'+target+' m (best ±'+c.accuracy_m+' m). Marked as below target; record again if you can.';};
 function render(){$('count').textContent=points.length;
-  $('list').innerHTML=points.map((p,i)=>'<div class="pt"><b>'+esc(p.place||'(no place)')+' · '+esc(KIND[p.kind])+'</b><span class="dim">'+esc(WALK[p.walk])+' · ±'+p.accuracy_m+' m'+(p.met_target?'':' (below target)')+' · '+esc(new Date(p.time).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}))+'</span>'
-    +(p.notes?'<div>'+esc(p.notes)+'</div>':'')+'<div class="row"><a class="dim" target="_blank" rel="noopener" href="https://www.google.com/maps?q='+p.lat+','+p.lon+'">'+p.lat+', '+p.lon+'</a><button data-del="'+i+'">Delete</button></div></div>').join('')||'<div class="dim">Nothing yet.</div>';}
+  $('list').innerHTML=points.map((p,i)=>'<div class="pt"><b>'+esc(p.place||'(no place)')+' · '+esc(KIND[p.kind])+'</b><span class="dim">±'+p.accuracy_m+' m'+(p.met_target?'':' (below target)')+' · '+esc(new Date(p.time).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}))+'</span>'
+    +describe(p)+(p.notes?'<div>'+esc(p.notes)+'</div>':'')+'<div class="row"><a class="dim" target="_blank" rel="noopener" href="https://www.google.com/maps?q='+p.lat+','+p.lon+'">'+p.lat+', '+p.lon+'</a><button data-del="'+i+'">Delete</button></div></div>').join('')||'<div class="dim">Nothing yet.</div>';}
 $('list').onclick=e=>{const b=e.target.closest('[data-del]');if(!b)return;points.splice(+b.dataset.del,1);save();render();};
-const exportText=()=>JSON.stringify({doorstep_survey:1,exported:new Date().toISOString(),points},null,1);
+const exportText=()=>JSON.stringify({doorstep_survey:2,exported:new Date().toISOString(),points},null,1);
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(exportText());$('msg').className='good';$('msg').textContent='Copied. Paste it to Claude or the team.';}catch{$('msg').textContent='Copy was blocked; use Download instead.';}};
 $('share').onclick=async()=>{if(!navigator.share){$('copy').onclick();return;}try{await navigator.share({title:'Doorstep survey points',text:exportText()});}catch{}};
 $('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([exportText()],{type:'application/json'}));a.download='doorstep-survey-'+new Date().toISOString().slice(0,10)+'.json';a.click();};
@@ -119,7 +138,7 @@ $('clear').onclick=()=>{if(!points.length)return;if(!$('clear').dataset.sure){$(
 $('target').onchange=()=>{if(last)$('acc').className='acc '+accClass(last.acc);};
 try{$('place').value=localStorage.getItem(KEY+'-place')||'';}catch{}
 $('place').oninput=()=>{try{localStorage.setItem(KEY+'-place',$('place').value);}catch{}};
-load();render();
+buildChecks();load();render();
 if(navigator.geolocation)navigator.geolocation.watchPosition(onFix,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:20000});
 else $('pos').textContent='This browser has no location access.';
 </script>
