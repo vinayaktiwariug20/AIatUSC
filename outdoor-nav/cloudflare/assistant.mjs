@@ -1,11 +1,11 @@
 // "Ask Doorstep": a question-answering assistant that is only allowed to answer
 // from facts this app already holds, and must cite them. Anything it cannot
-// answer that way goes to the organizers; their answers become facts too.
+// answer that way goes to the Doorstep team; their answers become facts too.
 //
-//   question ──▶ facts (gates now, game day, parking, closures, organizer
+//   question ──▶ facts (gates now, game day, parking, closures, team
 //                answers, how-to) ──▶ AI service /ask ──▶ answer + citations
 //                                                     └─▶ "not in the facts"
-//                                                          ──▶ organizer queue
+//                                                          ──▶ team queue
 //
 // The model never sees anything it could cite that isn't in `facts`, and the
 // Worker drops any citation that doesn't match a fact id. An answer with no
@@ -51,7 +51,7 @@ export function collectFacts(context, when, {closures = [], answers = [], rules 
     else if (c.status === 'unverified')
       add('report:' + c.id, `Unconfirmed public report: ${c.note || c.kind}. Not verified by staff; routes are not changed.`, 'public report');
   }
-  for (const a of answers) add('answer:' + a.id, `Q: ${a.question}\nA: ${a.answer}`, 'organizer answer' + (a.answered ? ', ' + a.answered : ''));
+  for (const a of answers) add('answer:' + a.id, `Q: ${a.question}\nA: ${a.answer}`, 'Doorstep team answer' + (a.answered ? ', ' + a.answered : ''));
   for (const [id, text] of HOWTO) add(id, text, 'Doorstep help');
   return facts;
 }
