@@ -11,7 +11,7 @@ async function walk(to, from, stepFree = false) {
 const TROUSDALE = {lat: 34.0204, lon: -118.2852}, WEST = {lat: 34.0205, lon: -118.2885};
 
 test('TCC, the Student Union and Sample Hall route to surveyed doors, not outline guesses', async () => {
-  for (const [to, ids] of [['TCC', ['rtcc-main', 'rtcc-lower']], ['Student Union', ['su-ramp', 'su-steps-north', 'su-steps-east']], ['Sample Hall', ['sample-plaza']]]) {
+  for (const [to, ids] of [['TCC', ['rtcc-main']], ["Tommy's Place", ['rtcc-lower']], ['Traditions', ['rtcc-lower']], ['Student Union', ['su-ramp', 'su-steps-north', 'su-steps-east']], ['Sample Hall', ['sample-plaza']]]) {
     const r = await walk(to, TROUSDALE);
     assert.equal(r.ok, true, to); assert.ok(ids.includes(r.handoff.entrance_id), to + ': ' + r.handoff.entrance_id);
     assert.equal(r.summary.entrance_source, 'surveyed');
