@@ -5,7 +5,7 @@ import {campusPlaces, addressSearch, reserveGeocodeQuota, hasHouseNumber, census
 import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
 import {adminGuard} from './adminguard.mjs';
-import {findStaff, createStaffKey, listStaffKeys, revokeStaffKey} from './staffkeys.mjs';
+import {findStaff, createStaffKey, listStaffKeys, revokeStaffKey, removeStaffKey, rollWords} from './staffkeys.mjs';
 import {MobilityError, readRules, mobilityState, gateState, validateRule, validateParkingStatus, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures, orsUsage, softGates} from './mobility.mjs';
 
 class ApiError extends Error {
@@ -156,12 +156,20 @@ export async function handleApi(request, env, context) {
       requireAdmin(); if (!db) fail(503, 'D1 is not connected.');
       try {
         if (method === 'GET') return reply(await listStaffKeys(db), 200, head);
-        if (method === 'POST') { const made = await createStaffKey(db, body.name); return made.error ? reply({error: made.error}, 400) : reply(made, 201); }
+        if (method === 'POST') { const made = await createStaffKey(db, body.name, body.key, env.ADMIN_TOKEN); return made.error ? reply({error: made.error}, 400) : reply(made, 201); }
       } catch { fail(503, 'Staff keys need database migration 0006. It is applied on the next deploy, or run npm run db:remote.'); }
+    }
+    if (path === '/api/staff-keys/roll' && method === 'GET') {
+      requireAdmin();
+      return reply({words: rollWords(parseInt(url.searchParams.get('n') || '10', 10) || 10)}, 200, head);
     }
     const staffKey = /^\/api\/staff-keys\/([0-9a-f]+)$/.exec(path);
     if (staffKey && method === 'DELETE') {
       requireAdmin(); if (!db) fail(503, 'D1 is not connected.');
+      if (url.searchParams.get('remove') === '1') {
+        let removed = null; try { removed = await removeStaffKey(db, staffKey[1]); } catch {}
+        return removed ? reply({removed}) : reply({error: 'Only a revoked key can be removed.'}, 404);
+      }
       let revoked = null; try { revoked = await revokeStaffKey(db, staffKey[1]); } catch {}
       return revoked ? reply({revoked}) : reply({error: 'not found'}, 404);
     }
