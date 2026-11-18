@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex">
 <style>
 :root{--bg:#f5f1ea;--card:#fffdf9;--ink:#202329;--dim:#59616e;--line:#e5ddd0;--cardinal:#7a1424;--good:#08734d;--warn:#9a6200;--bad:#9b1c1c}
-*{box-sizing:border-box}
+*{box-sizing:border-box}[hidden]{display:none!important}
 html,body{overscroll-behavior-y:none}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 header{background:var(--cardinal);color:#fff;padding:14px 16px}
@@ -56,6 +56,20 @@ a{color:var(--cardinal)}
   </select></label>
   <div id="checks"></div>
   <label>Notes<textarea id="notes" placeholder="Anything else: e.g. double doors, blocked by construction"></textarea></label>
+  <label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:16px;margin-top:12px"><input id="useOff" type="checkbox" style="width:auto;min-height:0">I'm standing away from it (under an overhang, poor GPS)</label>
+  <div id="off" hidden>
+    <p class="dim" style="margin:6px 0 0">Stand somewhere open where accuracy is good. Then say how far the door is (the iPhone Measure app, or paces) and which way.</p>
+    <div class="row">
+      <label>Distance to the door<input id="offDist" type="number" min="0" step="0.1" inputmode="decimal" placeholder="e.g. 5"></label>
+      <label>In<select id="offUnit"><option value="m">metres</option><option value="pace">paces</option></select></label>
+    </div>
+    <label id="paceRow" hidden>Your pace length, in metres<input id="pace" type="number" min="0.3" max="1.5" step="0.01" inputmode="decimal" placeholder="e.g. 0.75 (pace 10 m once to find it)"></label>
+    <div class="row" style="align-items:flex-end">
+      <label>Direction, ° from north<input id="offBearing" type="number" min="0" max="360" step="1" inputmode="numeric" placeholder="e.g. 126"></label>
+      <button id="compass" type="button">Use compass</button>
+    </div>
+    <div id="heading" class="dim"></div>
+  </div>
   <div class="row">
     <label>Accuracy target<select id="target"><option value="3">±3 m</option><option value="5" selected>±5 m</option><option value="10">±10 m</option></select></label>
     <label>Collect for<select id="secs"><option value="5">5 s</option><option value="8" selected>8 s</option><option value="15">15 s</option></select></label>
@@ -115,21 +129,53 @@ function onErr(e){$('pos').textContent=e.code===1?'Location access was refused. 
 function combine(fixes,target){const good=fixes.filter(f=>f.acc<=target),use=good.length?good:fixes;let w=0,la=0,lo=0;
   for(const f of use){const k=1/Math.max(f.acc,1)**2;w+=k;la+=f.lat*k;lo+=f.lon*k;}
   return {lat:la/w,lon:lo/w,accuracy_m:Math.round(Math.min(...use.map(f=>f.acc))*10)/10,fixes:use.length,met_target:good.length>0};}
-$('rec').onclick=async()=>{if(collecting)return;const secs=+$('secs').value,target=+$('target').value;collecting=last&&Date.now()-last.t<2000?[last]:[];   // only a fresh reading: an older one may be from the last door$('rec').disabled=true;
+$('rec').onclick=async()=>{if(collecting)return;const off=offset();if(off&&off.error){$('msg').className='warn';$('msg').textContent=off.error;return;}const secs=+$('secs').value,target=+$('target').value;collecting=last&&Date.now()-last.t<2000?[last]:[];$('rec').disabled=true;   // only a fresh reading: an older one may be from the last door
   for(let s=secs;s>0;s--){$('rec').textContent='Recording… '+s;await new Promise(r=>setTimeout(r,1000));}
   const fixes=collecting;collecting=null;$('rec').textContent='Record';$('rec').disabled=false;
   if(!fixes.length){$('msg').textContent='No GPS readings yet. Try again in a moment.';return;}
-  const c=combine(fixes,target);
+  const c=combine(fixes,target),door=off?moved(c.lat,c.lon,off.distance_m,off.bearing_deg):c;
   points.unshift({place:$('place').value.trim(),kind:$('kind').value,answers:answers(),notes:$('notes').value.trim(),
-    lat:+c.lat.toFixed(7),lon:+c.lon.toFixed(7),accuracy_m:c.accuracy_m,fixes:c.fixes,met_target:c.met_target,target_m:target,time:new Date().toISOString()});
+    lat:+door.lat.toFixed(7),lon:+door.lon.toFixed(7),accuracy_m:c.accuracy_m,fixes:c.fixes,met_target:c.met_target,target_m:target,time:new Date().toISOString(),
+    ...(off?{stood_at:{lat:+c.lat.toFixed(7),lon:+c.lon.toFixed(7)},offset:off}:{})});
   save();render();$('notes').value='';buildChecks();   // fresh "Not checked" for the next point
+  $('offDist').value='';$('offBearing').value='';bearingFrom='typed';$('useOff').checked=false;$('off').hidden=true;
   $('msg').className=c.met_target?'good':'warn';
   $('msg').textContent=c.met_target?'Recorded: ±'+c.accuracy_m+' m from '+c.fixes+' readings.':'Recorded, but no reading reached ±'+target+' m (best ±'+c.accuracy_m+' m). Marked as below target; record again if you can.';};
+// ---- Offset: the door is <distance> away from where I stand, in direction <bearing> ----
+// Browsers report compass headings from magnetic north; in Los Angeles that is about
+// 11.5° east of true north, so a compass reading is corrected (the raw one is kept too).
+const DECLINATION=11.5,PACE_KEY=KEY+'-pace';
+let heading=null,headingSource=null,bearingFrom='typed',takenRaw=null;
+$('useOff').onchange=()=>{$('off').hidden=!$('useOff').checked;};
+$('offUnit').onchange=()=>{$('paceRow').hidden=$('offUnit').value!=='pace';};
+try{$('pace').value=localStorage.getItem(PACE_KEY)||'';}catch{}
+$('pace').oninput=()=>{try{localStorage.setItem(PACE_KEY,$('pace').value);}catch{}};
+$('offBearing').oninput=()=>{bearingFrom='typed';};
+function onOrient(e){let h=null;
+  if(typeof e.webkitCompassHeading==='number')h=e.webkitCompassHeading;          // iPhone
+  else if(e.absolute&&typeof e.alpha==='number')h=(360-e.alpha)%360;             // Android
+  if(h===null)return;heading=h;headingSource=headingSource||'compass';
+  const t=(h+DECLINATION)%360;$('heading').textContent='Compass: '+Math.round(t)+'° (true north). Hold the phone flat, top edge pointing at the door, then tap Use compass again to take it.';}
+$('compass').onclick=async()=>{
+  if(heading!==null){takenRaw=heading;$('offBearing').value=Math.round((heading+DECLINATION)%360);bearingFrom='compass';$('heading').textContent='Taken: '+$('offBearing').value+'° (true north, from the compass). Check it looks right against the building.';return;}
+  try{if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){const r=await DeviceOrientationEvent.requestPermission();if(r!=='granted')throw new Error('denied');}}
+  catch{$('heading').textContent='Compass access was refused. Type the direction instead.';return;}
+  window.addEventListener('deviceorientationabsolute',onOrient,true);window.addEventListener('deviceorientation',onOrient,true);
+  $('heading').textContent='Starting the compass… If nothing appears, this phone has none: type the direction instead.';};
+function offset(){if(!$('useOff').checked)return null;
+  const n=parseFloat($('offDist').value),b=parseFloat($('offBearing').value),pace=parseFloat($('pace').value);
+  if(!(n>0))return {error:'Enter the distance to the door.'};
+  if(!(b>=0&&b<=360))return {error:'Enter the direction to the door (or use the compass).'};
+  const paces=$('offUnit').value==='pace';if(paces&&!(pace>0))return {error:'Enter your pace length in metres.'};
+  const m=paces?n*pace:n;if(m>60)return {error:'That is more than 60 m away; record closer to the door.'};
+  return {distance_m:Math.round(m*10)/10,bearing_deg:b%360,entered:paces?n+' paces of '+pace+' m':n+' m',bearing_from:bearingFrom,
+    raw_compass_deg:bearingFrom==='compass'&&takenRaw!==null?Math.round(takenRaw*10)/10:null,declination_deg:bearingFrom==='compass'?DECLINATION:null};}
+function moved(lat,lon,m,deg){const r=deg*Math.PI/180;return {lat:lat+m*Math.cos(r)/111320,lon:lon+m*Math.sin(r)/(111320*Math.cos(lat*Math.PI/180))};}
 function render(){$('count').textContent=points.length;
-  $('list').innerHTML=points.map((p,i)=>'<div class="pt"><b>'+esc(p.place||'(no place)')+' · '+esc(KIND[p.kind])+'</b><span class="dim">±'+p.accuracy_m+' m'+(p.met_target?'':' (below target)')+' · '+esc(new Date(p.time).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}))+'</span>'
+  $('list').innerHTML=points.map((p,i)=>'<div class="pt"><b>'+esc(p.place||'(no place)')+' · '+esc(KIND[p.kind])+'</b><span class="dim">±'+p.accuracy_m+' m'+(p.met_target?'':' (below target)')+(p.offset?' + '+p.offset.distance_m+' m at '+Math.round(p.offset.bearing_deg)+'° from where you stood':'')+' · '+esc(new Date(p.time).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}))+'</span>'
     +describe(p)+(p.notes?'<div>'+esc(p.notes)+'</div>':'')+'<div class="row"><a class="dim" target="_blank" rel="noopener" href="https://www.google.com/maps?q='+p.lat+','+p.lon+'">'+p.lat+', '+p.lon+'</a><button data-del="'+i+'">Delete</button></div></div>').join('')||'<div class="dim">Nothing yet.</div>';}
 $('list').onclick=e=>{const b=e.target.closest('[data-del]');if(!b)return;points.splice(+b.dataset.del,1);save();render();};
-const exportText=()=>JSON.stringify({doorstep_survey:2,exported:new Date().toISOString(),points},null,1);
+const exportText=()=>JSON.stringify({doorstep_survey:3,exported:new Date().toISOString(),points},null,1);
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(exportText());$('msg').className='good';$('msg').textContent='Copied. Paste it to Claude or the team.';}catch{$('msg').textContent='Copy was blocked; use Download instead.';}};
 $('share').onclick=async()=>{if(!navigator.share){$('copy').onclick();return;}try{await navigator.share({title:'Doorstep survey points',text:exportText()});}catch{}};
 $('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([exportText()],{type:'application/json'}));a.download='doorstep-survey-'+new Date().toISOString().slice(0,10)+'.json';a.click();};
