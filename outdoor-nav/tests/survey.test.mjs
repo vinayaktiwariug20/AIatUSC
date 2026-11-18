@@ -13,7 +13,7 @@ test('survey page: no network calls, not indexed, uses high-accuracy GPS', () =>
 
 test('an offset moves the point the right way: metres along the bearing from true north', async () => {
   const vm = await import('node:vm');
-  const src = html.match(/function moved\([^]*?\}\n/)[0];
+  const src = html.match(/function moved\([^]*?\}\r?\n/)[0];
   const moved = vm.runInNewContext(src + ';moved');
   const m = (a, b) => Math.hypot((a.lat - b.lat) * 111320, (a.lon - b.lon) * 111320 * Math.cos(34.02 * Math.PI / 180));
   const at = {lat: 34.021, lon: -118.284};
