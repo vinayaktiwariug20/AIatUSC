@@ -32,7 +32,7 @@ export function collectFacts(context, when, {closures = [], answers = [], rules 
     const v = g.vehicle || {}, ped = g.pedestrian || {};
     add('gate:' + g.id,
       `${g.name}${g.where ? ' (' + g.where + ')' : ''}: vehicle access is ${v.status || 'unknown'}${v.until ? ' until ' + v.until : ''}`
-      + `${v.reason ? ' (' + v.reason + ')' : ''}. On foot: ${ped.status === 'open' ? 'open' + (ped.until ? ' until ' + ped.until : '') + (ped.observed ? ' (observed ' + ped.observed + ')' : '') : ped.status === 'closed' ? 'closed' : ped.status === 'varies' ? 'may be closed right now (' + (ped.note || 'opening or closing time varies') + ')' : 'not stated by the source'}.`,
+      + `${v.reason ? ' (' + v.reason + ')' : ''}. On foot: ${ped.status === 'open' ? 'open' + (ped.until ? ' until ' + ped.until : '') + (ped.observed ? ' (observed ' + ped.observed + ')' : '') : ped.status === 'closed' ? 'scheduled closed (it may be locked)' : ped.status === 'varies' ? 'may be closed right now (' + (ped.note || 'opening or closing time varies') + ')' : 'not stated by the source'}.`,
       g.basis === 'staff_confirmed' ? 'staff closure' : 'USC Transportation entrance hours');
   }
   const fb = footballContext(context.footballData, when);

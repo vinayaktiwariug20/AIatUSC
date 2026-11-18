@@ -216,6 +216,7 @@ async function route(fit=true){
    if(s.entrance_source==='outline')h+='<div class="notice">A door has not been mapped. This route ends at the building outline.</div>';
    if(s.off_network)h+='<div class="notice">You are '+esc(s.snap_m)+' m from the walking map. Check where the route joins the mapped paths.</div>';
    for(const a of s.avoided)h+='<div class="success">Avoiding a blockage · about '+esc(a.extra_min)+' extra min</div>';
+   for(const n of s.gate_notes||[])h+='<div class="'+(n.kind==='avoided'?'success':'notice')+'">'+esc(n.text)+'</div>';
    for(const w of s.warnings)h+='<div class="notice">Unverified report: '+esc(w.note)+'</div>';
    // Arrival: near the door (GPS) or the user says so. This is the hand-off to indoor.
    arrival=arrivalCard(s,r.handoff||{});h+=s.near_venue?arrival:'<button class="small" data-arrived="1" style="margin-top:8px">I&#39;m at the building</button>';
@@ -235,7 +236,7 @@ async function loadMobility(){
   // Walking tab: what matters is access on foot. Pedestrian hours come from Transportation's
   // gate schedule where we have them; elsewhere "not stated" is shown as such, never as closed.
   if(mode==='walking'){const ped=g.pedestrian||{},open=ped.status==='open',shut=ped.status==='closed',varies=ped.status==='varies';
-   const pcolor=open?'#08734d':shut?'#b42328':varies?'#be8100':'#8a8f98',ptext=open?'Open on foot'+(ped.until&&ped.until!=='24:00'?' until '+ped.until:''):shut?'Closed on foot':varies?'May be closed on foot':'On foot: not stated';
+   const pcolor=open?'#08734d':shut?'#b42328':varies?'#be8100':'#8a8f98',ptext=open?'Open on foot'+(ped.until&&ped.until!=='24:00'?' until '+ped.until:''):shut?'Scheduled closed on foot':varies?'May be locked now':'On foot: not stated';
    if(g.lat!==undefined)L.circleMarker([g.lat,g.lon],{radius:7,color:pcolor,weight:2,fillOpacity:.8,dashArray:g.location_source==='approximate_intersection'?'3 3':null}).bindTooltip(esc(g.name)+': '+esc(ptext)).addTo(gateLayer);
    return '<div class="gate"><div class="row"><span class="grow">'+esc(g.name)+'</span><strong class="'+(open?'success':shut?'closed':varies?'restricted':'dim')+'">'+esc(ptext)+'</strong></div><div class="dim">'+(ped.observed?'Observed '+esc(ped.observed)+(ped.note?': '+esc(ped.note):'')+' · ':varies&&ped.note?esc(ped.note)+' · ':'')+'Cars: '+esc(labels[status]||status)+(g.basis==='staff_confirmed'?' (staff: '+esc(g.vehicle.reason)+')':'')+'</div></div>';}
   const color=status==='closed'?'#b42328':g.eligible?'#08734d':'#8c5e00';
