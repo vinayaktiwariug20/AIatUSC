@@ -4,7 +4,8 @@ import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
 import worker from '../cloudflare/worker.mjs';
-import {makeKey, normalizeKey} from '../cloudflare/staffkeys.mjs';
+import {makeKey, normalizeKey, checkOwnKey, rollWords} from '../cloudflare/staffkeys.mjs';
+import {WORDS} from '../cloudflare/words.mjs';
 
 const ALL = ['0001_closures.sql', '0002_mobility.sql', '0003_questions.sql', '0004_usage.sql', '0005_parking_status.sql', '0006_staff_keys.sql'];
 class D1 {
@@ -28,10 +29,14 @@ async function call(env, path, {method = 'GET', body, token, ip = '203.0.113.9'}
 const newEnv = () => ({DB: new D1(), ADMIN_TOKEN: ADMIN});
 const GATE_RULE = {kind: 'gate', gate: 'mcclintock', starts: '2026-11-17T12:00', ends: '2026-11-17T13:00', note: 'test'};
 
-test('keys are four made-up words, about 76 bits, and typing them loosely still works', () => {
-  const k = makeKey();
-  assert.match(k, /^([bdfghjklmnprstvz][aeiou]){3}( ([bdfghjklmnprstvz][aeiou]){3}){3}$/);
+test('keys are five real words from the EFF list, without plurals or -ed/-ing forms', () => {
+  const k = makeKey().split(' ');
+  assert.equal(k.length, 5); assert.ok(k.every(w => WORDS.includes(w)));
   assert.notEqual(makeKey(), makeKey());
+  assert.equal(WORDS.length, 1238); assert.equal(new Set(WORDS).size, WORDS.length);
+  for (const w of ['acts', 'boots', 'baked', 'going', 'yo-yo', 'april', 'ebay', 'mardi']) assert.ok(!WORDS.includes(w), w);
+  for (const w of ['acorn', 'chess', 'atlas', 'thing']) assert.ok(WORDS.includes(w), w);
+  const roll = rollWords(10); assert.equal(roll.length, 10); assert.equal(new Set(roll).size, 10);
   assert.equal(normalizeKey(' Tamoru-Kebisa  lodupe VINEKO '), 'tamorukebisalodupevineko');
 });
 
@@ -86,4 +91,31 @@ test('before migration 0006: the admin token still works and creating a key says
   const r = await call(env, '/api/staff-keys', {method: 'POST', body: {name: 'Desk'}, token: ADMIN});
   assert.equal(r.status, 503); assert.match(r.data.error, /migration 0006/);
   assert.equal((await call(env, '/api/whoami', {token: 'some made up words here'})).data.role, null);
+});
+
+test('your own key: accepted when long enough, refused when weak, guessable or reused', async () => {
+  assert.equal(checkOwnKey('acorn tidal maple shrug'), null);
+  assert.match(checkOwnKey('cat dog sun hat'), /16 letters/);
+  assert.match(checkOwnKey('acorn acorn maple shrug'), /only once/);
+  assert.match(checkOwnKey('fight on trojans forever'), /guessable/);
+  assert.match(checkOwnKey(ADMIN, ADMIN), /admin token|guessable/);
+  const env = newEnv();
+  const made = await call(env, '/api/staff-keys', {method: 'POST', body: {name: 'Desk', key: '  Acorn-Tidal  maple SHRUG '}, token: ADMIN});
+  assert.equal(made.status, 201); assert.equal(made.data.key, 'acorn tidal maple shrug');
+  assert.equal((await call(env, '/api/whoami', {token: 'acorn tidal maple shrug'})).data.name, 'Desk');
+  const again = await call(env, '/api/staff-keys', {method: 'POST', body: {name: 'Other', key: 'acorn tidal maple shrug'}, token: ADMIN});
+  assert.equal(again.status, 400); assert.match(again.data.error, /already in use/);
+  assert.equal((await call(env, '/api/staff-keys', {method: 'POST', body: {name: 'Weak', key: 'cat dog sun hat'}, token: ADMIN})).status, 400);
+});
+
+test('rolling words is admin-only; only a revoked key can be removed', async () => {
+  const env = newEnv();
+  const roll = await call(env, '/api/staff-keys/roll?n=8', {token: ADMIN});
+  assert.equal(roll.status, 200); assert.equal(roll.data.words.length, 8);
+  const {data: made} = await call(env, '/api/staff-keys', {method: 'POST', body: {name: 'Oops'}, token: ADMIN});
+  assert.equal((await call(env, '/api/staff-keys/roll', {token: made.key})).status, 403);
+  assert.equal((await call(env, '/api/staff-keys/' + made.id + '?remove=1', {method: 'DELETE', token: ADMIN})).status, 404);   // still working
+  await call(env, '/api/staff-keys/' + made.id, {method: 'DELETE', token: ADMIN});
+  assert.equal((await call(env, '/api/staff-keys/' + made.id + '?remove=1', {method: 'DELETE', token: ADMIN})).status, 200);
+  assert.deepEqual((await call(env, '/api/staff-keys', {token: ADMIN})).data, []);
 });
