@@ -154,10 +154,11 @@
   {
    "id": "MCCARTHY.ped.hellman",
    "kind": "pedestrian_exit",
-   "lat": 34.020277,
-   "lon": -118.2826385,
+   "lat": 34.0201709,
+   "lon": -118.2826097,
    "structure": "MCCARTHY",
-   "street": "Hellman Way"
+   "street": "Hellman Way",
+   "source": "team survey with the Doorstep survey page, 2026-11-17 (GPS ±3 m); the only pedestrian exit onto Hellman Way"
   },
   {
    "id": "ROYAL.junction.jefferson",
@@ -274,8 +275,7 @@
   {"id": "FLOWER.veh.flower", "kind": "vehicle_entrance", "lat": 34.0174924, "lon": -118.2814925, "name": "car entrance/exit on Flower St side", "structure": "FLOWER", "source": "Google Maps / Street View (team, 2026-11-17); not yet checked on site"},
   {"id": "FLOWER.veh.west", "kind": "vehicle_entrance", "lat": 34.0174374, "lon": -118.2822184, "name": "car entrance/exit, west (37th Pl side)", "structure": "FLOWER", "source": "Google Maps / Street View (team, 2026-11-17); not yet checked on site"},
   {"id": "FLOWER.ped.double", "kind": "pedestrian_exit", "lat": 34.0180407, "lon": -118.2822851, "name": "double doors", "structure": "FLOWER", "street": "W 37th St", "source": "Google Maps / Street View (team, 2026-11-17); not yet checked on site"},
-  {"id": "FLOWER.ped.door", "kind": "pedestrian_exit", "lat": 34.0180607, "lon": -118.2820189, "name": "single door", "structure": "FLOWER", "street": "W 37th St", "source": "Google Maps / Street View (team, 2026-11-17); not yet checked on site"},
-  {"id": "MCCARTHY.ped.south", "kind": "pedestrian_exit", "lat": 34.0201709, "lon": -118.2826097, "structure": "MCCARTHY", "name": "pedestrian door", "source": "team survey with the Doorstep survey page, 2026-11-17 (GPS ±3 m)"}
+  {"id": "FLOWER.ped.door", "kind": "pedestrian_exit", "lat": 34.0180607, "lon": -118.2820189, "name": "single door", "structure": "FLOWER", "street": "W 37th St", "source": "Google Maps / Street View (team, 2026-11-17); not yet checked on site"}
  ],
  "edges": [
   {

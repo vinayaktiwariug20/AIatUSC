@@ -27,9 +27,14 @@ test('avoiding stairs picks the Student Union ramp, and says the door is step-fr
   if (steps.handoff.entrance_id !== 'su-ramp') assert.equal(steps.handoff.step_free_door, false);
 });
 
-test('McCarthy structure has a second pedestrian exit', async () => {
+test('McCarthy structure: one pedestrian exit, onto Hellman Way, at the surveyed spot', async () => {
   const p = (await (await worker.fetch(new Request('https://x.test/api/mobility?at=2026-11-18T12:00:00'), {})).json()).parking.find(x => x.id === 'mccarthy');
   assert.equal(p.exit_node.id, 'MCCARTHY.ped.hellman');
-  const r = await walk('TCC', {place: 'mccarthy', exit: 'MCCARTHY.ped.south'});
-  assert.equal(r.ok, true);
+  assert.ok(Math.abs(p.exit_node.lat - 34.0201709) < 1e-7);
+  assert.equal((await walk('TCC', {place: 'mccarthy', exit: 'MCCARTHY.ped.south'})).ok, false);   // no second exit
+});
+
+test('surveyed doors carry their photo for the arrival card', async () => {
+  const r = await walk('Student Union', TROUSDALE, true);
+  assert.equal(r.handoff.photo, '/doors/su-ramp.jpg');
 });
