@@ -22,7 +22,7 @@
    "place": "gate.mcclintock",
    "weekday": [{"from": "00:00", "to": "24:00"}], "weekend": [{"from": "00:00", "to": "24:00"}],
    "holiday": [{"from": "00:00", "to": "24:00"}],
-   "pedestrian": {"status": "open", "observed": "2026-11-14", "note": "Open 24 hours to people on foot as well as vehicles (USC parking staff)."}},
+   "pedestrian_hours": {"source": "USC Transportation staff", "weekday": [{"from": "00:00", "to": "24:00"}], "weekend": [{"from": "00:00", "to": "24:00"}], "holiday": [{"from": "00:00", "to": "24:00"}]}},
   {"id": "downey-way", "name": "Downey Way Entrance", "where": "Vermont Ave at 36th Pl",
    "place": null, "note": "A campus gate, not the Downey structure.",
    "weekday": [{"from": "06:00", "to": "20:00"}], "weekend": [], "holiday": [],

@@ -63,7 +63,7 @@ class Gates:
         def inside(p):
             lo, hi = _mins(p["from"]), _mins(p["to"])
             return lo <= m < hi if lo < hi else (m >= lo or m < hi)
-        base = {"column": col, "source": self.pedestrian_source or "USC Transportation gate schedule"}
+        base = {"column": col, "source": h.get("source") or self.pedestrian_source or "USC Transportation gate schedule"}
         for p in h[col]:
             if inside(p):
                 return {**base, "status": "open", "until": p["to"]}

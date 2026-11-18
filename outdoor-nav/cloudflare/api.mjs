@@ -61,7 +61,7 @@ function pedestrianStatus(g, column, minute, source) {
   if (!Array.isArray(h[column])) return {status: 'not_stated', column};
   const mins = t => { const [hh, mm] = t.split(':').map(Number); return hh * 60 + mm; };
   const inside = s => { const a = mins(s.from), b = mins(s.to); return a < b ? a <= minute && minute < b : minute >= a || minute < b; };
-  const base = {column, source: source || 'USC Transportation gate schedule'};
+  const base = {column, source: h.source || source || 'USC Transportation gate schedule'};
   const open = h[column].find(inside); if (open) return {...base, status: 'open', until: open.to};
   const edge = (h.uncertain?.[column] || []).find(inside); if (edge) return {...base, status: 'varies', note: edge.note || null, until: edge.to};
   return {...base, status: 'closed'};
