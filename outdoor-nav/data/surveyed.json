@@ -154,10 +154,11 @@
   {
    "id": "MCCARTHY.ped.hellman",
    "kind": "pedestrian_exit",
-   "lat": 34.020277,
-   "lon": -118.2826385,
+   "lat": 34.0201709,
+   "lon": -118.2826097,
    "structure": "MCCARTHY",
-   "street": "Hellman Way"
+   "street": "Hellman Way",
+   "source": "team survey with the Doorstep survey page, 2026-11-17 (GPS ±3 m); the only pedestrian exit onto Hellman Way"
   },
   {
    "id": "ROYAL.junction.jefferson",

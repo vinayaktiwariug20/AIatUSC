@@ -196,7 +196,11 @@ export class WalkRouter {
       if (choices.length > 1) throw new Unreachable(`'${building}' could mean ${choices.length} places -- which one?`, [], choices.map(b => ({id: b.id, name: b.name})));
       throw new Unreachable(`unknown building: '${building}'`);
     }
-    const targets = this.data.targets[b.id] || [];
+    let targets = this.data.targets[b.id] || [];
+    if (stepFree) {   // prefer doors surveyed as step-free (level, ramp or elevator), when there are any
+      const ok = new Set((b.entrances || []).filter(e => e.wheelchair === true).map(e => 'E:' + e.id));
+      const pref = targets.filter(t => ok.has(t)); if (pref.length) targets = pref;
+    }
     if (!targets.length) throw new Unreachable(`${b.name} has no entrance within 60m of a mapped path`);
     // Virtual nodes and edges for this request only (the compiled graph is
     // shared and immutable). Same order as router.py's _link(..., live=True).
@@ -258,7 +262,7 @@ export class WalkRouter {
         warnings: warnings.map(r => ({id: r.id, note: r.note || '', status: r.status})),
       },
       handoff: {building: b.id, entrance_id: entrance?.id ?? null, entrance_name: entrance?.name ?? null,
-        indoor_node: entrance?.indoor_node ?? null, photo: entrance?.photo ?? null, lat: entranceLL[0], lon: entranceLL[1]},
+        indoor_node: entrance?.indoor_node ?? null, photo: entrance?.photo ?? null, step_free_door: entrance?.wheelchair ?? null, lat: entranceLL[0], lon: entranceLL[1]},
       features: [
         {type: 'Feature', properties: {kind: 'route', minutes: round1(found.cost / 60), metres: Math.round(metres)},
           geometry: {type: 'LineString', coordinates: coordinates.map(([a, b]) => [b, a])}},

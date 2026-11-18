@@ -311,3 +311,13 @@ def test_pedestrian_hours_from_the_gate_schedule():
     assert ped("downey-way", datetime(2026, 11, 17, 5, 30))["status"] == "varies"
     assert ped("watt", datetime(2026, 11, 21, 3, 0))["status"] == "open"
     assert ped("royal", datetime(2026, 11, 21, 12, 0))["status"] == "not_stated"
+
+
+def test_avoid_stairs_prefers_a_step_free_door():
+    """Surveyed doors carry wheelchair: true/false; avoiding stairs uses a step-free one."""
+    g = WalkGraph()
+    any_door = g.route(34.0204, -118.2852, "Student Union")
+    assert any_door["handoff"]["entrance_id"] in ("su-steps-north", "su-steps-east", "su-ramp")
+    level = g.route(34.0204, -118.2852, "Student Union", step_free=True)
+    assert level["handoff"]["entrance_id"] == "su-ramp"
+    assert level["handoff"]["step_free_door"] is True

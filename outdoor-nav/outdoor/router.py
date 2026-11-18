@@ -387,6 +387,10 @@ class WalkGraph:
                 raise e
             raise Unreachable("unknown building: %r" % (building,))
         targets = self.targets.get(b["id"]) or []
+        if step_free:
+            # Prefer doors surveyed as step-free (level, ramp or elevator), when there are any.
+            ok = {"E:" + e["id"] for e in b.get("entrances", []) if e.get("wheelchair") is True}
+            targets = [t for t in targets if t in ok] or targets
         if not targets:
             raise Unreachable("%s has no entrance within %dm of a mapped path"
                               % (b["name"], SNAP_LIMIT_M))
@@ -485,6 +489,7 @@ class WalkGraph:
                 "entrance_name": ent.get("name") if ent else None,
                 "indoor_node": ent.get("indoor_node") if ent else None,
                 "photo": ent.get("photo") if ent else None,
+                "step_free_door": ent.get("wheelchair") if ent else None,
                 "lat": ent_ll[0], "lon": ent_ll[1],
             },
             "features": [

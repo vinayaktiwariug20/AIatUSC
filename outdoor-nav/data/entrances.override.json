@@ -431,5 +431,11 @@
    "JMC"
   ],
   "_source": "official building code (USC maps); JMC is the John McKay Center, DMC the Medicine Crow Center"
- }
+ },
+  {"building": "rtcc", "id": "rtcc-main", "photo": "/doors/rtcc-main.jpg", "name": "Main doors under the \"Ronald Tutor Campus Center\" sign (food court)", "lat": 34.0202049, "lon": -118.2863187, "wheelchair": true, "replace_osm": true, "_source": "team survey with the Doorstep survey page, 2026-11-17 (GPS ±14.2 m); level, push button on the leftmost door"},
+  {"building": "rtcc", "id": "rtcc-lower", "photo": "/doors/rtcc-lower.jpg", "name": "Door to the stairs and elevator down to Tommy's Place and Traditions", "lat": 34.0198395, "lon": -118.2862591, "wheelchair": true, "_source": "team survey with the Doorstep survey page, 2026-11-17 (GPS ±2 m); step-free by the elevator"},
+  {"building": "student-union", "id": "su-ramp", "photo": "/doors/su-ramp.jpg", "name": "Ramp marked \"STU\" up to the Student Union, USC Credit Union and Career Center doors", "lat": 34.0201214, "lon": -118.2861277, "wheelchair": true, "replace_osm": true, "_source": "team survey with the Doorstep survey page, 2026-11-17 (GPS ±14.2 m); the step-free way in"},
+  {"building": "student-union", "id": "su-steps-north", "photo": "/doors/su-steps-north.jpg", "name": "Doors under the \"Gwynn Wilson Student Union\" sign (8 steps; ramp about 15 m away)", "lat": 34.020322, "lon": -118.2859487, "wheelchair": false, "_source": "team survey with the Doorstep survey page, 2026-11-17 (GPS ±7.6 m)"},
+  {"building": "student-union", "id": "su-steps-east", "photo": "/doors/su-steps-east.jpg", "name": "Doors under the \"3601 Gwynn Wilson Student Union\" sign (8 steps)", "lat": 34.0201196, "lon": -118.2855879, "wheelchair": false, "_source": "team survey with the Doorstep survey page, 2026-11-17 (GPS ±14.2 m)"},
+  {"building": "steven-and-katherine-sample-hall", "id": "sample-plaza", "photo": "/doors/sample-plaza.jpg", "name": "Doors facing International Plaza (push button on the leftmost door)", "lat": 34.0200989, "lon": -118.2862412, "wheelchair": true, "replace_osm": true, "_source": "team survey with the Doorstep survey page, 2026-11-17 (GPS ±14.2 m); level"}
 ]
