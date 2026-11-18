@@ -5,19 +5,19 @@ person) decides**:
 
 | Feature | What the model does | What it can't do |
 |---|---|---|
-| **Ask Doorstep** (chat) | Answers a question **only from facts the app sends it**, citing their ids | Answer without a real citation: the app drops it and sends the question to organizers |
+| **Ask Doorstep** (chat) | Answers a question **only from facts the app sends it**, citing their ids | Answer without a real citation: the app drops it and sends the question to the Doorstep team |
 | **Photo triage** (reports) | Reads a blockage photo + note and suggests category, area, duration, duplicates | Close a path: staff approve, optionally "as suggested" |
 
 ```
 phone ──question──▶ Worker ──facts + question──▶ /ask ─▶ answer + citations ─▶ shown with sources
-                      │                                └─▶ "not in the facts" ─▶ organizer queue
+                      │                                └─▶ "not in the facts" ─▶ team queue
                       │                                                        └─ answer ─▶ becomes a fact
 phone ──report+photo─▶ Worker ──────────────────▶ /triage ─▶ suggestion ─▶ staff approve
 ```
 
 The model runs in **one small Replit app** using **Replit AI Integrations**
 (paid from Replit credits; needs the Core plan or above). If it's missing, slow
-or down, Doorstep keeps working: questions go straight to organizers and
+or down, Doorstep keeps working: questions go straight to the Doorstep team and
 reports have no suggestion.
 
 ## 1. Create the Replit app
@@ -89,11 +89,11 @@ table) automatically.
 
 1. **Ask Doorstep:** ask *"Is the Watt Way gate open tonight?"*. The answer should
    cite *USC Transportation entrance hours*. Then ask something the app can't know
-   (*"Is there food?"*). It should say it has sent the question to the organizers.
-2. **Organizer:** open **Staff / organizer**, enter the admin token, and answer the
-   question under **Questions for organizers**. Within ~20 s the asker sees
-   *"Organizer answer"*, and the next person asking about food gets it from the bot,
-   cited as *organizer answer*. You can also pre-load answers with **Add an FAQ answer**.
+   (*"Is there food?"*). It should say it has sent the question to the Doorstep team.
+2. **Team:** open **Staff**, enter the admin token, and answer the
+   question under **Questions for the Doorstep team**. Within ~20 s the asker sees
+   *"Answer from the Doorstep team"*, and the next person asking about food gets it from the bot,
+   cited as *Doorstep team answer*. You can also pre-load answers with **Add an FAQ answer**.
 3. **Photo triage:** report a blockage with a photo. The confirmation says *"AI read it
    as …"*, and staff see **Approve as suggested**.
 
@@ -102,7 +102,7 @@ table) automatically.
 - **Ask:** an answer is shown only if it cites at least one real fact id; anything
   else is escalated, not shown. Facts are built fresh per question: live gate status,
   game-day status, parking eligibility, approved closures, unverified reports (labelled
-  as such), organizer answers, and how-to. Questions are limited to 300 characters,
+  as such), team answers, and how-to. Questions are limited to 300 characters,
   and to 40/min and 1,500/day overall.
 - **Triage:** suggestions never change a report's status. Every field is whitelisted
   or clamped. Photos are forwarded once and **never stored**.

@@ -349,11 +349,11 @@ export async function handleApi(request, env, context) {
       const b = out.destination ? router.findBuilding(out.destination) : null, destination = b ? {id: b.id, name: b.name} : null;
       if (out.answered) return reply({ok: true, answered: true, answer: out.answer, destination,
         sources: out.citations.map(id => { const f = facts.find(x => x.id === id); return {id, source: f.source, text: f.text}; })});
-      if (!db) return reply({ok: true, answered: false, message: "I couldn't answer that from verified information, and the organizer inbox isn't connected."});
+      if (!db) return reply({ok: true, answered: false, message: "I couldn't answer that from verified information, and the Doorstep team's inbox isn't connected."});
       const q = await storeQuestion(db, question, now, campusISO, {ai_available: Boolean(raw)});
       return reply({ok: true, answered: false, question_id: q.id, destination,
-        message: raw ? "I don't have verified information on that, so I've sent your question to the organizers. Their answer will appear here."
-                     : "The assistant is unavailable right now, so I've sent your question to the organizers. Their answer will appear here."}, 201);
+        message: raw ? "I don't have verified information on that, so I've sent your question to the Doorstep team. Their answer will appear here."
+                     : "The assistant is unavailable right now, so I've sent your question to the Doorstep team. Their answer will appear here."}, 201);
     }
     const qMatch = /^\/api\/questions\/([0-9a-f]{16})(?:\/(answer|dismiss))?$/.exec(path);
     if (method === 'GET' && qMatch && !qMatch[2]) {
@@ -368,7 +368,7 @@ export async function handleApi(request, env, context) {
       if (!(await questionsReady(db))) fail(503, 'The database needs an update (migration 0003). Run npm run db:remote.');
       const now = Date.now(), text = v => String(v ?? '').trim();
       if (method === 'GET' && path === '/api/questions') return reply(await staffList(db), 200, head);
-      if (method === 'POST' && path === '/api/questions') {          // organizer FAQ, answered up front
+      if (method === 'POST' && path === '/api/questions') {          // team FAQ, answered up front
         const question = text(body.question), answer = text(body.answer);
         if (!question || question.length > QUESTION_MAX || !answer || answer.length > ANSWER_MAX) fail(400, 'Give a question and an answer.');
         const q = await storeQuestion(db, question, now, campusISO, {status: 'answered', answer, answered: campusISO(now), faq: true});
