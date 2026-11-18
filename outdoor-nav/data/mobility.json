@@ -112,6 +112,26 @@
       "game_access": "unconfirmed",
       "address": "USC Hotel / Figueroa St",
       "note": "Surveyed shared vehicle/pedestrian entrance. Game-day visitor access is unconfirmed."
+    },
+    {
+      "id": "flower",
+      "name": "Flower Street Parking Structure",
+      "gate": "flower",
+      "entrance": "FLOWER.veh.flower",
+      "exit": "FLOWER.ped.double",
+      "access": [
+        {
+          "gate": "flower",
+          "entrance": "FLOWER.veh.flower"
+        },
+        {
+          "gate": "flower",
+          "entrance": "FLOWER.veh.west"
+        }
+      ],
+      "game_access": "unconfirmed",
+      "address": "3701 Flower St",
+      "note": "USC ID only, 24 hours (USCard required). Entrances and doors from Google Maps / Street View, not yet checked on site."
     }
   ]
 }
