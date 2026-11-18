@@ -6,7 +6,7 @@ import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQu
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
 import {adminGuard} from './adminguard.mjs';
 import {findStaff, createStaffKey, listStaffKeys, revokeStaffKey} from './staffkeys.mjs';
-import {MobilityError, readRules, mobilityState, gateState, validateRule, validateParkingStatus, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures, orsUsage} from './mobility.mjs';
+import {MobilityError, readRules, mobilityState, gateState, validateRule, validateParkingStatus, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures, orsUsage, softGates} from './mobility.mjs';
 
 class ApiError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -208,13 +208,16 @@ export async function handleApi(request, env, context) {
         catch(error){if(error instanceof Unreachable)return reply({ok:false,reason:error.message,blocked_by:error.blockedBy,choices:error.choices});throw error;}
       }
       if (!place && !router.containsStart(lat,lon)) return reply({ok:false,reason:'Start is outside the campus walking map. Choose a campus gate or parking exit.',blocked_by:[]});
-      const rows = forMode(await active(db,when),'walking');
+      const rows = forMode(await active(db,when),'walking'), rules = await readRules(db, when);
       // Staff rules closed on foot (areas, surveyed gates) apply to walking too.
-      rows.push(...walkingRuleClosures(context, await readRules(db, when), when));
+      rows.push(...walkingRuleClosures(context, rules, when));
       if(from.exit!==undefined&&(typeof from.exit!=='string'||!place))fail(400,'A parking place is required for a surveyed exit.');
       try {
-        const out = router.route({lat,lon,place,exit:from.exit??null,building:body.to,stepFree:Boolean(body.step_free),
-          closures: rows.filter(c => c.status === 'approved'), reports: rows.filter(c => c.status === 'unverified')});
+        const ask = extra => router.route({lat,lon,place,exit:from.exit??null,building:body.to,stepFree:Boolean(body.step_free),
+          closures: [...rows.filter(c => c.status === 'approved'), ...extra], reports: rows.filter(c => c.status === 'unverified')});
+        // Gates scheduled closed on foot: a preference, not a wall (see softGates).
+        const soft = softGates(context, when, rules, ask([]), ask), out = soft.route;
+        out.summary.gate_notes = soft.notes;
         if (out.summary.start_place) out.summary.vehicle_access = gateStatus(gateData,when).filter(g => g.place === out.summary.start_place.id);
         out.summary.storage = db ? 'd1' : 'read_only_preview';
         out.mode='walking';
