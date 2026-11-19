@@ -41,10 +41,13 @@ test('standing rates show on the structure for drivers, newest of each option', 
   assert.equal((await post(env, {parking: 'downey', option: 'daily', price: 15, ...YEAR})).status, 201); await pause();
   assert.equal((await post(env, {parking: 'downey', option: 'daily', price: 18, ...YEAR})).status, 201);   // a correction
   const d = await structure(env, '2026-11-17T10:00', 'downey');
-  assert.deepEqual(d.rates.map(rateText), ['$3/hour (max $18/day) · pay by Text2Park', 'All day $18']);
+  assert.deepEqual(d.rates.map(rateText), ['$3/hour (max $18/day) · pay by Text2Park (+$0.50 fee)', 'All day $18']);
   assert.equal(d.rates_apply, true);
   assert.equal((await structure(env, '2026-11-17T10:00', 'downey', 'downey')).rates_apply, false);   // their permit covers it
-  assert.deepEqual((await structure(env, '2026-11-17T10:00', 'mccarthy')).rates, []);
+  const m = await structure(env, '2026-11-17T10:00', 'mccarthy');   // nothing posted: USC Transportation's published rates
+  assert.deepEqual(m.rates.map(rateText), ['$4/hour · pay by Text2Park (+$0.50 fee) or pay station · 1 hour max', 'All day $20 · pay by Text2Park (+$0.50 fee) or pay station']);
+  assert.ok(m.rates.every(r => r.source === 'published')); assert.match(m.rates_source.url, /transnet\.usc\.edu/);
+  assert.equal(d.rates_source, null); assert.equal(d.published_rates, undefined);
   assert.equal(d.rates[0].by, undefined);   // who posted it stays on the Staff screen
 });
 
@@ -53,7 +56,7 @@ test('an event rate replaces the others while it applies, then they come back', 
   await post(env, {parking: 'royal', option: 'hourly', price: 3, ...YEAR}); await pause();
   await post(env, {parking: 'royal', option: 'event', price: 30, label: 'Football vs UCLA', pay: 'booth', starts: '2026-11-21T06:00', ends: '2026-11-21T23:59'});
   assert.deepEqual((await structure(env, '2026-11-21T12:00', 'royal')).rates.map(rateText), ['Football vs UCLA: Event rate $30 · pay by booth']);
-  assert.deepEqual((await structure(env, '2026-11-22T12:00', 'royal')).rates.map(rateText), ['$3/hour']);
+  assert.deepEqual((await structure(env, '2026-11-22T12:00', 'royal')).rates.map(rateText), ['$3/hour', 'All day $20 · pay by Text2Park (+$0.50 fee) or pay station']);   // staff hourly, published daily
 });
 
 test('an event rate can offer a lower validated price for people not at the event', async () => {
@@ -71,7 +74,7 @@ test('weekly rates apply only on their days and hours', async () => {
   const env = {DB: new D1(), ADMIN_TOKEN: 'staff'};
   await post(env, {parking: 'mccarthy', option: 'free', days: ['Sat', 'Sun'], from: '00:00', to: '24:00', note: 'weekends', ...YEAR});
   assert.deepEqual((await structure(env, '2026-11-22T12:00', 'mccarthy')).rates.map(rateText), ['Free · weekends']);
-  assert.deepEqual((await structure(env, '2026-11-23T12:00', 'mccarthy')).rates, []);
+  assert.ok((await structure(env, '2026-11-23T12:00', 'mccarthy')).rates.every(r => r.source === 'published'));   // Monday: back to the published rates
 });
 
 test('bad rates are refused, and only staff can post or remove them', async () => {
@@ -102,4 +105,20 @@ test('Ask Doorstep can answer from posted rates', async () => {
   const facts = collectFacts(context, parseTime('2026-11-19T10:00'), {closures: [], answers: [], rules});
   const f = facts.find(x => x.id === 'rate:downey');
   assert.match(f.text, /Downey Way Parking Structure prices now.*All day \$18 · pay by Text2Park/);
+});
+
+test("published rates follow USC Transportation's day and time windows", async () => {
+  const env = {DB: new D1(), ADMIN_TOKEN: 'staff'}, at = async (when, id) => (await structure(env, when, id)).rates.map(rateText);
+  assert.deepEqual(await at('2026-11-17T10:00', 'downey'), []);   // Tuesday morning: no visitor sales at Downey
+  assert.match((await at('2026-11-17T13:00', 'downey'))[0], /^All day \$20/);
+  assert.match((await at('2026-11-21T09:00', 'downey'))[0], /^All day \$20/);   // Saturday: all day
+  assert.deepEqual(await at('2026-11-17T13:00', 'royal'), ['All day $20 · pay by Text2Park (+$0.50 fee) or pay station']);
+  assert.equal((await at('2026-11-21T13:00', 'royal')).length, 2);   // hourly on weekends too
+  assert.deepEqual(await at('2026-11-17T13:00', 'lot2'), ['$5/hour · pay by Text2Park (+$0.50 fee) · 2 hours max']);
+});
+
+test('a staff Free rate replaces the published prices', async () => {
+  const env = {DB: new D1(), ADMIN_TOKEN: 'staff'};
+  await post(env, {parking: 'figueroa', option: 'free', note: 'open house', starts: '2026-11-21T00:00', ends: '2026-11-22T00:00'});
+  assert.deepEqual((await structure(env, '2026-11-21T12:00', 'figueroa')).rates.map(rateText), ['Free · open house']);
 });

@@ -71,6 +71,35 @@
           "gate": "downey-way",
           "entrance": "DOWNEY.veh.downey"
         }
+      ],
+      "published_rates": [
+        {
+          "option": "daily",
+          "price": 20,
+          "pay": "phone_or_station",
+          "windows": [
+            {
+              "days": [
+                "Mon",
+                "Tue",
+                "Wed",
+                "Thu"
+              ],
+              "from": "12:00",
+              "to": "24:00"
+            },
+            {
+              "days": [
+                "Fri",
+                "Sat",
+                "Sun"
+              ],
+              "from": "00:00",
+              "to": "24:00"
+            }
+          ],
+          "note": "Mon–Thu: after 4 pm by phone, after 12 pm at the pay station (1st floor NE, by the elevators); all day Fri–Sun"
+        }
       ]
     },
     {
@@ -81,7 +110,64 @@
       "exit": "JEFFERSON.ped.small",
       "game_access": "unconfirmed",
       "address": "Jefferson Blvd",
-      "note": "Game-day visitor access requires staff confirmation; excluded on home-game dates."
+      "note": "Game-day visitor access requires staff confirmation; excluded on home-game dates.",
+      "published_rates": [
+        {
+          "option": "hourly",
+          "price": 4,
+          "max": 20,
+          "pay": "phone_or_station",
+          "windows": [
+            {
+              "days": [
+                "Mon",
+                "Tue",
+                "Wed",
+                "Thu"
+              ],
+              "from": "12:00",
+              "to": "24:00"
+            },
+            {
+              "days": [
+                "Fri",
+                "Sat",
+                "Sun"
+              ],
+              "from": "00:00",
+              "to": "24:00"
+            }
+          ],
+          "note": "after 12 pm"
+        },
+        {
+          "option": "daily",
+          "price": 20,
+          "pay": "pay_station",
+          "windows": [
+            {
+              "days": [
+                "Mon",
+                "Tue",
+                "Wed",
+                "Thu"
+              ],
+              "from": "12:00",
+              "to": "24:00"
+            },
+            {
+              "days": [
+                "Fri",
+                "Sat",
+                "Sun"
+              ],
+              "from": "00:00",
+              "to": "24:00"
+            }
+          ],
+          "note": "after 12 pm Mon–Thu, all day Fri–Sun"
+        }
+      ]
     },
     {
       "id": "royal",
@@ -91,7 +177,31 @@
       "exit": "ROYAL.ped.jefferson",
       "game_access": "parking_pass",
       "address": "Jefferson Blvd / Royal St",
-      "note": "Game-day prepaid parking may be sold through ParkWhiz. A parking pass does not override a closed gate."
+      "note": "Game-day prepaid parking may be sold through ParkWhiz. A parking pass does not override a closed gate.",
+      "published_rates": [
+        {
+          "option": "daily",
+          "price": 20,
+          "pay": "phone_or_station"
+        },
+        {
+          "option": "hourly",
+          "price": 4,
+          "max": 20,
+          "pay": "text2park",
+          "windows": [
+            {
+              "days": [
+                "Sat",
+                "Sun"
+              ],
+              "from": "00:00",
+              "to": "24:00"
+            }
+          ],
+          "note": "weekends only"
+        }
+      ]
     },
     {
       "id": "mccarthy",
@@ -101,7 +211,20 @@
       "exit": "MCCARTHY.ped.hellman",
       "game_access": "public",
       "address": "McCarthy Way from Figueroa St",
-      "note": "Walking exit is on Hellman Way."
+      "note": "Walking exit is on Hellman Way.",
+      "published_rates": [
+        {
+          "option": "hourly",
+          "price": 4,
+          "pay": "phone_or_station",
+          "note": "1 hour max"
+        },
+        {
+          "option": "daily",
+          "price": 20,
+          "pay": "phone_or_station"
+        }
+      ]
     },
     {
       "id": "figueroa",
@@ -111,7 +234,20 @@
       "exit": "FIGUEROA.veh.hotel",
       "game_access": "unconfirmed",
       "address": "USC Hotel / Figueroa St",
-      "note": "Surveyed shared vehicle/pedestrian entrance. Game-day visitor access is unconfirmed."
+      "note": "Surveyed shared vehicle/pedestrian entrance. Game-day visitor access is unconfirmed.",
+      "published_rates": [
+        {
+          "option": "hourly",
+          "price": 4,
+          "max": 20,
+          "pay": "phone_or_station"
+        },
+        {
+          "option": "daily",
+          "price": 20,
+          "pay": "pay_station"
+        }
+      ]
     },
     {
       "id": "flower",
@@ -131,7 +267,14 @@
       ],
       "game_access": "unconfirmed",
       "address": "3701 Flower St",
-      "note": "USC ID only, 24 hours (USCard required). Entrances and doors from Google Maps / Street View, not yet checked on site."
+      "note": "USC ID only, 24 hours (USCard required). Entrances and doors from Google Maps / Street View, not yet checked on site.",
+      "published_rates": [
+        {
+          "option": "daily",
+          "price": 20,
+          "pay": "text2park"
+        }
+      ]
     },
     {
       "id": "shrine",
@@ -147,7 +290,50 @@
       ],
       "game_access": "unconfirmed",
       "address": "686 W 32nd St (across Jefferson Blvd from campus)",
-      "note": "Across the street from campus; Shrine Auditorium events can raise the price. Car entrance from a Google Maps pin, the pedestrian door placed a few metres east of it; not yet checked on site. After hours, USC ID at the Jefferson entrance (645 W Jefferson Blvd), which is not mapped yet."
+      "note": "Across the street from campus; Shrine Auditorium events can raise the price. Car entrance from a Google Maps pin, the pedestrian door placed a few metres east of it; not yet checked on site. After hours, USC ID at the Jefferson entrance (645 W Jefferson Blvd), which is not mapped yet.",
+      "published_rates": [
+        {
+          "option": "hourly",
+          "price": 4,
+          "max": 20,
+          "pay": "phone_or_station"
+        }
+      ]
+    },
+    {
+      "id": "lot2",
+      "name": "Lot 2 (USC Bookstore lot)",
+      "gate": "mcclintock",
+      "entrance": "LOT2.veh.main",
+      "exit": "LOT2.ped.east",
+      "access": [
+        {
+          "gate": "mcclintock",
+          "entrance": "LOT2.veh.main"
+        },
+        {
+          "gate": "downey-way",
+          "entrance": "LOT2.veh.main"
+        }
+      ],
+      "game_access": "unconfirmed",
+      "address": "Open lot by the USC Bookstore, off McClintock Ave",
+      "note": "Open surface lot. Car entrance and walkways from Google Maps pins; not yet checked on site. Which campus entrance drivers use is assumed (as for the Downey structure next to it).",
+      "published_rates": [
+        {
+          "option": "hourly",
+          "price": 5,
+          "pay": "text2park",
+          "note": "2 hours max",
+          "_source": "Sign seen by the team 2026-11-19 ($5/hour, 2 hours max); USC Transportation listed Lot 2 at $5/hour from July 1, 2026"
+        }
+      ]
     }
-  ]
+  ],
+  "rates_source": {
+    "name": "USC Transportation, Hourly and All Day Parking Availability FY27",
+    "url": "https://transnet.usc.edu/wp-content/uploads/2026/06/Hourly-and-All-Day-Parking-Availability-FY27.pdf",
+    "checked": "2026-11-19",
+    "note": "Hourly: up to 4 hours unless noted; 5+ hours are charged the $20 daily rate (shown as the daily max). Text2Park adds a one-time $0.50 fee; pay stations have none. Space-available; event and game-day rates differ (staff post those)."
+  }
 }

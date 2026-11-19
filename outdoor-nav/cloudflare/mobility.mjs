@@ -99,7 +99,7 @@ export function parkingSpace(rules,p,when,permit){
 // An event rate may come with a lower all-day price for people not at the event, with a
 // validation code (e.g. a Shrine concert: event price, or $20 validated). Never the code itself.
 export const RATE_OPTIONS=['hourly','daily','event','free'];
-export const RATE_PAY=['text2park','pay_station','booth','online','other'];
+export const RATE_PAY=['text2park','pay_station','phone_or_station','booth','online','other'];
 export function validateParkingRate(body,context,now=Date.now()) {
   const p=context.mobilityData.parking.find(x=>x.id===body.parking);
   if(!p)throw new MobilityError(400,'Unknown parking structure.');
@@ -127,18 +127,24 @@ export function validateParkingRate(body,context,now=Date.now()) {
   }
   return rate;
 }
-// The prices that apply at this structure at this time: an event rate replaces the rest;
-// otherwise the newest of each option. Public fields only (not who posted it).
+// The prices that apply at this structure at this time: a staff event or free rate replaces the rest;
+// otherwise, per option, the newest staff rate, else USC Transportation's published one
+// (mobility.json published_rates, which may apply only in some day/time windows).
+// Public fields only (not who posted it).
+const inWindow=(w,when)=>{const c=clock(when);return w.days.includes(c.day)&&hhmm(w.from)<=c.minute&&c.minute<hhmm(w.to);};
 export function parkingRates(rules,p,when){
   const mine=rules.filter(r=>r.kind==='rate'&&r.parking===p.id&&parkingRuleActive(r,when)).sort((a,b)=>b.created_ms-a.created_ms);
-  const event=mine.filter(r=>r.option==='event');
-  const pick=event.length?event:RATE_OPTIONS.map(o=>mine.find(r=>r.option===o)).filter(Boolean);
-  return pick.map(r=>({option:r.option,price:r.price,max:r.max,validated:r.validated||null,pay:r.pay,label:r.label,note:r.note||null,updated:r.updated,until:r.days?r.to:r.ends}));
+  const event=mine.filter(r=>r.option==='event'||r.option==='free');   // staff said so: it replaces every other price
+  const staff=r=>({option:r.option,price:r.price,max:r.max,validated:r.validated||null,pay:r.pay,label:r.label,note:r.note||null,source:'staff',updated:r.updated,until:r.days?r.to:r.ends});
+  if(event.length)return event.map(staff);
+  const published=(p.published_rates||[]).filter(r=>!r.windows||r.windows.some(w=>inWindow(w,when)));
+  return RATE_OPTIONS.flatMap(o=>{const s=mine.find(r=>r.option===o);if(s)return [staff(s)];
+    return published.filter(r=>r.option===o).map(r=>({option:r.option,price:r.price,max:r.max??null,validated:null,pay:r.pay||null,label:null,note:r.note||null,source:'published',updated:null,until:null}));});
 }
 // "$3/hour (max $18/day)", "All day $18", "Football vs UCLA: $30", "Free"; plus how to pay.
 // The page has the same wording (index.html rateText).
 const dollars=n=>'$'+(Number.isInteger(n)?n:n.toFixed(2));
-export const RATE_PAY_TEXT={text2park:'Text2Park',pay_station:'pay station',booth:'booth',online:'online',other:'see signs'};
+export const RATE_PAY_TEXT={text2park:'Text2Park (+$0.50 fee)',pay_station:'pay station',phone_or_station:'Text2Park (+$0.50 fee) or pay station',booth:'booth',online:'online',other:'see signs'};
 export function rateText(r){
   const what=r.option==='free'?'Free':r.option==='hourly'?dollars(r.price)+'/hour'+(r.max!=null?' (max '+dollars(r.max)+'/day)':''):r.option==='daily'?'All day '+dollars(r.price):'Event rate '+dollars(r.price)
     +(r.validated?'; not here for the event: '+dollars(r.validated.price)+' all day with a validation code'+(r.validated.how?' ('+r.validated.how+')':''):'');
@@ -195,8 +201,8 @@ export function parkingState(context,when,rules=[],credentials={}) {
     // True only when the permit is what lets this driver in (not when the structure is open to everyone).
     const byPermit=permit&&(gate?.permit_access===true||gameRule!==null);
     if(!entrance||!exit) reason='Surveyed entrance or pedestrian exit is missing.';
-    const rates=parkingRates(rules,p,when);
-    return {...p,rates,rates_apply:!permit,gate:primary.gate,campus_via:primary.campus_via,access,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:space?.status||'unknown',space,availability_basis:space?'staff update; spaces are not guaranteed':'gate hours and published access; spaces are not guaranteed'};
+    const rates=parkingRates(rules,p,when),{published_rates,...pub}=p;
+    return {...pub,rates,rates_source:rates.some(r=>r.source==='published')?context.mobilityData.rates_source:null,rates_apply:!permit,gate:primary.gate,campus_via:primary.campus_via,access,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:space?.status||'unknown',space,availability_basis:space?'staff update; spaces are not guaranteed':'gate hours and published access; spaces are not guaranteed'};
   });
 }
 export function circlePolygon(lat,lon,radius=35) {
