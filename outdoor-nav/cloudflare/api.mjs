@@ -6,7 +6,7 @@ import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQu
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
 import {adminGuard} from './adminguard.mjs';
 import {findStaff, createStaffKey, listStaffKeys, revokeStaffKey, removeStaffKey, rollWords} from './staffkeys.mjs';
-import {MobilityError, readRules, mobilityState, gateState, validateRule, validateParkingStatus, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures, orsUsage, softGates} from './mobility.mjs';
+import {MobilityError, readRules, mobilityState, gateState, validateRule, validateParkingStatus, validateParkingRate, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures, orsUsage, softGates} from './mobility.mjs';
 
 class ApiError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -187,6 +187,12 @@ export async function handleApi(request, env, context) {
         catch{fail(503,'Parking status needs database migration 0005. It is applied on the next deploy, or run npm run db:remote.');}
         return reply(status,201);
       }
+      if(body.kind==='rate'){
+        const rate={...validateParkingRate(body,context),by:actor()};
+        try{await db.prepare('INSERT INTO parking_rates(id,parking,starts_ms,ends_ms,created_ms,payload) VALUES(?,?,?,?,?,?)').bind(rate.id,rate.parking,rate.starts_ms,rate.ends_ms,rate.created_ms,JSON.stringify(rate)).run();}
+        catch{fail(503,'Parking rates need database migration 0007. It is applied on the next deploy, or run npm run db:remote.');}
+        return reply(rate,201);
+      }
       const rule={...validateRule(body,context),by:actor()};
       await db.prepare('INSERT INTO mobility_rules(id,kind,starts_ms,ends_ms,created_ms,payload) VALUES(?,?,?,?,?,?)').bind(rule.id,rule.kind,rule.starts_ms,rule.ends_ms,rule.created_ms,JSON.stringify(rule)).run();
       return reply(rule,201);
@@ -196,6 +202,7 @@ export async function handleApi(request, env, context) {
       requireStaff();if(!db)fail(503,'D1 is not connected.');
       let deleted=await db.prepare('DELETE FROM mobility_rules WHERE id=? RETURNING id').bind(mobilityRule[1]).first('id');
       if(!deleted)try{deleted=await db.prepare('DELETE FROM parking_status WHERE id=? RETURNING id').bind(mobilityRule[1]).first('id');}catch{}
+      if(!deleted)try{deleted=await db.prepare('DELETE FROM parking_rates WHERE id=? RETURNING id').bind(mobilityRule[1]).first('id');}catch{}
       return deleted?reply({deleted}):reply({error:'not found'},404);
     }
     const building = /^\/api\/buildings\/([^/]+)$/.exec(path);

@@ -18,7 +18,7 @@ export async function readRules(db,from,to=from+1) {
     const value = await db.prepare("SELECT COALESCE(json_group_array(json(payload)), '[]') AS data FROM (SELECT payload FROM mobility_rules WHERE starts_ms<? AND ends_ms>? ORDER BY created_ms,id LIMIT 101)").bind(to,from).first('data');
     const rows=JSON.parse(value);
     if (rows.length>100) throw new Error('limit');
-    return [...rows,...await readParkingStatus(db,from,to)];
+    return [...rows,...await readParkingStatus(db,from,to),...await readParkingRates(db,from,to)];
   } catch(error) { if(error instanceof MobilityError)throw error; throw new MobilityError(503,'Mobility storage is unavailable. Run npm run db:local and npm run db:remote for the new migration.'); }
 }
 // Parking statuses ride along with the gate and road rules as kind 'parking'; every
@@ -29,6 +29,16 @@ async function readParkingStatus(db,from,to) {
   catch { return []; }
   const rows=JSON.parse(value);
   if(rows.length>200)throw new MobilityError(503,'Too many parking statuses. Lift old ones on the Staff screen.');
+  return rows;
+}
+
+// Parking prices ride along the same way, as kind 'rate'. Before migration 0007 there are none.
+async function readParkingRates(db,from,to) {
+  let value;
+  try { value=await db.prepare("SELECT COALESCE(json_group_array(json(payload)), '[]') AS data FROM (SELECT payload FROM parking_rates WHERE starts_ms<? AND ends_ms>? ORDER BY created_ms,id LIMIT 201)").bind(to,from).first('data'); }
+  catch { return []; }
+  const rows=JSON.parse(value);
+  if(rows.length>200)throw new MobilityError(503,'Too many parking rates. Remove old ones on the Staff screen.');
   return rows;
 }
 
@@ -82,6 +92,50 @@ export function parkingSpace(rules,p,when,permit){
   return {status:closed?'closed':live.status,applies:r.applies,spaces:live?.spaces??null,updated:(live||closed).updated,
     stale:!!live&&live.status!=='closed'&&when-live.created_ms>STALE_MS,until:r.days?r.to:r.ends,note:r.note||null,reason};
 }
+// ---- Parking rates (staff) ----
+// What a visitor without a permit for the structure pays. hourly (optional daily max),
+// daily (all day), event (a flat rate, e.g. a game; while one applies it replaces the
+// others) or free. Prices are dollars. A rate can repeat on days and times, like a status.
+export const RATE_OPTIONS=['hourly','daily','event','free'];
+export const RATE_PAY=['text2park','pay_station','booth','online','other'];
+export function validateParkingRate(body,context,now=Date.now()) {
+  const p=context.mobilityData.parking.find(x=>x.id===body.parking);
+  if(!p)throw new MobilityError(400,'Unknown parking structure.');
+  if(!RATE_OPTIONS.includes(body.option))throw new MobilityError(400,'Choose hourly, all day, event or free.');
+  const money=(v,what)=>{const n=Number(v);if(v===''||v===null||v===undefined||!Number.isFinite(n)||n<0||n>500||Math.round(n*100)!==n*100)throw new MobilityError(400,what+' must be a dollar amount from 0 to 500, e.g. 18 or 2.50.');return n;};
+  const price=body.option==='free'?0:money(body.price,'The price');
+  let max=null;
+  if(body.option==='hourly'&&body.max!==undefined&&body.max!==null&&body.max!==''){max=money(body.max,'The daily maximum');if(max<price)throw new MobilityError(400,'The daily maximum must be at least the hourly price.');}
+  if(body.pay!==undefined&&body.pay!==null&&body.pay!==''&&!RATE_PAY.includes(body.pay))throw new MobilityError(400,'Unknown way to pay.');
+  const starts=context.time.parseTime(body.starts,now),ends=context.time.parseTime(body.ends,starts+365*86400000);
+  if(ends<=starts||ends-starts>400*86400000)throw new MobilityError(400,'Use an end after the start, at most 400 days later.');
+  const rate={id:crypto.randomUUID().replaceAll('-',''),kind:'rate',parking:p.id,parking_name:p.name,option:body.option,price,max,pay:body.pay||null,
+    label:String(body.label||'').replace(/\s+/g,' ').trim().slice(0,80)||null,note:String(body.note||'').slice(0,280),
+    starts_ms:starts,ends_ms:ends,created_ms:now,starts:context.time.campusISO(starts),ends:context.time.campusISO(ends),updated:context.time.campusISO(now),source:'staff_confirmed'};
+  if(body.days!==undefined&&body.days!==null){
+    if(!Array.isArray(body.days)||!body.days.length||body.days.some(d=>!DAYS.includes(d)))throw new MobilityError(400,'Choose at least one day of the week.');
+    const from=hhmm(body.from),to=hhmm(body.to);
+    if(from===null||to===null||from>=to)throw new MobilityError(400,'Use daily times like 06:00 to 16:00 (start before end).');
+    rate.days=DAYS.filter(d=>body.days.includes(d));rate.from=body.from;rate.to=body.to;
+  }
+  return rate;
+}
+// The prices that apply at this structure at this time: an event rate replaces the rest;
+// otherwise the newest of each option. Public fields only (not who posted it).
+export function parkingRates(rules,p,when){
+  const mine=rules.filter(r=>r.kind==='rate'&&r.parking===p.id&&parkingRuleActive(r,when)).sort((a,b)=>b.created_ms-a.created_ms);
+  const event=mine.filter(r=>r.option==='event');
+  const pick=event.length?event:RATE_OPTIONS.map(o=>mine.find(r=>r.option===o)).filter(Boolean);
+  return pick.map(r=>({option:r.option,price:r.price,max:r.max,pay:r.pay,label:r.label,note:r.note||null,updated:r.updated,until:r.days?r.to:r.ends}));
+}
+// "$3/hour (max $18/day)", "All day $18", "Football vs UCLA: $30", "Free"; plus how to pay.
+// The page has the same wording (index.html rateText).
+const dollars=n=>'$'+(Number.isInteger(n)?n:n.toFixed(2));
+export const RATE_PAY_TEXT={text2park:'Text2Park',pay_station:'pay station',booth:'booth',online:'online',other:'see signs'};
+export function rateText(r){
+  const what=r.option==='free'?'Free':r.option==='hourly'?dollars(r.price)+'/hour'+(r.max!=null?' (max '+dollars(r.max)+'/day)':''):r.option==='daily'?'All day '+dollars(r.price):'Event rate '+dollars(r.price);
+  return (r.label?r.label+': ':'')+what+(r.pay?' · pay by '+RATE_PAY_TEXT[r.pay]:'')+(r.note?' · '+r.note:'');
+}
 export function footballContext(data,when) {
   const date=localDate(when), game=data.home_games.find(g=>g.date===date);
   return {season:data.season,checked:data.checked,schedule_source:data.schedule_source,traffic_source:data.traffic_source,
@@ -133,7 +187,8 @@ export function parkingState(context,when,rules=[],credentials={}) {
     // True only when the permit is what lets this driver in (not when the structure is open to everyone).
     const byPermit=permit&&(gate?.permit_access===true||gameRule!==null);
     if(!entrance||!exit) reason='Surveyed entrance or pedestrian exit is missing.';
-    return {...p,gate:primary.gate,campus_via:primary.campus_via,access,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:space?.status||'unknown',space,availability_basis:space?'staff update; spaces are not guaranteed':'gate hours and published access; spaces are not guaranteed'};
+    const rates=parkingRates(rules,p,when);
+    return {...p,rates,rates_apply:!permit,gate:primary.gate,campus_via:primary.campus_via,access,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:space?.status||'unknown',space,availability_basis:space?'staff update; spaces are not guaranteed':'gate hours and published access; spaces are not guaranteed'};
   });
 }
 export function circlePolygon(lat,lon,radius=35) {
@@ -200,7 +255,7 @@ export function avoidance(context,when,end,rules,credentials={}) {
 export function mobilityState(context,when,rules,credentials={}) {
   return {at:context.time.campusISO(when),timezone:'America/Los_Angeles',checked:context.mobilityData.checked,
     gates:gateState(context,when,rules,credentials),parking:parkingState(context,when,rules,credentials),
-    football:footballContext(context.footballData,when),rules:rules.filter(r=>r.starts_ms<=when&&when<r.ends_ms),
+    football:footballContext(context.footballData,when),rules:rules.filter(r=>r.kind!=='rate'&&r.starts_ms<=when&&when<r.ends_ms).map(({by,...r})=>r),   // rates are under parking[]; who posted is staff-only
     avoid:avoidance(context,when,when+1,rules,credentials),entrance_document:context.mobilityData.entrance_document,
     gate_locations_note:context.mobilityData.gate_locations_note};
 }
