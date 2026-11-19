@@ -27,6 +27,12 @@ Demo page: `http://localhost:8100/?to=<building-id>&at=<lat>,<lon>`
 `at` fakes the start position, because the judges will be indoors and not moving.
 Without it, tap the map or press *Use my location*.
 
+Event links (a QR code, or a "Navigate" button in another app):
+`/?to=<building id or code>&room=<room>&event=<name>&go=1`. `to` fills the
+destination; `go=1` asks for the location straight away and routes as soon as it
+arrives (the phone still shows its own "Allow location?" prompt the first time).
+Never put anything about the user in the link.
+
 ## Why not Google Maps
 
 Google can't route around **your** closures, and the Directions API terms

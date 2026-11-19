@@ -138,6 +138,8 @@ window.addEventListener('unhandledrejection',e=>{showError(e.reason);e.preventDe
 // Shown in front of the building name, "(DMC-218) Dr. Joseph Medicine Crow ...", and stripped before lookup.
 const ROOM=(qs.get('room_label')||qs.get('room')||'').trim().slice(0,40);
 // Event name from an organizer's link (/create/): shown under the destination and on arrival.
+// go=1 (e.g. a "Navigate" button in another app): ask for the location at once and route as soon as it arrives.
+let goPending=qs.get('go')==='1'&&!!qs.get('to');
 const EVENT=(qs.get('event')||'').replace(/\s+/g,' ').trim().slice(0,80);
 const ROOM_TEXT=ROOM?(/^room\b/i.test(ROOM)?ROOM:'room '+ROOM):'';
 if(EVENT){$('eventLine').hidden=false;$('eventLine').textContent='Event: '+EVENT;document.title=EVENT+' · Doorstep';}
@@ -162,7 +164,7 @@ function stopGps(){if(watchId!==null){navigator.geolocation.clearWatch(watchId);
 const pill=L.DomUtil.create('div','maphint',map.getContainer());
 function mapHint(text){pill.textContent=text||'';pill.hidden=!text;}
 mapHint('📍 Tap the map or type where you’re starting');
-function setStart(lat,lon,gps=false,label=null){start={lat,lon};if(!reporting)mapHint('');marker(lat,lon);if(document.activeElement!==$('from'))$('from').value=label||(gps?'My location':'Point on the map');if(gps)stat('start_gps');info(label?'Starting from '+label+'.':gps?'Using your current location.':'Start set on the map.');if(mode==='walking'&&$('to').value)route(!routeLayer);else if(mode==='driving'&&plan&&Date.now()-lastRouted>45000)route(false);}
+function setStart(lat,lon,gps=false,label=null){start={lat,lon};if(!reporting)mapHint('');marker(lat,lon);if(document.activeElement!==$('from'))$('from').value=label||(gps?'My location':'Point on the map');if(gps)stat('start_gps');info(label?'Starting from '+label+'.':gps?'Using your current location.':'Start set on the map.');if(goPending&&$('to').value){goPending=false;route(true);}else if(mode==='walking'&&$('to').value)route(!routeLayer);else if(mode==='driving'&&plan&&Date.now()-lastRouted>45000)route(false);}
 function setMode(next){clearRoute();mode=next;$('walkMode').classList.toggle('active',mode==='walking');$('driveMode').classList.toggle('active',mode==='driving');$('walkMode').setAttribute('aria-pressed',mode==='walking');$('driveMode').setAttribute('aria-pressed',mode==='driving');$('driveOptions').hidden=mode!=='driving';if(start?.place)start=null;info(mode==='driving'?'Choose a start and destination, then select Find route.':'Walking routes cover campus and the surrounding area.');loadMobility().catch(showError);}
 function availableReports(){const enabled=health?.database==='connected'&&(health.public_reports||$('token').value.trim());$('repBtn').disabled=!enabled;}
 // Draw the route simplified (Douglas-Peucker, ~6 m): the path is the same, it just
@@ -728,6 +730,7 @@ $('to').onblur=()=>searchMode(false);
         setStart(lat,lon);
       }
     }
+    if(goPending&&!start)$('locBtn').click();   // the phone shows its own "Allow location?" prompt the first time
 
     setInterval(()=>refresh().catch(showError),30000);
   }catch(error){
