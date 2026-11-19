@@ -56,6 +56,17 @@ test('an event rate replaces the others while it applies, then they come back', 
   assert.deepEqual((await structure(env, '2026-11-22T12:00', 'royal')).rates.map(rateText), ['$3/hour']);
 });
 
+test('an event rate can offer a lower validated price for people not at the event', async () => {
+  const env = {DB: new D1(), ADMIN_TOKEN: 'staff'}, day = {starts: '2026-11-19T06:00', ends: '2026-11-19T23:59'};
+  const r = await post(env, {parking: 'figueroa', option: 'event', price: 40, label: 'Concert at the Shrine', validated_price: 20, validated_how: 'ask the attendant at the entrance', ...day});
+  assert.equal(r.status, 201);
+  assert.deepEqual((await structure(env, '2026-11-19T18:00', 'figueroa')).rates.map(rateText),
+    ['Concert at the Shrine: Event rate $40; not here for the event: $20 all day with a validation code (ask the attendant at the entrance)']);
+  assert.match((await post(env, {parking: 'figueroa', option: 'event', price: 40, validated_price: 40, ...day})).data.error, /lower than the event price/);
+  const hourly = (await post(env, {parking: 'figueroa', option: 'hourly', price: 3, validated_price: 1, ...day})).data;
+  assert.equal(hourly.validated, null);   // only event rates have one
+});
+
 test('weekly rates apply only on their days and hours', async () => {
   const env = {DB: new D1(), ADMIN_TOKEN: 'staff'};
   await post(env, {parking: 'mccarthy', option: 'free', days: ['Sat', 'Sun'], from: '00:00', to: '24:00', note: 'weekends', ...YEAR});

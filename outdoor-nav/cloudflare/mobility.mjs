@@ -96,6 +96,8 @@ export function parkingSpace(rules,p,when,permit){
 // What a visitor without a permit for the structure pays. hourly (optional daily max),
 // daily (all day), event (a flat rate, e.g. a game; while one applies it replaces the
 // others) or free. Prices are dollars. A rate can repeat on days and times, like a status.
+// An event rate may come with a lower all-day price for people not at the event, with a
+// validation code (e.g. a Shrine concert: event price, or $20 validated). Never the code itself.
 export const RATE_OPTIONS=['hourly','daily','event','free'];
 export const RATE_PAY=['text2park','pay_station','booth','online','other'];
 export function validateParkingRate(body,context,now=Date.now()) {
@@ -106,10 +108,15 @@ export function validateParkingRate(body,context,now=Date.now()) {
   const price=body.option==='free'?0:money(body.price,'The price');
   let max=null;
   if(body.option==='hourly'&&body.max!==undefined&&body.max!==null&&body.max!==''){max=money(body.max,'The daily maximum');if(max<price)throw new MobilityError(400,'The daily maximum must be at least the hourly price.');}
+  let validated=null;
+  if(body.option==='event'&&body.validated_price!==undefined&&body.validated_price!==null&&body.validated_price!==''){
+    const v=money(body.validated_price,'The validated price');if(v>=price)throw new MobilityError(400,'The validated price should be lower than the event price.');
+    validated={price:v,how:String(body.validated_how||'').replace(/\s+/g,' ').trim().slice(0,140)||null};
+  }
   if(body.pay!==undefined&&body.pay!==null&&body.pay!==''&&!RATE_PAY.includes(body.pay))throw new MobilityError(400,'Unknown way to pay.');
   const starts=context.time.parseTime(body.starts,now),ends=context.time.parseTime(body.ends,starts+365*86400000);
   if(ends<=starts||ends-starts>400*86400000)throw new MobilityError(400,'Use an end after the start, at most 400 days later.');
-  const rate={id:crypto.randomUUID().replaceAll('-',''),kind:'rate',parking:p.id,parking_name:p.name,option:body.option,price,max,pay:body.pay||null,
+  const rate={id:crypto.randomUUID().replaceAll('-',''),kind:'rate',parking:p.id,parking_name:p.name,option:body.option,price,max,validated,pay:body.pay||null,
     label:String(body.label||'').replace(/\s+/g,' ').trim().slice(0,80)||null,note:String(body.note||'').slice(0,280),
     starts_ms:starts,ends_ms:ends,created_ms:now,starts:context.time.campusISO(starts),ends:context.time.campusISO(ends),updated:context.time.campusISO(now),source:'staff_confirmed'};
   if(body.days!==undefined&&body.days!==null){
@@ -126,14 +133,15 @@ export function parkingRates(rules,p,when){
   const mine=rules.filter(r=>r.kind==='rate'&&r.parking===p.id&&parkingRuleActive(r,when)).sort((a,b)=>b.created_ms-a.created_ms);
   const event=mine.filter(r=>r.option==='event');
   const pick=event.length?event:RATE_OPTIONS.map(o=>mine.find(r=>r.option===o)).filter(Boolean);
-  return pick.map(r=>({option:r.option,price:r.price,max:r.max,pay:r.pay,label:r.label,note:r.note||null,updated:r.updated,until:r.days?r.to:r.ends}));
+  return pick.map(r=>({option:r.option,price:r.price,max:r.max,validated:r.validated||null,pay:r.pay,label:r.label,note:r.note||null,updated:r.updated,until:r.days?r.to:r.ends}));
 }
 // "$3/hour (max $18/day)", "All day $18", "Football vs UCLA: $30", "Free"; plus how to pay.
 // The page has the same wording (index.html rateText).
 const dollars=n=>'$'+(Number.isInteger(n)?n:n.toFixed(2));
 export const RATE_PAY_TEXT={text2park:'Text2Park',pay_station:'pay station',booth:'booth',online:'online',other:'see signs'};
 export function rateText(r){
-  const what=r.option==='free'?'Free':r.option==='hourly'?dollars(r.price)+'/hour'+(r.max!=null?' (max '+dollars(r.max)+'/day)':''):r.option==='daily'?'All day '+dollars(r.price):'Event rate '+dollars(r.price);
+  const what=r.option==='free'?'Free':r.option==='hourly'?dollars(r.price)+'/hour'+(r.max!=null?' (max '+dollars(r.max)+'/day)':''):r.option==='daily'?'All day '+dollars(r.price):'Event rate '+dollars(r.price)
+    +(r.validated?'; not here for the event: '+dollars(r.validated.price)+' all day with a validation code'+(r.validated.how?' ('+r.validated.how+')':''):'');
   return (r.label?r.label+': ':'')+what+(r.pay?' · pay by '+RATE_PAY_TEXT[r.pay]:'')+(r.note?' · '+r.note:'');
 }
 export function footballContext(data,when) {
