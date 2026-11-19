@@ -70,6 +70,10 @@
         {
           "gate": "downey-way",
           "entrance": "DOWNEY.veh.downey"
+        },
+        {
+          "gate": "watt",
+          "entrance": "DOWNEY.veh.mcclintock"
         }
       ],
       "published_rates": [
@@ -314,11 +318,15 @@
         {
           "gate": "downey-way",
           "entrance": "LOT2.veh.main"
+        },
+        {
+          "gate": "watt",
+          "entrance": "LOT2.veh.main"
         }
       ],
       "game_access": "unconfirmed",
       "address": "Open lot by the USC Bookstore, off McClintock Ave",
-      "note": "Open surface lot. Car entrance and walkways from Google Maps pins; not yet checked on site. Which campus entrance drivers use is assumed (as for the Downey structure next to it).",
+      "note": "Open surface lot. Car entrance and walkways from Google Maps pins; not yet checked on site. Drivers can come in at McClintock, Downey Way or Watt Way: the campus roads connect (team, 2026-11-19).",
       "published_rates": [
         {
           "option": "hourly",
