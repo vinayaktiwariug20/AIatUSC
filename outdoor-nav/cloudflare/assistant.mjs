@@ -11,7 +11,7 @@
 // Worker drops any citation that doesn't match a fact id. An answer with no
 // valid citation is treated as "unknown" and escalated, not shown.
 
-import {gateState, parkingState, footballContext} from './mobility.mjs';
+import {gateState, parkingState, footballContext, rateText} from './mobility.mjs';
 import {callAi, aiConfigured} from './ai.mjs';
 
 export const QUESTION_MAX = 300, ANSWER_MAX = 600;
@@ -43,6 +43,8 @@ export function collectFacts(context, when, {closures = [], answers = [], rules 
   for (const p of parkingState(context, when, rules)) {
     add('parking:' + p.id, `${p.name}${p.address ? ' (' + p.address + ')' : ''}: ${p.eligible ? 'can be driven into now' : 'not recommended now: ' + p.reason}`
       + ` Vehicle entrance via ${p.gate_name || p.gate}. ${p.note || ''} Spaces are not guaranteed.`, 'Doorstep parking data');
+    if (p.rates.length)
+      add('rate:' + p.id, `${p.name} prices now, for visitors without a permit for it: ${p.rates.map(rateText).join('; ')}. Posted by staff, updated ${p.rates[0].updated.slice(0, 10)}.`, 'staff parking rates');
   }
   for (const c of closures) {
     if (c.status === 'approved')
