@@ -101,7 +101,7 @@ test('the building carries the outdoor map\'s id and names for it, and the door 
   assert.ok(doors.length);
   for (const d of doors) {
     assert.equal(d.building, B.id);
-    for (const a of d.aliases) assert.ok(B.aliases.includes(a), a);
+    for (const a of d.aliases || []) assert.ok(B.aliases.includes(a), a);   // names ride on one entry per building
     assert.ok(findPlace(B, d.indoor_node), d.indoor_node);
   }
 });
