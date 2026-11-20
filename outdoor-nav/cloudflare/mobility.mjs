@@ -549,7 +549,8 @@ export function softGates(context,when,rules,first,reroute){
   const scheduled=status.filter(g=>['closed','varies'].includes(g.pedestrian?.status)&&pin(g.id)&&!staffClosed.has(g.id));
   const crossed=scheduled.filter(g=>{const p=gateArea(pin(g.id));return nearLine(first,p.lat,p.lon,GATE_WALK_RADIUS_M);});
   if(!crossed.length)return {route:first,notes:[]};
-  const limit=crossed.some(g=>g.pedestrian.status==='closed')?(night?SOFT_GATE.night_min:SOFT_GATE.day_min):SOFT_GATE.varies_min;
+  // A gate seen kept locked (not just scheduled closed) is always avoided when there is another way.
+  const limit=crossed.some(g=>g.pedestrian.locked)?Infinity:crossed.some(g=>g.pedestrian.status==='closed')?(night?SOFT_GATE.night_min:SOFT_GATE.day_min):SOFT_GATE.varies_min;
   const ids=new Set(crossed.map(g=>'schedule:'+g.id));
   const names=crossed.map(g=>g.name).join(' and ');
   let alt=null;
@@ -557,7 +558,7 @@ export function softGates(context,when,rules,first,reroute){
   const extra=alt?Math.round((alt.summary.minutes-first.summary.minutes)*10)/10:null;
   if(alt&&extra<=limit){
     alt.summary.avoided=alt.summary.avoided.filter(a=>!ids.has(a.closure?.id??a.closure));
-    return {route:alt,notes:[{kind:'avoided',gates:crossed.map(g=>g.id),text:`Avoiding ${names}: scheduled closed on foot now${extra>0?` (about ${extra} extra min)`:''}.`}]};
+    return {route:alt,notes:[{kind:'avoided',gates:crossed.map(g=>g.id),text:`Avoiding ${names}: ${crossed.some(g=>g.pedestrian.locked)?'kept locked to people on foot':'scheduled closed on foot now'}${extra>0?` (about ${extra} extra min)`:''}.`}]};
   }
   // Keep the direct route; say where to go if it's locked.
   const open=status.filter(g=>g.pedestrian?.status==='open'&&context.mobilityData.gates.find(x=>x.id===g.id&&x.lat!==undefined));
