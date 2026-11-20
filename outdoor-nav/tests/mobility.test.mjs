@@ -224,33 +224,40 @@ test('a walking-only AREA makes walking routes go round it, and is not a driving
 // its own structure; on weekends a permit for any structure is valid at every structure.
 // A permit never overrides a closure that staff confirmed.
 test('a parking permit opens its own structure when the public cannot use it',()=>{
- const night=parseTime('2026-11-16T22:00:00');   // Monday: the Royal gate's public hours end at 20:00
- const royal=c=>parkingState(context,night,[],c).find(p=>p.id==='royal');
- assert.equal(royal({}).eligible,false);
- const mine=royal({permit:'royal'});assert.equal(mine.eligible,true);assert.equal(mine.permit_access,true);
- assert.equal(gateState(context,night,[],{permit:'royal'}).find(g=>g.id==='royal').permit_access,true);
+ const night=parseTime('2026-11-16T22:00:00');   // Monday: the Jefferson Blvd. gate's public hours end at 20:00 (and it reaches only its structure)
+ const jeff=c=>parkingState(context,night,[],c).find(p=>p.id==='jefferson');
+ assert.equal(jeff({}).eligible,false);
+ const mine=jeff({permit:'jefferson'});assert.equal(mine.eligible,true);assert.equal(mine.permit_access,true);
+ assert.equal(gateState(context,night,[],{permit:'jefferson'}).find(g=>g.id==='jefferson-blvd').permit_access,true);
  // A weekday permit for another structure does not help, and an unknown value is ignored.
- assert.equal(royal({permit:'downey'}).eligible,false);assert.equal(royal({permit:'nope'}).eligible,false);
+ assert.equal(jeff({permit:'downey'}).eligible,false);assert.equal(jeff({permit:'nope'}).eligible,false);
  // It only opens the gate of the structure it covers.
- assert.equal(gateState(context,night,[],{permit:'royal'}).find(g=>g.id==='watt').eligible,false);
+ assert.equal(gateState(context,night,[],{permit:'jefferson'}).find(g=>g.id==='watt').eligible,false);
 });
 test('on weekends a permit for any structure is valid at every structure; not on weekdays',()=>{
- const sat=parseTime('2026-11-14T20:00:00');     // Saturday evening: Jefferson and Royal gates are closed to the public
+ const sat=parseTime('2026-11-14T20:00:00');     // Saturday evening: the Jefferson gate is closed to the public
  const state=c=>Object.fromEntries(parkingState(context,sat,[],c).map(p=>[p.id,p.eligible]));
- assert.equal(state({}).jefferson,false);assert.equal(state({}).royal,false);
+ assert.equal(state({}).jefferson,false);
  const withPermit=state({permit:'downey'});
  for(const id of ['downey','jefferson','royal','mccarthy','figueroa'])assert.equal(withPermit[id],true,id);
  const weekday=parseTime('2026-11-16T22:00:00');
- assert.equal(parkingState(context,weekday,[],{permit:'downey'}).find(p=>p.id==='royal').eligible,false);
+ assert.equal(parkingState(context,weekday,[],{permit:'downey'}).find(p=>p.id==='jefferson').eligible,false);
 });
 test('a permit also covers game-day restrictions, but never a staff-confirmed gate closure',()=>{
  const game=parseTime('2026-11-21T10:00:00');    // home game (a Saturday)
- assert.equal(parkingState(context,game,[],{}).find(p=>p.id==='royal').eligible,false);
- assert.equal(parkingState(context,game,[],{permit:'royal'}).find(p=>p.id==='royal').eligible,true);
- const rule={id:'r1',kind:'gate',gate:'royal',modes:['driving'],starts_ms:game-3600000,ends_ms:game+3600000,note:'Closed for the game'};
- const shut=parkingState(context,game,[rule],{permit:'royal'}).find(p=>p.id==='royal');
+ assert.equal(parkingState(context,game,[],{}).find(p=>p.id==='jefferson').eligible,false);
+ assert.equal(parkingState(context,game,[],{permit:'jefferson'}).find(p=>p.id==='jefferson').eligible,true);
+ const rule={id:'r1',kind:'gate',gate:'jefferson-blvd',modes:['driving'],starts_ms:game-3600000,ends_ms:game+3600000,note:'Closed for the game'};
+ const shut=parkingState(context,game,[rule],{permit:'jefferson'}).find(p=>p.id==='jefferson');
  assert.equal(shut.eligible,false);assert.match(shut.reason,/staff/i);
- assert.equal(gateState(context,game,[rule],{permit:'royal'}).find(g=>g.id==='royal').eligible,false);
+ assert.equal(gateState(context,game,[rule],{permit:'jefferson'}).find(g=>g.id==='jefferson-blvd').eligible,false);
+});
+test('Royal, Downey and Lot 2 can be reached through any of the connected campus entrances',()=>{
+ const night=parseTime('2026-11-16T22:00:00');   // Royal's own gate is closed; McClintock is open 24 hours
+ const royal=parkingState(context,night,[],{}).find(p=>p.id==='royal');
+ assert.equal(royal.eligible,true);assert.equal(royal.gate,'mcclintock');
+ assert.deepEqual(royal.access.map(a=>a.gate).sort(),['downey-way','mcclintock','royal','watt']);
+ for(const id of ['jefferson','mccarthy'])assert.equal(parkingState(context,night,[],{}).find(p=>p.id===id).access.length,1,id);
 });
 test('a driving route uses the permit, and an unknown permit is rejected',async()=>{
  const sat=parseTime('2026-11-14T20:00:00'),request={...body,parking:'jefferson'};
