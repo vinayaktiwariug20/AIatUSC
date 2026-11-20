@@ -35,7 +35,7 @@ export async function hashKey(k) {
 
 /** The staff member this key belongs to, or null. Never throws (no table yet = no staff). */
 export async function findStaff(db, supplied, now = Date.now()) {
-  if (!db || normalizeKey(supplied).length < 20) return null;
+  if (!db || normalizeKey(supplied).length < 16) return null;   // the shortest key checkOwnKey accepts
   try {
     const row = await db.prepare('SELECT id, name, last_used_ms FROM staff_keys WHERE key_hash=? AND revoked_ms IS NULL').bind(await hashKey(supplied)).first();
     if (!row) return null;
