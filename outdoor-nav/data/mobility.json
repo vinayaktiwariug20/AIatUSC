@@ -132,6 +132,22 @@
       "game_access": "unconfirmed",
       "address": "3701 Flower St",
       "note": "USC ID only, 24 hours (USCard required). Entrances and doors from Google Maps / Street View, not yet checked on site."
+    },
+    {
+      "id": "shrine",
+      "name": "USC Shrine Parking Structure",
+      "gate": "shrine",
+      "entrance": "SHRINE.veh.main",
+      "exit": "SHRINE.ped.main",
+      "access": [
+        {
+          "gate": "shrine",
+          "entrance": "SHRINE.veh.main"
+        }
+      ],
+      "game_access": "unconfirmed",
+      "address": "686 W 32nd St (across Jefferson Blvd from campus)",
+      "note": "Across the street from campus; Shrine Auditorium events can raise the price. Car entrance from a Google Maps pin, the pedestrian door placed a few metres east of it; not yet checked on site. After hours, USC ID at the Jefferson entrance (645 W Jefferson Blvd), which is not mapped yet."
     }
   ]
 }

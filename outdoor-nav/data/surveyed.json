@@ -272,6 +272,8 @@
    "structure": "LOT_V",
    "also_pedestrian": true
   },
+  {"id": "SHRINE.veh.main", "kind": "vehicle_entrance", "lat": 34.0239653, "lon": -118.2801785, "name": "car entrance/exit", "structure": "SHRINE", "source": "Google Maps pin by the team (2026-11-19); not yet checked on site"},
+  {"id": "SHRINE.ped.main", "kind": "pedestrian_exit", "lat": 34.0239653, "lon": -118.280146, "name": "pedestrian entrance/exit, a few metres east of the car entrance", "structure": "SHRINE", "source": "Google Maps pin by the team (2026-11-19); not yet checked on site; placed about 3 m east of the car entrance"},
   {"id": "FLOWER.veh.flower", "kind": "vehicle_entrance", "lat": 34.0174924, "lon": -118.2814925, "name": "car entrance/exit on Flower St side", "structure": "FLOWER", "source": "Google Maps / Street View (team, 2026-11-17); not yet checked on site"},
   {"id": "FLOWER.veh.west", "kind": "vehicle_entrance", "lat": 34.0174374, "lon": -118.2822184, "name": "car entrance/exit, west (37th Pl side)", "structure": "FLOWER", "source": "Google Maps / Street View (team, 2026-11-17); not yet checked on site"},
   {"id": "FLOWER.ped.double", "kind": "pedestrian_exit", "lat": 34.0180407, "lon": -118.2822851, "name": "double doors", "structure": "FLOWER", "street": "W 37th St", "source": "Google Maps / Street View (team, 2026-11-17); not yet checked on site"},
