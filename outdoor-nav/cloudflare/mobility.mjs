@@ -182,12 +182,13 @@ export function gateState(context,when,rules=[],credentials={}) {
 }
 // A structure can have several ways in: (gate, entrance, campus leg). Downey is
 // reached through McClintock or through the Downey Way gate on Vermont.
+// An access option may be usable only in some windows (e.g. Shrine's 32nd St entrance, weekdays 6-6).
 export const accessOptions=p=>Array.isArray(p.access)&&p.access.length?p.access:[{gate:p.gate,entrance:p.entrance,campus_via:p.campus_via}];
 export function parkingState(context,when,rules=[],credentials={}) {
   const gates=gateState(context,when,rules,credentials),football=footballContext(context.footballData,when);
   return context.mobilityData.parking.map(p=>{
     const node=id=>context.survey.nodes.find(n=>n.id===id),exit=node(p.exit);
-    const access=accessOptions(p).map(o=>{const g=gates.find(x=>x.id===o.gate);return {gate:o.gate,gate_name:g?.name,eligible:!!g?.eligible,entrance:node(o.entrance),campus_via:o.campus_via||[]};});
+    const access=accessOptions(p).map(o=>{const g=gates.find(x=>x.id===o.gate);return {gate:o.gate,gate_name:g?.name,eligible:!!g?.eligible&&(!o.windows||o.windows.some(w=>inWindow(w,when))),entrance:node(o.entrance),campus_via:o.campus_via||[]};});
     // The structure is open if ANY way in is; show the first open one.
     const primary=access.find(o=>o.eligible&&o.entrance)||access[0],gate=gates.find(x=>x.id===primary.gate),entrance=primary.entrance;
     const permit=permitCovers(context,credentials,p,gate?.vehicle.column);
@@ -247,6 +248,10 @@ export function intersectsPolygon(coords,polygon) {
 // evenings and weekends no driving route survived. A closed campus gate must stop
 // you entering campus through it, not driving past it.
 export const GATE_AVOID_RADIUS_M=12;
+// Where a closed gate's no-go circle goes. Usually the pin; a gate pinned close to a public
+// street (Royal, 12 m from Jefferson) has an `area` point a little way into campus, so its
+// circle never closes the street outside it.
+export const gateArea=g=>Array.isArray(g.area)?{lat:g.area[0],lon:g.area[1]}:{lat:g.lat,lon:g.lon};
 const knownGate=g=>g.lat!==undefined&&g.location_source!=='approximate_intersection';
 export function avoidance(context,when,end,rules,credentials={}) {
   const until=Math.max(when+1,end),gates=gateState(context,when,rules,credentials),laterGates=gateState(context,until,rules,credentials),areas=[];
@@ -255,7 +260,7 @@ export function avoidance(context,when,end,rules,credentials={}) {
     // Check both trip ends and all intervening staff restrictions, conservatively.
     const later=laterGates.find(g=>g.id===gate.id);
     if(!gate.eligible||!later.eligible||rules.some(r=>r.kind==='gate'&&r.gate===gate.id&&forCars(r)&&overlaps(when,until,r.starts_ms,r.ends_ms)))
-      areas.push({id:'gate:'+gate.id,name:gate.name,basis:gate.basis,geometry:circlePolygon(gate.lat,gate.lon,GATE_AVOID_RADIUS_M)});
+      areas.push({id:'gate:'+gate.id,name:gate.name,basis:gate.basis,geometry:circlePolygon(gateArea(gate).lat,gateArea(gate).lon,GATE_AVOID_RADIUS_M)});
   }
   for(const rule of rules) if(rule.kind==='road'&&forCars(rule)&&overlaps(when,until,rule.starts_ms,rule.ends_ms))
     areas.push({id:rule.id,name:rule.note||'Staff road closure',basis:'staff_confirmed',geometry:rule.geometry});
@@ -520,7 +525,7 @@ export function walkingRuleClosures(context,rules,when) {
     if(!ruleModes(r).includes('walking')||!(r.starts_ms<=when&&when<r.ends_ms))continue;
     const base={id:'rule:'+r.id,status:'approved',source:'official',modes:['walking'],note:r.note,ends:r.ends};
     if(r.kind==='road'&&r.geometry)out.push({...base,polygon:r.geometry.coordinates[0]});
-    else if(r.kind==='gate'){const g=context.mobilityData.gates.find(x=>x.id===r.gate);if(g&&g.lat!==undefined)out.push({...base,lat:g.lat,lon:g.lon,radius_m:GATE_WALK_RADIUS_M});}
+    else if(r.kind==='gate'){const g=context.mobilityData.gates.find(x=>x.id===r.gate);if(g&&g.lat!==undefined)out.push({...base,...gateArea(g),radius_m:GATE_WALK_RADIUS_M});}
   }
   return out;
 }
@@ -542,13 +547,13 @@ export function softGates(context,when,rules,first,reroute){
   const staffClosed=new Set(rules.filter(r=>r.kind==='gate'&&ruleModes(r).includes('walking')&&r.starts_ms<=when&&when<r.ends_ms).map(r=>r.gate));
   const pin=id=>context.mobilityData.gates.find(g=>g.id===id&&knownGate(g));
   const scheduled=status.filter(g=>['closed','varies'].includes(g.pedestrian?.status)&&pin(g.id)&&!staffClosed.has(g.id));
-  const crossed=scheduled.filter(g=>{const p=pin(g.id);return nearLine(first,p.lat,p.lon,GATE_WALK_RADIUS_M);});
+  const crossed=scheduled.filter(g=>{const p=gateArea(pin(g.id));return nearLine(first,p.lat,p.lon,GATE_WALK_RADIUS_M);});
   if(!crossed.length)return {route:first,notes:[]};
   const limit=crossed.some(g=>g.pedestrian.status==='closed')?(night?SOFT_GATE.night_min:SOFT_GATE.day_min):SOFT_GATE.varies_min;
   const ids=new Set(crossed.map(g=>'schedule:'+g.id));
   const names=crossed.map(g=>g.name).join(' and ');
   let alt=null;
-  try{alt=reroute(crossed.map(g=>{const p=pin(g.id);return {id:'schedule:'+g.id,lat:p.lat,lon:p.lon,radius_m:GATE_WALK_RADIUS_M,status:'approved',modes:['walking'],note:g.name+' (scheduled closed on foot)'};}));}catch{}
+  try{alt=reroute(crossed.map(g=>{const p=gateArea(pin(g.id));return {id:'schedule:'+g.id,lat:p.lat,lon:p.lon,radius_m:GATE_WALK_RADIUS_M,status:'approved',modes:['walking'],note:g.name+' (scheduled closed on foot)'};}));}catch{}
   const extra=alt?Math.round((alt.summary.minutes-first.summary.minutes)*10)/10:null;
   if(alt&&extra<=limit){
     alt.summary.avoided=alt.summary.avoided.filter(a=>!ids.has(a.closure?.id??a.closure));
