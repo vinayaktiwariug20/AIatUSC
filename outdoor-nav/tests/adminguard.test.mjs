@@ -42,12 +42,13 @@ test('the page resending the same typo never locks anyone out', async () => {
   assert.equal(await call(env, '/api/stats', {token: TOKEN}), 200);
 });
 
-test('the lock ends when the window does, and nothing readable about the connection is stored', async () => {
+test('the lock ends one full window after the guessing, and nothing readable about the connection is stored', async () => {
   const db = new D1(), env = {ADMIN_TOKEN: TOKEN}, now = Date.UTC(2026, 10, 21, 18, 0, 0);
   const req = token => new Request('https://x.test/api/stats', {headers: {'X-Admin-Token': token, 'CF-Connecting-IP': '203.0.113.5'}});
   for (let i = 0; i < ADMIN_GUARD.max_wrong; i++) assert.equal(await adminGuard(req('g' + i), env, db, now), null);
   assert.match(await adminGuard(req(TOKEN), env, db, now), /Too many wrong admin tokens/);
-  assert.equal(await adminGuard(req(TOKEN), env, db, now + ADMIN_GUARD.window_ms), null);
+  assert.match(await adminGuard(req(TOKEN), env, db, now + ADMIN_GUARD.window_ms), /Too many/);   // the next window still counts them
+  assert.equal(await adminGuard(req(TOKEN), env, db, now + 2 * ADMIN_GUARD.window_ms), null);
   const slots = db.db.prepare('SELECT slot FROM routing_usage').all().map(r => r.slot).join(' ');
   assert.ok(!slots.includes('203.0.113.5') && !slots.includes('g1'));
 });
@@ -57,4 +58,11 @@ test('without the usage table, or without a token header, the guard stays out of
   for (let i = 0; i < 15; i++) await adminGuard(new Request('https://x.test/', {headers: {'X-Admin-Token': 'g' + i}}), env, env.DB);
   assert.equal(await adminGuard(new Request('https://x.test/', {headers: {'X-Admin-Token': TOKEN}}), env, env.DB), null);
   assert.equal(await adminGuard(new Request('https://x.test/'), {DB: new D1(), ADMIN_TOKEN: TOKEN}, new D1()), null);
+});
+
+test('guesses on both sides of a window boundary still add up', async () => {
+  const db = new D1(), env = {ADMIN_TOKEN: TOKEN}, edge = Math.ceil(Date.UTC(2026, 10, 21, 18) / ADMIN_GUARD.window_ms) * ADMIN_GUARD.window_ms;
+  const req = token => new Request('https://x.test/api/stats', {headers: {'X-Admin-Token': token, 'CF-Connecting-IP': '203.0.113.5'}});
+  for (let i = 0; i < ADMIN_GUARD.max_wrong; i++) await adminGuard(req('g' + i), env, db, i < 5 ? edge - 1000 : edge + 1000);
+  assert.match(await adminGuard(req(TOKEN), env, db, edge + 2000), /Too many wrong admin tokens/);
 });
