@@ -185,7 +185,7 @@
       "exit": "ROYAL.ped.jefferson",
       "game_access": "parking_pass",
       "address": "Jefferson Blvd / Royal St",
-      "note": "Game-day prepaid parking may be sold through ParkWhiz. A parking pass does not override a closed gate.",
+      "note": "Game-day prepaid parking may be sold through ParkWhiz. A parking pass does not override a closed gate. Open at night by way of the McClintock entrance; the Royal St. gate itself closes to the public at 8 pm (team, 2026-11-19).",
       "published_rates": [
         {
           "option": "daily",
@@ -259,7 +259,7 @@
       "entrance": "FIGUEROA.veh.hotel",
       "exit": "FIGUEROA.veh.hotel",
       "game_access": "unconfirmed",
-      "address": "USC Hotel / Figueroa St",
+      "address": "USC Hotel / Figueroa St (across Figueroa from campus)",
       "note": "Surveyed shared vehicle/pedestrian entrance. Game-day visitor access is unconfirmed.",
       "published_rates": [
         {
