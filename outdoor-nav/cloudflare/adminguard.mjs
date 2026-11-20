@@ -1,6 +1,8 @@
 // Slows down guessing the admin token. The code is public, so the token's strength
 // is the only protection: after too many *different* wrong tokens from one address
-// in 15 minutes, admin requests from there are refused until the window ends.
+// in the current and previous 15-minute windows, admin requests from there are refused
+// (for 15 to 30 minutes). Counting the previous window too means guesses timed around a
+// window boundary still add up.
 // Repeating the same typo counts once, so a staff member who mistyped isn't locked
 // out by the page resending it. The address is stored only as a salted hash, for
 // up to 30 minutes, in the existing routing_usage table (expired rows are swept).
@@ -20,9 +22,9 @@ export async function adminGuard(request, env, db, now = Date.now(), isKnown = n
   try {
     const {window_ms, max_wrong} = ADMIN_GUARD, w = Math.floor(now / window_ms), expires = now + window_ms * 2;
     const who = await hash(token + '|' + (request.headers.get('CF-Connecting-IP') || 'unknown'));
-    const counter = 'adminfail:' + who + ':' + w;
-    const wrong = await db.prepare('SELECT count FROM routing_usage WHERE slot=?').bind(counter).first('count') || 0;
-    if (wrong >= max_wrong) return 'Too many wrong admin tokens from this connection. Try again in 15 minutes.';
+    const counter = 'adminfail:' + who + ':' + w, slot = n => db.prepare('SELECT count FROM routing_usage WHERE slot=?').bind('adminfail:' + who + ':' + n).first('count');
+    const wrong = (await slot(w) || 0) + (await slot(w - 1) || 0);
+    if (wrong >= max_wrong) return 'Too many wrong admin tokens from this connection. Try again in 30 minutes.';
     if (supplied === token) return null;
     if (isKnown && await isKnown(supplied)) return null;
     const guess = 'adminguess:' + who + ':' + await hash(token + '|' + supplied) + ':' + w;
