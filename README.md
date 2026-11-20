@@ -4,6 +4,8 @@ USC event wayfinding: to the right door, then to the room. (Repository: AIatUSC.
 
 Campus walking routes and gate-aware driving to surveyed USC parking entrances, deployed with Cloudflare Workers and D1. Node.js 24 LTS is recommended.
 
+**Looking after Doorstep?** Start with [DEVELOPER.md](DEVELOPER.md). Staff help is at `/staff-guide/` on the site.
+
 Read [UPDATE_EN.md](UPDATE_EN.md) to update an existing deployment (`git pull`, then the new D1 migration). A full setup guide is in [CLOUDFLARE_EN.md](CLOUDFLARE_EN.md).
 
 ```bash
