@@ -31,7 +31,7 @@ export function collectFacts(context, when, {closures = [], answers = [], rules 
   for (const g of gateState(context, when, rules)) {
     const v = g.vehicle || {}, ped = g.pedestrian || {};
     add('gate:' + g.id,
-      `${g.name}${g.where ? ' (' + g.where + ')' : ''}: vehicle access is ${v.status || 'unknown'}${v.until ? ' until ' + v.until : ''}`
+      `${g.name}${g.where ? ' (' + g.where + ')' : ''}: ${g.pedestrian_only ? 'a gate for people on foot only, not cars' : 'vehicle access is ' + (v.status || 'unknown') + (v.until ? ' until ' + v.until : '')}`
       + `${v.reason ? ' (' + v.reason + ')' : ''}. On foot: ${ped.status === 'open' ? 'open' + (ped.until ? ' until ' + ped.until : '') + (ped.observed ? ' (observed ' + ped.observed + ')' : '') : ped.status === 'closed' ? 'scheduled closed (it may be locked)' : ped.status === 'varies' ? 'may be closed right now (' + (ped.note || 'opening or closing time varies') + ')' : 'not stated by the source'}.`,
       g.basis === 'staff_confirmed' ? 'staff closure' : 'USC Transportation entrance hours');
   }

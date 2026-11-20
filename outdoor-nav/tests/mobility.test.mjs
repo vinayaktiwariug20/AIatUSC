@@ -171,7 +171,10 @@ test('closed gates with approximate pins do not close public streets; surveyed g
  const ids=areas.map(a=>a.id);
  assert.ok(ids.includes('gate:watt'),ids);                                  // surveyed, closed on weekends
  assert.ok(ids.includes('gate:downey-way'),ids);                            // pinned on 36th Pl, closed to cars on weekends
- for(const approx of ['gate:royal','gate:jefferson-blvd'])assert.ok(!ids.includes(approx),approx);
+ assert.ok(!ids.includes('gate:jefferson-blvd'));                         // approximate pin
+ // Royal is pinned 12 m from Jefferson: its circle sits inside campus and stays clear of the street.
+ const royal=areas.find(a=>a.id==='gate:royal');assert.ok(royal);
+ for(const [lon,lat] of royal.geometry.coordinates[0])assert.ok(lat<34.02285,'circle reaches Jefferson: '+lat);
  const watt=areas.find(a=>a.id==='gate:watt').geometry.coordinates[0][0];   // a ring point
  const r=haversine([watt[1],watt[0]],[34.0184081,-118.2889172]);assert.ok(r<=GATE_AVOID_RADIUS_M+1,r);
 });
@@ -198,7 +201,7 @@ test('rule modes: default cars; walking needs a surveyed gate pin; bad modes rej
  assert.deepEqual(validateRule(base,context).modes,['driving']);
  assert.deepEqual(validateRule({...base,modes:['walking','driving']},context).modes,['walking','driving']);
  assert.throws(()=>validateRule({...base,modes:['flying']},context),/Closed to/);
- assert.throws(()=>validateRule({...base,gate:'royal',modes:['walking']},context),/approximate/);
+ assert.throws(()=>validateRule({...base,gate:'jefferson-blvd',modes:['walking']},context),/approximate/);
  assert.deepEqual(validateRule({...base,gate:'downey-way',modes:['walking']},context).modes,['walking']);   // now pinned
 });
 test('a walking-only gate closure leaves car access alone; a cars-only one leaves walking alone',()=>{
@@ -298,4 +301,18 @@ test('the faster way in is chosen door to door (drive + walk), not by drive time
  const out=await drivingRoute(context,west,parseTime('2026-11-16T21:00'),[],[],env(),provider().fn);
  assert.equal(out.ok,true);
  if(out.summary.provider_requests>1)assert.equal(out.summary.parking.id,'downey',JSON.stringify(out.summary.parking.id));
+});
+test("Shrine: the 32nd St entrance on weekdays 6-6, the Jefferson entrance (USC ID) otherwise",()=>{
+ const at=(t,c={})=>parkingState(context,parseTime(t),[],c).find(p=>p.id==='shrine');
+ assert.equal(at('2026-11-16T10:00:00').entrance.id,'SHRINE.veh.main');
+ assert.equal(at('2026-11-16T20:00:00').eligible,false);                    // after hours, no ID
+ assert.equal(at('2026-11-16T20:00:00',{usc_id:true}).entrance.id,'SHRINE.veh.jefferson');
+ assert.equal(at('2026-11-14T12:00:00',{usc_id:true}).entrance.id,'SHRINE.veh.jefferson');   // Saturday
+});
+test('the DCC-PSD gate is for people on foot: pedestrian hours, never a no-drive area',()=>{
+ const sat=parseTime('2026-11-14T12:00:00'),wed=parseTime('2026-11-18T12:00:00');
+ const g=t=>gateState(context,t,[],{}).find(x=>x.id==='dcc-psd');
+ assert.equal(g(wed).pedestrian.status,'open');assert.equal(g(sat).pedestrian.status,'closed');
+ assert.equal(g(wed).pedestrian_only,true);
+ assert.ok(!avoidance(context,sat,sat+1800000,[],{}).some(a=>a.id==='gate:dcc-psd'));
 });

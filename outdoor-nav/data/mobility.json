@@ -21,15 +21,21 @@
     },
     {
       "id": "mccarthy-way",
-      "lat": 34.0206,
-      "lon": -118.28145,
-      "location_source": "approximate_intersection"
+      "lat": 34.0205173,
+      "lon": -118.2812467,
+      "location_source": "team_pin",
+      "location_note": "Pinned by the team (2026-11-20)."
     },
     {
       "id": "royal",
-      "lat": 34.02257,
-      "lon": -118.28199,
-      "location_source": "approximate_intersection"
+      "lat": 34.0228204,
+      "lon": -118.2824145,
+      "location_source": "team_pin",
+      "location_note": "Pinned by the team (2026-11-20). The pin is about 12 m from Jefferson Blvd, so the closed-gate area sits 10 m south of it, inside campus, and never closes Jefferson.",
+      "area": [
+        34.02273,
+        -118.2824145
+      ]
     },
     {
       "id": "downey-way",
@@ -43,6 +49,14 @@
       "lat": 34.02488,
       "lon": -118.29026,
       "location_source": "approximate_intersection"
+    },
+    {
+      "id": "dcc-psd",
+      "lat": 34.0212404,
+      "lon": -118.2806405,
+      "location_source": "team_pin",
+      "pedestrian_only": true,
+      "location_note": "Pinned by the team (2026-11-20): the gate onto 34th St. A gate for people on foot; it never limits cars."
     }
   ],
   "parking_source": "Supplied data/surveyed.json (vehicle entrances and pedestrian exits); gate eligibility from USC Transportation. No occupancy feed.",
@@ -311,12 +325,29 @@
       "access": [
         {
           "gate": "shrine",
-          "entrance": "SHRINE.veh.main"
+          "entrance": "SHRINE.veh.main",
+          "windows": [
+            {
+              "days": [
+                "Mon",
+                "Tue",
+                "Wed",
+                "Thu",
+                "Fri"
+              ],
+              "from": "06:00",
+              "to": "18:00"
+            }
+          ]
+        },
+        {
+          "gate": "shrine",
+          "entrance": "SHRINE.veh.jefferson"
         }
       ],
       "game_access": "unconfirmed",
       "address": "686 W 32nd St (across Jefferson Blvd from campus)",
-      "note": "Across the street from campus; Shrine Auditorium events can raise the price. Car entrance from a Google Maps pin, the pedestrian door placed a few metres east of it; not yet checked on site. After hours, USC ID at the Jefferson entrance (645 W Jefferson Blvd), which is not mapped yet.",
+      "note": "Across the street from campus; Shrine Auditorium events can raise the price. Entrances from Google Maps pins, the pedestrian door placed a few metres east of the 32nd St entrance; not yet checked on site. Weekdays 6 am-6 pm by 32nd St; otherwise USC ID at the Jefferson Blvd entrance (assumed: the 32nd St entrance is not used after hours).",
       "published_rates": [
         {
           "option": "hourly",
