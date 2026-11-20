@@ -38,3 +38,11 @@ test('surveyed doors carry their photo for the arrival card', async () => {
   const r = await walk('Student Union', TROUSDALE, true);
   assert.equal(r.handoff.photo, '/doors/su-ramp.jpg');
 });
+
+test('DMC: the nearest surveyed door from each side; the east breezeway starts the indoor map at its right breezeway', async () => {
+  for (const [from, door, indoor] of [[{lat: 34.0222, lon: -118.2845}, 'jmc-main', 'entrance'], [{lat: 34.0210, lon: -118.2826}, 'dmc-breezeway-east', 'breezeway-right'],
+    [{lat: 34.0212, lon: -118.2852}, 'dmc-west', null], [{lat: 34.0200, lon: -118.2844}, 'dmc-southeast', null]]) {
+    const r = await walk('DMC', from);
+    assert.equal(r.handoff.entrance_id, door); assert.equal(r.handoff.indoor_node, indoor);
+  }
+});
