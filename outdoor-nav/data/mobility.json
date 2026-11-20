@@ -343,5 +343,6 @@
     "url": "https://transnet.usc.edu/wp-content/uploads/2026/06/Hourly-and-All-Day-Parking-Availability-FY27.pdf",
     "checked": "2026-11-19",
     "note": "Hourly: up to 4 hours unless noted; 5+ hours are charged the $20 daily rate (shown as the daily max). Text2Park adds a one-time $0.50 fee; pay stations have none. Space-available; event and game-day rates differ (staff post those)."
-  }
+  },
+  "campus_roads_note": "Campus roads (team, 2026-11-19): the McClintock, Downey Way and Watt Way entrances connect by car, so a structure reached from one can be reached from the others (Downey structure, Lot 2). The Jefferson Blvd. and McCarthy Way entrances do NOT connect to the rest of campus by car: they serve only the Jefferson and McCarthy structures. Don't add them as access options elsewhere."
 }
