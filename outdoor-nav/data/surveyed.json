@@ -272,6 +272,7 @@
    "structure": "LOT_V",
    "also_pedestrian": true
   },
+  {"id": "LOTV.veh.main", "kind": "vehicle_entrance", "lat": 34.0244441, "lon": -118.2859463, "name": "car entrance/exit on Jefferson Blvd", "structure": "LOTV", "source": "Pin by the team (2026-11-20); an open lot, people walk out almost anywhere"},
   {"id": "LOT2.veh.main", "kind": "vehicle_entrance", "lat": 34.0207052, "lon": -118.2883361, "name": "car entrance/exit", "structure": "LOT2", "source": "Google Maps pins by the team (2026-11-19); not yet checked on site"},
   {"id": "LOT2.ped.east", "kind": "pedestrian_exit", "lat": 34.021055, "lon": -118.2881229, "name": "walkway, east side", "structure": "LOT2", "source": "Google Maps pins by the team (2026-11-19); not yet checked on site; an open lot, people walk out almost anywhere"},
   {"id": "LOT2.ped.north", "kind": "pedestrian_exit", "lat": 34.0211465, "lon": -118.2885225, "name": "walkway, north side", "structure": "LOT2", "source": "Google Maps pins by the team (2026-11-19); not yet checked on site; an open lot, people walk out almost anywhere"},
