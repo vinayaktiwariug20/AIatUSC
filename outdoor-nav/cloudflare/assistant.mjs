@@ -44,7 +44,9 @@ export function collectFacts(context, when, {closures = [], answers = [], rules 
     add('parking:' + p.id, `${p.name}${p.address ? ' (' + p.address + ')' : ''}: ${p.eligible ? 'can be driven into now' : 'not recommended now: ' + p.reason}`
       + ` Vehicle entrance via ${p.gate_name || p.gate}. ${p.note || ''} Spaces are not guaranteed.`, 'Doorstep parking data');
     if (p.rates.length)
-      add('rate:' + p.id, `${p.name} prices now, for visitors without a permit for it: ${p.rates.map(rateText).join('; ')}. Posted by staff, updated ${p.rates[0].updated.slice(0, 10)}.`, 'staff parking rates');
+      add('rate:' + p.id, `${p.name} prices now, for visitors without a permit for it: ${p.rates.map(rateText).join('; ')}.`
+        + (p.rates.some(r => r.source === 'staff') ? ` Staff update ${p.rates.find(r => r.source === 'staff').updated.slice(0, 10)}.` : ' Space-available; event prices can differ.'),
+        p.rates.some(r => r.source === 'staff') ? 'staff parking rates' : context.mobilityData.rates_source.name);
   }
   for (const c of closures) {
     if (c.status === 'approved')
