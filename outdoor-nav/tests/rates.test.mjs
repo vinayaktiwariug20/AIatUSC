@@ -122,3 +122,13 @@ test('a staff Free rate replaces the published prices', async () => {
   await post(env, {parking: 'figueroa', option: 'free', note: 'open house', starts: '2026-11-21T00:00', ends: '2026-11-22T00:00'});
   assert.deepEqual((await structure(env, '2026-11-21T12:00', 'figueroa')).rates.map(rateText), ['Free · open house']);
 });
+
+test('Lot V: public, weekdays until 8 pm, $5/hour up to 4 hours; the dental note points to Shrine', async () => {
+  const env = {DB: new D1(), ADMIN_TOKEN: 'staff'};
+  const tue = await structure(env, '2026-11-17T10:00', 'lotv');
+  assert.equal(tue.eligible, true);
+  assert.deepEqual(tue.rates.map(rateText), ['$5/hour (max $20/day) · pay by Text2Park (+$0.50 fee) · up to 4 hours; longer stays are charged the $20 daily rate']);
+  assert.match(tue.note, /Shrine/);
+  assert.equal((await structure(env, '2026-11-17T21:00', 'lotv')).eligible, false);
+  assert.equal((await structure(env, '2026-11-21T10:00', 'lotv')).eligible, false);   // Saturday
+});

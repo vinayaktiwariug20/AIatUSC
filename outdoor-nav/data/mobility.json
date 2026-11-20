@@ -347,7 +347,7 @@
       ],
       "game_access": "unconfirmed",
       "address": "686 W 32nd St (across Jefferson Blvd from campus)",
-      "note": "Across the street from campus; Shrine Auditorium events can raise the price. Entrances from Google Maps pins, the pedestrian door placed a few metres east of the 32nd St entrance; not yet checked on site. Weekdays 6 am-6 pm by 32nd St; otherwise USC ID at the Jefferson Blvd entrance (assumed: the 32nd St entrance is not used after hours).",
+      "note": "Across the street from campus; Shrine Auditorium events can raise the price. Entrances from Google Maps pins, the pedestrian door placed a few metres east of the 32nd St entrance; not yet checked on site. Weekdays 6 am-6 pm by 32nd St; otherwise USC ID at the Jefferson Blvd entrance (assumed: the 32nd St entrance is not used after hours). Dental patients sent on from a full Lot V can use their dental parking code here (USC Transportation, 2026-11-20).",
       "published_rates": [
         {
           "option": "hourly",
@@ -391,6 +391,32 @@
           "pay": "text2park",
           "note": "2 hours max",
           "_source": "Sign seen by the team 2026-11-19 ($5/hour, 2 hours max); USC Transportation listed Lot 2 at $5/hour from July 1, 2026"
+        }
+      ]
+    },
+    {
+      "id": "lotv",
+      "name": "Lot V",
+      "gate": "lot-v",
+      "entrance": "LOTV.veh.main",
+      "exit": "LOTV.veh.main",
+      "access": [
+        {
+          "gate": "lot-v",
+          "entrance": "LOTV.veh.main"
+        }
+      ],
+      "game_access": "unconfirmed",
+      "address": "Jefferson Blvd, next to the dental school (Norris Dental Science Center)",
+      "note": "Public lot (USC Transportation, 2026-11-20), not owned by the dental school. Dental patients: if Lot V is full, park at the USC Shrine structure; the dental parking code is valid there.",
+      "published_rates": [
+        {
+          "option": "hourly",
+          "price": 5,
+          "max": 20,
+          "pay": "text2park",
+          "note": "up to 4 hours; longer stays are charged the $20 daily rate",
+          "_source": "USC Transportation FY27 table (high-demand lots: up to 4 hours, 5+ hours charged $20) with the $5/hour rate from July 1, 2026 announced for Lots V and 2; 4-hour limit confirmed by a supervisor 2026-11-20"
         }
       ]
     }
