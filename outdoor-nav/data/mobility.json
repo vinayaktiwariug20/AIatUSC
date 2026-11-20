@@ -74,6 +74,10 @@
         {
           "gate": "watt",
           "entrance": "DOWNEY.veh.mcclintock"
+        },
+        {
+          "gate": "royal",
+          "entrance": "DOWNEY.veh.mcclintock"
         }
       ],
       "published_rates": [
@@ -181,7 +185,7 @@
       "exit": "ROYAL.ped.jefferson",
       "game_access": "parking_pass",
       "address": "Jefferson Blvd / Royal St",
-      "note": "Game-day prepaid parking may be sold through ParkWhiz. A parking pass does not override a closed gate.",
+      "note": "Game-day prepaid parking may be sold through ParkWhiz. A parking pass does not override a closed gate. Open at night by way of the McClintock entrance; the Royal St. gate itself closes to the public at 8 pm (team, 2026-11-19).",
       "published_rates": [
         {
           "option": "daily",
@@ -204,6 +208,24 @@
             }
           ],
           "note": "weekends only"
+        }
+      ],
+      "access": [
+        {
+          "gate": "royal",
+          "entrance": "ROYAL.veh.jefferson"
+        },
+        {
+          "gate": "mcclintock",
+          "entrance": "ROYAL.veh.jefferson"
+        },
+        {
+          "gate": "downey-way",
+          "entrance": "ROYAL.veh.jefferson"
+        },
+        {
+          "gate": "watt",
+          "entrance": "ROYAL.veh.jefferson"
         }
       ]
     },
@@ -237,7 +259,7 @@
       "entrance": "FIGUEROA.veh.hotel",
       "exit": "FIGUEROA.veh.hotel",
       "game_access": "unconfirmed",
-      "address": "USC Hotel / Figueroa St",
+      "address": "USC Hotel / Figueroa St (across Figueroa from campus)",
       "note": "Surveyed shared vehicle/pedestrian entrance. Game-day visitor access is unconfirmed.",
       "published_rates": [
         {
@@ -322,6 +344,10 @@
         {
           "gate": "watt",
           "entrance": "LOT2.veh.main"
+        },
+        {
+          "gate": "royal",
+          "entrance": "LOT2.veh.main"
         }
       ],
       "game_access": "unconfirmed",
@@ -344,5 +370,5 @@
     "checked": "2026-11-19",
     "note": "Hourly: up to 4 hours unless noted; 5+ hours are charged the $20 daily rate (shown as the daily max). Text2Park adds a one-time $0.50 fee; pay stations have none. Space-available; event and game-day rates differ (staff post those)."
   },
-  "campus_roads_note": "Campus roads (team, 2026-11-19): the McClintock, Downey Way and Watt Way entrances connect by car, so a structure reached from one can be reached from the others (Downey structure, Lot 2). The Jefferson Blvd. and McCarthy Way entrances do NOT connect to the rest of campus by car: they serve only the Jefferson and McCarthy structures. Don't add them as access options elsewhere."
+  "campus_roads_note": "Campus roads (team, 2026-11-19): the Royal Street, McClintock, Downey Way and Watt Way entrances connect by car on campus roads (e.g. Royal -> 34th St -> McClintock -> Downey Way -> Watt Way), so a structure reached from one can be reached from the others (Royal and Downey structures, Lot 2). The Jefferson Blvd. and McCarthy Way entrances do NOT connect to the rest of campus by car: they serve only the Jefferson and McCarthy structures. Structures entered straight from a public street (Figueroa, Flower, Shrine) use their own entrance; getting between those means leaving campus, which the driving route already handles."
 }
