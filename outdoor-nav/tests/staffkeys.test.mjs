@@ -119,3 +119,12 @@ test('rolling words is admin-only; only a revoked key can be removed', async () 
   assert.equal((await call(env, '/api/staff-keys/' + made.id + '?remove=1', {method: 'DELETE', token: ADMIN})).status, 200);
   assert.deepEqual((await call(env, '/api/staff-keys', {token: ADMIN})).data, []);
 });
+
+test('a chosen key of 4 short words (16-19 letters) signs in: creating and checking agree', async () => {
+  const env = newEnv();
+  const made = await call(env, '/api/staff-keys', {method: 'POST', body: {name: 'Desk', key: 'oak fern kiwi plum'}, token: ADMIN});   // 15 letters: refused
+  assert.equal(made.status, 400);
+  const ok = await call(env, '/api/staff-keys', {method: 'POST', body: {name: 'Desk', key: 'tulip brick dish salon'}, token: ADMIN});  // 19 letters
+  assert.equal(ok.status, 201);
+  assert.equal((await call(env, '/api/whoami', {token: 'tulip brick dish salon'})).data.role, 'staff');
+});
