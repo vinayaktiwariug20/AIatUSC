@@ -256,7 +256,7 @@ const knownGate=g=>g.lat!==undefined&&g.location_source!=='approximate_intersect
 export function avoidance(context,when,end,rules,credentials={}) {
   const until=Math.max(when+1,end),gates=gateState(context,when,rules,credentials),laterGates=gateState(context,until,rules,credentials),areas=[];
   for(const gate of gates) {
-    if(!knownGate(gate)) continue;
+    if(!knownGate(gate)||gate.pedestrian_only) continue;   // a gate for people on foot never closes a road
     // Check both trip ends and all intervening staff restrictions, conservatively.
     const later=laterGates.find(g=>g.id===gate.id);
     if(!gate.eligible||!later.eligible||rules.some(r=>r.kind==='gate'&&r.gate===gate.id&&forCars(r)&&overlaps(when,until,r.starts_ms,r.ends_ms)))

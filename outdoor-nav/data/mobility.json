@@ -49,6 +49,14 @@
       "lat": 34.02488,
       "lon": -118.29026,
       "location_source": "approximate_intersection"
+    },
+    {
+      "id": "dcc-psd",
+      "lat": 34.0212404,
+      "lon": -118.2806405,
+      "location_source": "team_pin",
+      "pedestrian_only": true,
+      "location_note": "Pinned by the team (2026-11-20): the gate onto 34th St. A gate for people on foot; it never limits cars."
     }
   ],
   "parking_source": "Supplied data/surveyed.json (vehicle entrances and pedestrian exits); gate eligibility from USC Transportation. No occupancy feed.",

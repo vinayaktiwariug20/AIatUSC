@@ -243,7 +243,7 @@ async function loadMobility(){
  const fingerprint=JSON.stringify({gates:state.gates.map(g=>[g.id,g.vehicle,g.eligible]),rules:state.rules,rates:state.parking.map(p=>p.rates),game:state.football.game});const changed=mobilityFingerprint!==''&&mobilityFingerprint!==fingerprint;mobilityFingerprint=fingerprint;
  gateLayer.clearLayers();parkingLayer.clearLayers();avoidLayer.clearLayers();
  $('gateModeLabel').textContent=mode==='walking'?'On foot':'Vehicle access';
- $('gates').innerHTML=state.gates.map(g=>{
+ $('gates').innerHTML=state.gates.filter(g=>mode==='walking'||!g.pedestrian_only).map(g=>{   // foot-only gates don't belong in the vehicle list
   const status=g.vehicle.status;
   // Walking tab: what matters is access on foot. Pedestrian hours come from Transportation's
   // gate schedule where we have them; elsewhere "not stated" is shown as such, never as closed.
