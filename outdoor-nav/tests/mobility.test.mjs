@@ -309,10 +309,10 @@ test("Shrine: the 32nd St entrance on weekdays 6-6, the Jefferson entrance (USC 
  assert.equal(at('2026-11-16T20:00:00',{usc_id:true}).entrance.id,'SHRINE.veh.jefferson');
  assert.equal(at('2026-11-14T12:00:00',{usc_id:true}).entrance.id,'SHRINE.veh.jefferson');   // Saturday
 });
-test('the DCC-PSD gate is for people on foot: pedestrian hours, never a no-drive area',()=>{
+test('the DCC-PSD gate: kept locked on foot (seen), never a no-drive area',()=>{
  const sat=parseTime('2026-11-14T12:00:00'),wed=parseTime('2026-11-18T12:00:00');
  const g=t=>gateState(context,t,[],{}).find(x=>x.id==='dcc-psd');
- assert.equal(g(wed).pedestrian.status,'open');assert.equal(g(sat).pedestrian.status,'closed');
+ assert.equal(g(wed).pedestrian.status,'closed');assert.equal(g(wed).pedestrian.locked,true);   // seen locked inside its scheduled hours
  assert.equal(g(wed).pedestrian_only,true);
  assert.ok(!avoidance(context,sat,sat+1800000,[],{}).some(a=>a.id==='gate:dcc-psd'));
 });

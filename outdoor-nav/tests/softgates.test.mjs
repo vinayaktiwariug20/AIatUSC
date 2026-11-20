@@ -54,3 +54,13 @@ test('a staff closure on foot still blocks outright, with no schedule note', asy
   const s = await walk('2026-11-28T12:00:00', env);
   assert.ok(s.minutes > 13); assert.deepEqual(s.gate_notes, []);
 });
+
+test('a gate seen kept locked is avoided even for a long detour', async () => {
+  const {softGates} = await import('../cloudflare/mobility.mjs');
+  const gate = {id: 'x', name: 'X Gate', pedestrian: {status: 'closed', locked: true}};
+  const context = {gateData: {}, time: {gateStatus: () => [gate]}, mobilityData: {gates: [{id: 'x', lat: 34.02, lon: -118.28, location_source: 'team_pin'}]}};
+  const route = minutes => ({summary: {minutes, avoided: []}, features: [{geometry: {type: 'LineString', coordinates: [[-118.2801, 34.02], [-118.2799, 34.02]]}}]});
+  const out = softGates(context, Date.parse('2026-11-19T20:00:00Z'), [], route(5), () => route(25));
+  assert.equal(out.route.summary.minutes, 25);
+  assert.match(out.notes[0].text, /^Avoiding X Gate: kept locked to people on foot \(about 20 extra min\)\.$/);
+});
