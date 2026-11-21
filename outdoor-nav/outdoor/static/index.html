@@ -241,11 +241,14 @@ async function route(fit=true){
 }
 const labels={open:'Scheduled open',closed:'Closed',usc_id:'USC ID required',reservation:'Reservation required'};
 async function loadMobility(){
+// A foot-only gate seen kept locked (DCC-PSD) is no way in for anyone, so it isn't listed or
+// drawn. It stays in gates.json so routes keep avoiding it and Ask Doorstep can explain it.
+const listedGate=g=>!(g.pedestrian_only&&g.pedestrian&&g.pedestrian.locked);
  const state=await api('/api/mobility'+query());mobility=state;
  const fingerprint=JSON.stringify({gates:state.gates.map(g=>[g.id,g.vehicle,g.eligible]),rules:state.rules,rates:state.parking.map(p=>p.rates),game:state.football.game});const changed=mobilityFingerprint!==''&&mobilityFingerprint!==fingerprint;mobilityFingerprint=fingerprint;
  gateLayer.clearLayers();parkingLayer.clearLayers();avoidLayer.clearLayers();
  $('gateModeLabel').textContent=mode==='walking'?'On foot':'Vehicle access';
- $('gates').innerHTML=state.gates.filter(g=>mode==='walking'||!g.pedestrian_only).map(g=>{   // foot-only gates don't belong in the vehicle list
+ $('gates').innerHTML=state.gates.filter(g=>listedGate(g)&&(mode==='walking'||!g.pedestrian_only)).map(g=>{   // foot-only gates don't belong in the vehicle list
   const status=g.vehicle.status;
   // Walking tab: what matters is access on foot. Pedestrian hours come from Transportation's
   // gate schedule where we have them; elsewhere "not stated" is shown as such, never as closed.
@@ -270,7 +273,7 @@ async function loadMobility(){
  $('pkStruct').innerHTML=state.parking.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('');if([...$('pkStruct').options].some(o=>o.value===previousStruct))$('pkStruct').value=previousStruct;
  const previousRate=$('rtStruct').value;$('rtStruct').innerHTML=$('pkStruct').innerHTML;if(previousRate)$('rtStruct').value=previousRate;
  const previousGate=$('ruleGate').value;
- $('ruleGate').innerHTML=state.gates.map(g=>'<option value="'+esc(g.id)+'">'+esc(g.name)+'</option>').join('');if([...$('ruleGate').options].some(o=>o.value===previousGate))$('ruleGate').value=previousGate;
+ $('ruleGate').innerHTML=state.gates.filter(listedGate).map(g=>'<option value="'+esc(g.id)+'">'+esc(g.name)+'</option>').join('');if([...$('ruleGate').options].some(o=>o.value===previousGate))$('ruleGate').value=previousGate;
  const f=state.football;$('football').hidden=!f.game&&f.known_season;
  $('football').innerHTML=f.game?'<strong>Home game · USC vs '+esc(f.game.opponent)+'</strong><br>Kickoff '+esc(f.game.kickoff?.slice(11,16)||'TBD')+' PT. Amber areas are precautionary detours along four nearby roads, not confirmed closures. Check the official red closure lines, traffic arrows and on-site directions. The official page includes older-year guidance, so verify current restrictions. Staff enter confirmed closure times.':!f.known_season?'The football schedule for this year is not registered. Staff must update it before driving routes are available.':'';
  $('sourcesNote').textContent='Sources checked: '+state.checked+' · '+f.season+' schedule snapshot. Verify traffic restriction boundaries on site. Game-day precautions conservatively cover the campus-area portions of the roads named in the official guidance.';
