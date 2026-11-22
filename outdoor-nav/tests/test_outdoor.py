@@ -135,6 +135,20 @@ def test_override_entrance_carries_indoor_node():
     assert r["handoff"]["entrance_id"] == "main"
     assert r["handoff"]["indoor_node"] == "F1_entrance"
     assert r["summary"]["entrance_source"] == "surveyed"
+    assert r["handoff"]["indoor_doors"] == []
+
+
+def test_unlinked_door_names_the_doors_with_indoor_directions():
+    c = ll("C")
+    ov = [{"building": "hall", "id": "main", "name": "Main doors", "lat": c[0],
+           "lon": c[1] + 0.0001, "indoor_node": "F1_entrance", "replace_osm": True},
+          {"building": "hall", "id": "side", "name": "Side door", "lat": c[0],
+           "lon": c[1] + 0.00005}]
+    g = WalkGraph(walk(), buildings(), overrides=ov)
+    r = g.route(*start(), "hall")
+    assert r["handoff"]["entrance_id"] == "side"      # the nearer door, not linked indoors
+    assert r["handoff"]["indoor_node"] is None
+    assert r["handoff"]["indoor_doors"] == [{"id": "main", "name": "Main doors"}]
 
 
 def test_near_venue_flag(g):

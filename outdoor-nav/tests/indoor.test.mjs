@@ -100,3 +100,20 @@ test('the destination list shows building codes, and a picked "Name (CODE)" stil
   assert.equal(run("findId('Ronald Tutor Campus Center')"),'rtcc');
   assert.equal(run("bLabel({name:'No Code Hall',aliases:[]})"),'No Code Hall');
 });
+
+test('a door with no indoor directions names the building doors that have them',async()=>{
+  // DMC's west door is surveyed but not yet linked to the indoor map.
+  const response=await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.02108,lon:-118.28468},to:'DMC'})}),{});
+  const result=await response.json();assert.equal(result.ok,true);
+  assert.equal(result.handoff.entrance_id,'dmc-west');assert.equal(result.handoff.indoor_node,null);
+  assert.deepEqual(result.handoff.indoor_doors.map(d=>d.id).sort(),['dmc-breezeway-east','jmc-main']);
+  const card=html.slice(html.indexOf("// \"Ronald Tutor"),html.indexOf("$('result').onclick"));
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const ctx=vm.createContext({URLSearchParams,buildings,qs:new URLSearchParams(),esc,EVENT:'',ROOM:'',ROOM_TEXT:'',summary:result.summary,handoff:result.handoff});
+  const out=vm.runInContext(card+'\narrivalCard(summary,handoff)',ctx);
+  assert.match(out,/No indoor directions from this door yet\. They start from <b>Main entrance/);assert.doesNotMatch(out,/not set up for this building/);
+  // A linked door gets no list, and a building with no indoor map keeps the old line.
+  const main=await (await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.0215019,lon:-118.2840557},to:'DMC'})}),{})).json();
+  assert.deepEqual(main.handoff.indoor_doors,[]);
+  assert.match(vm.runInContext("arrivalCard({building:'x',building_name:'X'},{building:'x',indoor_doors:[]})",ctx),/not set up for this building yet/);
+});

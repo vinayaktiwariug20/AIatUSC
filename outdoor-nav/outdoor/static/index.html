@@ -360,7 +360,9 @@ function arrivalCard(s,ho){
     +(ho.photo?'<img class="doorphoto" src="'+esc(ho.photo)+'" alt="Photo of the entrance to use">':'')
     +(ho.indoor_node
       ?'<a class="btnlink" href="'+esc(href)+'">Continue inside →</a>'
-      :'<div class="dim" style="margin-top:6px">Indoor directions are not set up for this building yet.</div>')
+      :(ho.indoor_doors||[]).length
+        ?'<div class="dim" style="margin-top:6px">No indoor directions from this door yet. They start from '+ho.indoor_doors.map(d=>'<b>'+esc(d.name)+'</b>').join(' or ')+'.</div>'
+        :'<div class="dim" style="margin-top:6px">Indoor directions are not set up for this building yet.</div>')
     +'</div>';
 }
 

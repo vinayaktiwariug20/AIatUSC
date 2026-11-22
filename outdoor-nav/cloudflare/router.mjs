@@ -262,7 +262,9 @@ export class WalkRouter {
         warnings: warnings.map(r => ({id: r.id, note: r.note || '', status: r.status})),
       },
       handoff: {building: b.id, entrance_id: entrance?.id ?? null, entrance_name: entrance?.name ?? null,
-        indoor_node: entrance?.indoor_node ?? null, photo: entrance?.photo ?? null, step_free_door: entrance?.wheelchair ?? null, lat: entranceLL[0], lon: entranceLL[1]},
+        indoor_node: entrance?.indoor_node ?? null, photo: entrance?.photo ?? null, step_free_door: entrance?.wheelchair ?? null, lat: entranceLL[0], lon: entranceLL[1],
+        // When this door has no indoor directions, the building's doors that do (so the card can name them).
+        indoor_doors: entrance?.indoor_node ? [] : (b.entrances || []).filter(e => e.indoor_node).map(e => ({id: e.id, name: e.name || e.id}))},
       features: [
         {type: 'Feature', properties: {kind: 'route', minutes: round1(found.cost / 60), metres: Math.round(metres)},
           geometry: {type: 'LineString', coordinates: coordinates.map(([a, b]) => [b, a])}},

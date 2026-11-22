@@ -491,6 +491,10 @@ class WalkGraph:
                 "photo": ent.get("photo") if ent else None,
                 "step_free_door": ent.get("wheelchair") if ent else None,
                 "lat": ent_ll[0], "lon": ent_ll[1],
+                # When this door has no indoor directions, the building's doors that do.
+                "indoor_doors": ([] if ent and ent.get("indoor_node") else
+                                 [{"id": e["id"], "name": e.get("name") or e["id"]}
+                                  for e in b.get("entrances", []) if e.get("indoor_node")]),
             },
             "features": [
                 {"type": "Feature",
