@@ -143,3 +143,10 @@ test('the building list carries official codes, so organizers can search TCC or 
   const rows=(await call({},'/api/buildings?q=tcc')).data;
   assert.ok(rows.some(b=>b.name==='Ronald Tutor Campus Center'&&b.aliases.includes('TCC')),JSON.stringify(rows.slice(0,2)));
 });
+
+test('EVK is found by its short name and links to its owner\'s hours page, not typed-in hours', async () => {
+  const rows = (await call({}, '/api/buildings?q=evk')).data;
+  assert.deepEqual(rows.map(b => b.id), ['evk']);
+  assert.equal(rows[0].hours_url, 'https://hospitality.usc.edu/hours/');
+  assert.ok((await call({}, '/api/buildings?q=doheny')).data.every(b => b.hours_url === null));
+});
