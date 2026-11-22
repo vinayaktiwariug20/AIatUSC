@@ -27,7 +27,9 @@ test('home games activate precautionary avoidance; away games do not',()=>{
  const game=parseTime('2026-11-21T09:00:00');assert.equal(footballContext(context.footballData,game).game.opponent,'Maryland');
  assert.ok(avoidance(context,game,game+1,[],{}).some(a=>a.basis==='precaution_not_confirmed'));
  assert.equal(avoidance(context,saturday,saturday+1,[],{}).some(a=>a.basis==='precaution_not_confirmed'),false);
- assert.equal(footballContext(context.footballData,parseTime('2027-01-01T09:00')).known_season,false);
+ assert.equal(footballContext(context.footballData,parseTime('2027-01-01T09:00')).known_season,true);    // off-season: no home games
+ assert.equal(footballContext(context.footballData,parseTime('2027-07-31T23:00')).known_season,true);
+ assert.equal(footballContext(context.footballData,parseTime('2027-08-01T09:00')).known_season,false);   // next season's schedule needed
 });
 test('a trip crossing midnight into a home-game date activates precautions',()=>{
  const t=parseTime('2026-11-20T23:55:00');assert.ok(avoidance(context,t,t+600000,[],{}).some(a=>a.id.startsWith('precaution:')));

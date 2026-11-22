@@ -150,10 +150,14 @@ export function rateText(r){
     +(r.validated?'; not here for the event: '+dollars(r.validated.price)+' all day with a validation code'+(r.validated.how?' ('+r.validated.how+')':''):'');
   return (r.label?r.label+': ':'')+what+(r.pay?' · pay by '+RATE_PAY_TEXT[r.pay]:'')+(r.note?' · '+r.note:'');
 }
+// The schedule covers its season's year and the off-season after it: no home games are
+// played January to July, so driving keeps working then. From August 1 the next season's
+// schedule must be in football.json, or driving routes stop rather than miss a game day.
+export const knownSeason=(season,date)=>date.startsWith(String(season)+'-')||(date.startsWith(String(season+1)+'-')&&date<String(season+1)+'-08');
 export function footballContext(data,when) {
   const date=localDate(when), game=data.home_games.find(g=>g.date===date);
   return {season:data.season,checked:data.checked,schedule_source:data.schedule_source,traffic_source:data.traffic_source,
-    source_note:data.traffic_source_note,known_season:date.startsWith(String(data.season)+'-'),game:game||null,
+    source_note:data.traffic_source_note,known_season:knownSeason(data.season,date),game:game||null,
     policy:game?'precaution_all_day':'none',next:data.home_games.find(g=>g.date>=date)||null,
     home_games:data.home_games};
 }

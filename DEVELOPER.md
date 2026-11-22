@@ -64,7 +64,7 @@ After any change in `data/`, run `npm run build:graph`. If two PRs both touched 
 - **Prices**: `published_rates` per structure, from USC Transportation's yearly "Hourly and
   All Day Parking Availability" PDF (`rates_source`). Update them each fiscal year. Staff
   post exceptions (events, free days) on the Staff screen; those are stored in D1.
-- **Football dates**: `data/football.json`, once a season.
+- **Football dates**: `data/football.json`, once a season: set `season` and `home_games` **before August 1**. Without the new season's schedule, driving routes stop from August 1 rather than miss a game day.
 - **Field surveys**: the `/survey/` page exports JSON (GPS averaged, optional paced
   distance and compass bearing). Check each point against the building outline before
   adding it; a point well inside another building is usually a bad fix.
