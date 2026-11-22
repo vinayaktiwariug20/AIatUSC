@@ -318,3 +318,10 @@ test('the DCC-PSD gate: kept locked on foot (seen), never a no-drive area',()=>{
  assert.equal(g(wed).pedestrian_only,true);
  assert.ok(!avoidance(context,sat,sat+1800000,[],{}).some(a=>a.id==='gate:dcc-psd'));
 });
+
+test('a storage failure tells people what to do, not how to run migrations', async () => {
+  const broken = {prepare(){ return {bind(){ return {first: async () => { throw new Error('no such table: mobility_rules'); }}; }}; }};
+  const log = console.error; console.error = () => {};
+  try { await assert.rejects(readRules(broken, Date.now()), e => e.status === 503 && /Try again in a minute/.test(e.message) && !/npm/.test(e.message)); }
+  finally { console.error = log; }
+});
