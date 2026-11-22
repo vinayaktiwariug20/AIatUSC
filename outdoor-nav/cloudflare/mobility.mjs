@@ -15,7 +15,9 @@ export const forMode = (rows, mode) => rows.filter(c => (c.modes || ['walking'])
 export async function readRules(db,from,to=from+1) {
   if (!db) return [];
   try {
-    const value = await db.prepare("SELECT COALESCE(json_group_array(json(payload)), '[]') AS data FROM (SELECT payload FROM mobility_rules WHERE starts_ms<? AND ends_ms>? ORDER BY created_ms,id LIMIT 101)").bind(to,from).first('data');
+    // One retry: D1 occasionally fails a read for a moment (seen on the map 2026-11-21; a reload fixed it).
+    const read = () => db.prepare("SELECT COALESCE(json_group_array(json(payload)), '[]') AS data FROM (SELECT payload FROM mobility_rules WHERE starts_ms<? AND ends_ms>? ORDER BY created_ms,id LIMIT 101)").bind(to,from).first('data');
+    const value = await read().catch(() => new Promise(r => setTimeout(r, 250)).then(read));
     const rows=JSON.parse(value);
     if (rows.length>100) throw new MobilityError(503,'More than 100 closures in this period. Lift old ones on the Staff screen.');
     return [...rows,...await readParkingStatus(db,from,to),...await readParkingRates(db,from,to)];

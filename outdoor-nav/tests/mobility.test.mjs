@@ -325,3 +325,12 @@ test('a storage failure tells people what to do, not how to run migrations', asy
   try { await assert.rejects(readRules(broken, Date.now()), e => e.status === 503 && /Try again in a minute/.test(e.message) && !/npm/.test(e.message)); }
   finally { console.error = log; }
 });
+
+test('a momentary storage failure is retried once', async () => {
+  let calls = 0;
+  const flaky = {prepare(sql){ return {bind(){ return {first: async () => {
+    if (sql.includes('mobility_rules') && calls++ === 0) throw new Error('D1 hiccup');
+    return '[]'; }}; }}; }};
+  assert.deepEqual(await readRules(flaky, Date.now()), []);
+  assert.equal(calls, 2);
+});
