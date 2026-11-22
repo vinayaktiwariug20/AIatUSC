@@ -17,9 +17,15 @@ export async function readRules(db,from,to=from+1) {
   try {
     const value = await db.prepare("SELECT COALESCE(json_group_array(json(payload)), '[]') AS data FROM (SELECT payload FROM mobility_rules WHERE starts_ms<? AND ends_ms>? ORDER BY created_ms,id LIMIT 101)").bind(to,from).first('data');
     const rows=JSON.parse(value);
-    if (rows.length>100) throw new Error('limit');
+    if (rows.length>100) throw new MobilityError(503,'More than 100 closures in this period. Lift old ones on the Staff screen.');
     return [...rows,...await readParkingStatus(db,from,to),...await readParkingRates(db,from,to)];
-  } catch(error) { if(error instanceof MobilityError)throw error; throw new MobilityError(503,'Mobility storage is unavailable. Run npm run db:local and npm run db:remote for the new migration.'); }
+  } catch(error) {
+    if(error instanceof MobilityError)throw error;
+    // The fix for developers (a missing table: npm run db:local / db:remote) goes to the log;
+    // people on the map or Staff screen get a message they can act on.
+    console.error('readRules failed (missing migration? run npm run db:local / db:remote):',error);
+    throw new MobilityError(503,'Closures and parking updates could not be loaded just now. Try again in a minute; if it keeps happening, tell the Doorstep team.');
+  }
 }
 // Parking statuses ride along with the gate and road rules as kind 'parking'; every
 // other reader filters by kind. Before migration 0005 there are none.
