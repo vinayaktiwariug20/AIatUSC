@@ -138,7 +138,7 @@ export async function handleApi(request, env, context) {
     if (method === 'GET' && path === '/api/buildings') {
       const q = (url.searchParams.get('q') || '').toLowerCase().slice(0, 200);
       const rows = Object.values(data.buildings).filter(b => !q || b.name.toLowerCase().includes(q) || (b.aliases || []).some(a => a.toLowerCase().includes(q)))
-        .map(b => ({id: b.id, name: b.name, aliases: b.aliases || [], lat: b.lat, lon: b.lon, entrance_source: b.entrance_source ?? null, entrances: (b.entrances || []).length}))
+        .map(b => ({id: b.id, name: b.name, aliases: b.aliases || [], lat: b.lat, lon: b.lon, entrance_source: b.entrance_source ?? null, entrances: (b.entrances || []).length, hours_url: b.hours_url ?? null}))
         .sort((a, b) => a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0);
       return reply(rows, 200, head);
     }

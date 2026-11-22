@@ -122,8 +122,8 @@ class WalkGraph:
         door goes -- the same door the indoor graph starts from.
 
         An entry may also carry building metadata: `aliases` (names people
-        actually type) and `outline` ([[lat, lon], ...], drawn as the
-        highlight). An entry with no lat/lon is metadata only: no door."""
+        actually type), `outline` ([[lat, lon], ...], drawn as the
+        highlight) and `hours_url` (the owner's hours page, shown as a link). An entry with no lat/lon is metadata only: no door."""
         for o in overrides:
             b = self.buildings.get(o["building"])
             if b is None:
@@ -136,6 +136,8 @@ class WalkGraph:
             # Ours first: official codes (e.g. TCC) come before OSM's (RTCC), and labels show the first.
             if o.get("aliases"):
                 b["aliases"] = list(dict.fromkeys(list(o["aliases"]) + list(b.get("aliases", []))))
+            if str(o.get("hours_url", "")).startswith("https://"):
+                b["hours_url"] = o["hours_url"]   # a link, never typed-in hours: they change for holidays and game days
             if o.get("outline"):
                 ring = [list(map(float, pt)) for pt in o["outline"]]
                 b["outline"] = ring if ring[0] == ring[-1] else ring + [ring[0]]
