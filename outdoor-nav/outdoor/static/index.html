@@ -157,6 +157,8 @@ const stated=new Set();
 function stat(kind){if(stated.has(kind)||!navigator.sendBeacon)return;stated.add(kind);
  try{navigator.sendBeacon('/api/stats',new Blob([JSON.stringify({kind})],{type:'application/json'}));}catch{}}
 stat('visit');if(qs.get('to'))stat('visit_event_link');
+// door: a door the person chose (Walk to the main entrance), for that destination only.
+let door=null;
 function buildingId(){const text=$('to').value.trim().replace(/^\([^)]{1,40}\)\s*/,'');return findId(text)||text;}
 function marker(lat,lon){if(!startMarker)startMarker=L.circleMarker([lat,lon],{radius:7,color:'#fff',weight:3,fillColor:'#2459d3',fillOpacity:1}).addTo(map);else startMarker.setLatLng([lat,lon]);}
 // Every GPS fix: move the dot, show the fix's accuracy, and keep the map on the walker while following.
@@ -209,10 +211,10 @@ async function route(fit=true){
  const id=++routeVersion;controller?.abort();controller=new AbortController();busy=true;$('goBtn').disabled=true;$('parkedBtn').hidden=true;plan=null;updateIndoorView();
  if(routeLayer){routeLayer.remove();routeLayer=null;}if(walkingLayer){walkingLayer.remove();walkingLayer=null;}$('result').innerHTML='';info('Checking access and routes…');
  try{
-  const r=await api('/api/outdoor/route',{method:'POST',signal:controller.signal,body:JSON.stringify({from:start,to:buildingId(),mode,at:$('departAt').value||undefined,parking:$('parking').value,usc_id:$('uscId').checked,parking_pass:$('parkingPass').checked,permit:$('permit').value||undefined,step_free:$('stepFree').checked})});
+  const r=await api('/api/outdoor/route',{method:'POST',signal:controller.signal,body:JSON.stringify({from:start,to:buildingId(),mode,at:$('departAt').value||undefined,parking:$('parking').value,usc_id:$('uscId').checked,parking_pass:$('parkingPass').checked,permit:$('permit').value||undefined,step_free:$('stepFree').checked,entrance:mode==='walking'&&door?.building===buildingId()&&door.id||undefined})});
   if(id!==routeVersion)return;lastRouted=Date.now();
   if(!r.ok){const choices=(r.choices||[]).map(c=>'<button class="small" data-pick="'+esc(c.id)+'">'+esc(c.name)+'</button>').join(' ');$('result').innerHTML='<div class="card error">'+esc(r.reason||r.error)+(choices?'<div class="row wrap" style="margin-top:8px">'+choices+'</div>':'')+'</div>';info('Choose another start or parking structure.');return;}
-  plan=r;drawPlan(r,fit);const s=r.summary;track('route');stat(mode==='driving'?'route_drive':'route_walk');if(mode==='walking'&&s.step_free)stat('step_free');if(r.handoff_only)stat('drive_fallback');updateIndoorView(s,mode==='walking'?r.handoff||{}:{},!!(mode==='walking'?r.handoff:r.walking_preview?.handoff)?.indoor_node);
+  plan=r;drawPlan(r,fit);const s=r.summary;track('route');stat(mode==='driving'?'route_drive':'route_walk');if(mode==='walking'&&s.step_free)stat('step_free');if(r.handoff_only)stat('drive_fallback');const hoIn=(mode==='walking'?r.handoff:r.walking_preview?.handoff)||{};updateIndoorView(s,mode==='walking'?r.handoff||{}:{},!!(hoIn.indoor_node||(hoIn.indoor_doors||[]).length));
   if(mode==='driving'){
    const dt=s.drive_to,apps=mapsButtons(dt);
    if(r.handoff_only){
@@ -299,7 +301,7 @@ async function refresh(){if(refreshing)return;refreshing=true;try{const results=
 $('walkMode').onclick=()=>setMode('walking');$('driveMode').onclick=()=>setMode('driving');$('goBtn').onclick=safe(()=>route());
 
 $('to').oninput=()=>updateIndoorView();
-$('to').onchange=()=>{clearRoute();updateIndoorView();};
+$('to').onchange=()=>{door=null;clearRoute();updateIndoorView();};
 $('stepFree').onchange=()=>{clearRoute();};
 $('parking').onchange=()=>{clearRoute();};
 
@@ -362,7 +364,10 @@ function arrivalCard(s,ho){
     +(ho.photo?'<img class="doorphoto" src="'+esc(ho.photo)+'" alt="Photo of the entrance to use">':'')
     +(ho.indoor_node
       ?'<a class="btnlink" href="'+esc(href)+'">Continue inside →</a>'
-      :'<div class="dim" style="margin-top:6px">Indoor directions are not set up for this building yet.</div>')
+      :(ho.indoor_doors||[]).length
+        ?'<div class="dim" style="margin-top:6px">No indoor directions from this door yet. They start from '+ho.indoor_doors.map(d=>'<b>'+esc(d.name)+'</b>').join(' or ')+'.</div>'
+          +'<div class="row wrap" style="margin-top:6px">'+ho.indoor_doors.map(d=>'<button class="small" data-door="'+esc(d.id)+'">Walk to '+esc(d.name)+'</button>').join('')+'</div>'
+        :'<div class="dim" style="margin-top:6px">Indoor directions are not set up for this building yet.</div>')
     +'</div>';
 }
 
@@ -377,9 +382,13 @@ $('result').onclick=safe(async e=>{
     return;
   }
 
+  const d=e.target.closest('button[data-door]');
+
+  if(d){door={id:d.dataset.door,building:buildingId()};await route();return;}
+
   const b=e.target.closest('button[data-pick]');
 
-  if(b){
+  if(b){door=null;
     $('to').value=bLabel(buildings.find(x=>x.id===b.dataset.pick))||b.dataset.pick;
     updateIndoorView();
     await route();

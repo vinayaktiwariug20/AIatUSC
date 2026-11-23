@@ -32,6 +32,9 @@ def main():
     cases = [base, {**base, "building": "norris"}, {**base, "building": "not-a-real-building"},
              {**base, "lat": None, "lon": None, "place": "royal", "building": "norris theatre"},
              {**base, "stepFree": True},
+             {"lat": 34.02108, "lon": -118.28468, "building": "DMC"},
+             {"lat": 34.02108, "lon": -118.28468, "building": "DMC", "entrance": "jmc-main"},
+             {"lat": 34.02108, "lon": -118.28468, "building": "DMC", "entrance": "not-a-door"},
              {**base, "closures": [{"id": "block", "lat": 34.020, "lon": -118.287, "radius_m": 15}]},
              {**base, "closures": [{"id": "ring", "lat": base["lat"], "lon": base["lon"], "radius_m": 30}]},
              {**base, "reports": [{"id": "report", "lat": base["lat"], "lon": base["lon"], "radius_m": 15, "status": "unverified", "note": "Check"}]}]
@@ -46,7 +49,7 @@ def main():
     for case in cases:
         try:
             result = g.route(case['lat'], case['lon'], case['building'], case.get('closures', []),
-                             case.get('reports', []), step_free=case.get('stepFree', False), place=case.get('place'))
+                             case.get('reports', []), step_free=case.get('stepFree', False), place=case.get('place'), entrance=case.get('entrance'))
             expected.append({"ok": True, **result})
         except Unreachable as error:
             expected.append({"ok": False, "blocked_by": error.blocked_by, "choices": error.choices})

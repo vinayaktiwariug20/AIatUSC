@@ -228,7 +228,7 @@ export async function handleApi(request, env, context) {
       rows.push(...walkingRuleClosures(context, rules, when));
       if(from.exit!==undefined&&(typeof from.exit!=='string'||!place))fail(400,'A parking place is required for a surveyed exit.');
       try {
-        const ask = extra => router.route({lat,lon,place,exit:from.exit??null,building:body.to,stepFree:Boolean(body.step_free),
+        const ask = extra => router.route({lat,lon,place,exit:from.exit??null,entrance:typeof body.entrance==='string'?body.entrance.slice(0,80):null,building:body.to,stepFree:Boolean(body.step_free),
           closures: [...rows.filter(c => c.status === 'approved'), ...extra], reports: rows.filter(c => c.status === 'unverified')});
         // Gates scheduled closed on foot: a preference, not a wall (see softGates).
         const soft = softGates(context, when, rules, ask([]), ask), out = soft.route;
