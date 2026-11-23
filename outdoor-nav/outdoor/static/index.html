@@ -129,6 +129,8 @@ async function api(path,options={}){const headers={'Content-Type':'application/j
 function info(text,error=false){$('hint').textContent=text;$('hint').classList.toggle('error',error);}
 // Shade the destination building (its OSM outline; a circle if it has none, e.g. surveyed venues).
 let buildingLayer=null;const buildingCache={};
+// The owner's hours page (e.g. USC Hospitality for EVK), never hours we typed in.
+function hoursLink(id){const u=(buildings.find(b=>b.id===id)||{}).hours_url;return u&&/^https:\/\//.test(u)?' · <a href="'+esc(u)+'" target="_blank" rel="noopener">Hours</a>':'';}
 async function highlightBuilding(id,fit=false){if(buildingLayer){buildingLayer.remove();buildingLayer=null;}if(!id)return;let b=buildingCache[id];if(!b){try{b=buildingCache[id]=await api('/api/buildings/'+encodeURIComponent(id));}catch{return;}}const style={color:'#8b1e2c',weight:2.5,fillColor:'#8b1e2c',fillOpacity:.18};buildingLayer=(b.outline&&b.outline.length>2?L.polygon(b.outline,style):L.circle([b.lat,b.lon],{...style,radius:30})).addTo(map);try{const bb=buildingLayer.getBounds();buildingLayer.bindTooltip(esc(b.name),{permanent:true,direction:'top',offset:[0,-6]}).openTooltip([bb.getNorth(),bb.getCenter().lng]);}catch{}routeLayer?.bringToFront?.();if(fit&&routeLayer){try{map.fitBounds(routeLayer.getBounds().extend(buildingLayer.getBounds()),{padding:[30,30]});}catch{}}}
 function clearRoute(){routeVersion++;controller?.abort();if(routeLayer)routeLayer.remove();if(buildingLayer){buildingLayer.remove();buildingLayer=null;}if(walkingLayer)walkingLayer.remove();routeLayer=walkingLayer=null;plan=null;$('parkedBtn').hidden=true;$('result').innerHTML='';updateIndoorView();busy=false;$('goBtn').disabled=false;}
 function showError(error){if(error.name==='AbortError')return;clearRoute();info(error.message,true);}
@@ -223,7 +225,7 @@ async function route(fit=true){
    $('parkedBtn').hidden=false;info('Blue: driving · dotted green: walking after parking. Select the parking button after you have parked.');
    }
   }else{
-   let h='<section class="card"><div class="big">About '+esc(s.minutes)+' min walk</div><div>'+esc(s.building_name)+' · '+esc(s.metres)+' m</div>';
+   let h='<section class="card"><div class="big">About '+esc(s.minutes)+' min walk</div><div>'+esc(s.building_name)+' · '+esc(s.metres)+' m'+hoursLink(s.building)+'</div>';
    // "Avoid stairs" took effect: say so, and say what it does and doesn't cover.
    if(s.step_free){const door=r.handoff?.step_free_door;h+='<div class="success">Step-free route: no mapped stairs'+(door===true?', and the door is step-free (checked on site).':'.')+'</div>'
     +(door===false?'<div class="notice">This door has steps, and no step-free door is recorded for this building.</div>':'')
@@ -354,7 +356,7 @@ function arrivalCard(s,ho){
 
   return '<div class="arrival">'
     +'<div class="dim">YOU&#39;VE ARRIVED</div>'
-    +'<h2 style="margin:4px 0">'+esc(s.building_name)+'</h2>'
+    +'<h2 style="margin:4px 0">'+esc(s.building_name)+'</h2>'+(hoursLink(s.building)?'<div>'+hoursLink(s.building).slice(3)+'</div>':'')
     +((EVENT||ROOM)&&atEvent(s.building)?'<div>Your event: <b>'+esc([EVENT,ROOM_TEXT].filter(Boolean).join(' · '))+'</b></div>':'')
     +((EVENT||ROOM)&&!atEvent(s.building)?'<div class="notice">Your event'+((EVENT||ROOM_TEXT)?' ('+esc([EVENT,ROOM_TEXT].filter(Boolean).join(' · '))+')':'')+' is at <b>'+esc(eventName())+'</b>, not here.'
       +'<div style="margin-top:6px"><button class="small" data-pick="'+esc(eventBuilding())+'">Route to the event</button></div></div>':'')

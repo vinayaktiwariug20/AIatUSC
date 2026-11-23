@@ -115,7 +115,7 @@ test('a door with no indoor directions names the building doors that have them',
   assert.deepEqual(result.handoff.indoor_doors.map(d=>d.id).sort(),['dmc-breezeway-east','jmc-main']);
   const card=html.slice(html.indexOf("// \"Ronald Tutor"),html.indexOf("$('result').onclick"));
   const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const ctx=vm.createContext({URLSearchParams,buildings,qs:new URLSearchParams(),esc,EVENT:'',ROOM:'',ROOM_TEXT:'',summary:result.summary,handoff:result.handoff});
+  const ctx=vm.createContext({URLSearchParams,buildings,qs:new URLSearchParams(),esc,EVENT:'',ROOM:'',ROOM_TEXT:'',hoursLink:()=>'',summary:result.summary,handoff:result.handoff});
   const out=vm.runInContext(card+'\narrivalCard(summary,handoff)',ctx);
   assert.match(out,/No indoor directions from this door yet\. They start from <b>the main entrance<\/b> or <b>the east breezeway doors<\/b>\./);
   assert.match(out,/<button class="small" data-door="jmc-main">Walk to the main entrance<\/button>/);assert.doesNotMatch(out,/not set up for this building/);

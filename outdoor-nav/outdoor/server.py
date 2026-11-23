@@ -55,7 +55,8 @@ class App:
             q = (query.get("q", [""])[0] or "").lower()
             rows = [{"id": b["id"], "name": b["name"], "lat": b["lat"], "lon": b["lon"],
                      "entrance_source": b.get("entrance_source"),
-                     "entrances": len(b.get("entrances", []))}
+                     "entrances": len(b.get("entrances", [])),
+                     "hours_url": b.get("hours_url")}
                     for b in g.buildings.values()
                     if not q or q in b["name"].lower()
                     or any(q in a.lower() for a in b.get("aliases", []))]
