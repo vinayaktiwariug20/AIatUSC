@@ -12,7 +12,7 @@ https://aiatusc-outdoor-nav.doorstepusc.workers.dev/?to=<building>&room=<room id
 - `to`: a building id or a name people type. For the demo venue:
   `dr-joseph-medicine-crow-center-for-international-and-public-affairs`,
   or simply `DMC` (its official code).
-- `room`: the indoor team's room id (e.g. `room_205`). The map doesn't use it.
+- `room`: the indoor team's room id (e.g. `205`). The map doesn't use it.
   It's passed straight through to indoor.
 - `anchor` (optional): an indoor place id where indoor directions should start,
   e.g. `left-stair-1`. Without it they start at the door the outdoor route ends
@@ -53,10 +53,15 @@ The viewer is `outdoor-nav/outdoor/static/indoor/` (`index.html`, `nav.mjs`,
 `building.json`, `scene/`) and is deployed with the rest of the site. You pick
 where you are from pictures of the building, then get steps and a walk preview.
 
-Rooms live in `building.json` under `rooms`: an `id` (what `room=` carries), a
-`name`, and either a graph `node` or `floor`, `x`, `z` for the door. Add a
-`labels` entry to show the room on the map. Room `258` is there now, at a door
-on the second-floor left wing picked from the scan.
+Rooms live in `building.json` under `rooms`. Each room has an `id` used in
+`room=`, a `name`, and either a graph `node` or `floor`, `x`, `z` for the
+door. The viewer puts a number badge at the door when its floor is selected.
+When a room is the destination, its number appears on the route pin.
+Room records with `estimated: true` show an **≈** badge and say “estimated”
+in the destination picker and directions. These include doors placed using
+the two-number step along the same hallway wall and Room `258`'s provisional
+position. Confirm each match against a readable plaque or numbered floor plan
+before removing the estimate.
 
 `building.json` carries the map's building `id` and `aliases`, so `/indoor/`
 can tell a link for another building apart; keep them equal to the entry in §4.

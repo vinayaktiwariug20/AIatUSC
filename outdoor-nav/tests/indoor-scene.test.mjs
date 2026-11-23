@@ -86,13 +86,26 @@ test('room 258 is on the second-floor left wing, and the entrance route to it cl
   assert.equal(r.points[r.points.length - 1].floor, 2);
   const steps = describe(r, 'Entrance', room.name);
   assert.equal(steps[steps.length - 1], 'Arrive at Room 258.');
-  assert.ok(B.labels.some(l => l.text === 'Room 258' && l.floors.includes(2)));
+});
+
+test('door badges on both floors correspond to unique, reachable room destinations', () => {
+  assert.deepEqual(new Set(B.rooms.map(room => room.floor)), new Set([1, 2]));
+  assert.equal(new Set(B.rooms.map(room => room.id)).size, B.rooms.length);
+  for (const room of B.rooms) {
+    assert.equal(findPlace(B, room.name).id, room.id);
+    const at = placeEnd(B, room);
+    assert.equal(at.floor, room.floor, room.id);
+    assert.ok(at.dist < 2, room.id);
+    const r = route(NAV, end('entrance'), at);
+    assert.ok(r, room.id);
+    assert.equal(r.points.at(-1).floor, room.floor, room.id);
+  }
 });
 
 test('places are found by id or name; an unmapped room is not', () => {
   assert.equal(findPlace(B, 'ENTRANCE').id, 'entrance');
   assert.equal(findPlace(B, 'Elevator, floor 2').id, 'elevator-2');
-  assert.equal(findPlace(B, 'room_205'), null);
+  assert.equal(findPlace(B, 'room_999'), null);
 });
 
 test('the building carries the outdoor map\'s id and names for it, and the door anchor the map sends exists', () => {
