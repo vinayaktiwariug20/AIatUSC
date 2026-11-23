@@ -101,6 +101,12 @@ test('the destination list shows building codes, and a picked "Name (CODE)" stil
   assert.equal(run("bLabel({name:'No Code Hall',aliases:[]})"),'No Code Hall');
 });
 
+test('the chosen door is sent only for the destination it was chosen for, and Indoor View stays for a building with an indoor map',()=>{
+  assert.match(html,/entrance:mode==='walking'&&door\?\.building===buildingId\(\)&&door\.id\|\|undefined/);
+  assert.match(html,/if\(d\)\{door=\{id:d\.dataset\.door,building:buildingId\(\)\};await route\(\);return;\}/);
+  assert.match(html,/updateIndoorView\(s,[^;]+,!!\(hoIn\.indoor_node\|\|\(hoIn\.indoor_doors\|\|\[\]\)\.length\)\);/);
+});
+
 test('a door with no indoor directions names the building doors that have them',async()=>{
   // DMC's west door is surveyed but not yet linked to the indoor map.
   const response=await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.02108,lon:-118.28468},to:'DMC'})}),{});
@@ -111,9 +117,15 @@ test('a door with no indoor directions names the building doors that have them',
   const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const ctx=vm.createContext({URLSearchParams,buildings,qs:new URLSearchParams(),esc,EVENT:'',ROOM:'',ROOM_TEXT:'',summary:result.summary,handoff:result.handoff});
   const out=vm.runInContext(card+'\narrivalCard(summary,handoff)',ctx);
-  assert.match(out,/No indoor directions from this door yet\. They start from <b>Main entrance/);assert.doesNotMatch(out,/not set up for this building/);
+  assert.match(out,/No indoor directions from this door yet\. They start from <b>the main entrance<\/b> or <b>the east breezeway doors<\/b>\./);
+  assert.match(out,/<button class="small" data-door="jmc-main">Walk to the main entrance<\/button>/);assert.doesNotMatch(out,/not set up for this building/);
   // A linked door gets no list, and a building with no indoor map keeps the old line.
   const main=await (await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.0215019,lon:-118.2840557},to:'DMC'})}),{})).json();
   assert.deepEqual(main.handoff.indoor_doors,[]);
+  // "Walk to the main entrance" asks for that one door, and the route ends there with indoor directions.
+  const chosen=await (await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.02108,lon:-118.28468},to:'DMC',entrance:'jmc-main'})}),{})).json();
+  assert.equal(chosen.ok,true);assert.equal(chosen.handoff.entrance_id,'jmc-main');assert.equal(chosen.handoff.indoor_node,'entrance');
+  const wrong=await (await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{lat:34.02108,lon:-118.28468},to:'DMC',entrance:'evk-main'})}),{})).json();
+  assert.equal(wrong.ok,false);assert.match(wrong.reason,/does not belong/);
   assert.match(vm.runInContext("arrivalCard({building:'x',building_name:'X'},{building:'x',indoor_doors:[]})",ctx),/not set up for this building yet/);
 });

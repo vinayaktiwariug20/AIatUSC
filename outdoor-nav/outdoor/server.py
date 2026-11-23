@@ -89,7 +89,8 @@ class App:
                 with self._route_lock:
                     out = g.route(
                         lat, lon, to, closures, reports,
-                        step_free=bool(body.get("step_free")), place=place)
+                        step_free=bool(body.get("step_free")), place=place,
+                        entrance=body.get("entrance") if isinstance(body.get("entrance"), str) else None)
                 sp = out["summary"].get("start_place")
                 if sp:
                     # vehicle hours for the gate at this place: can the car get in?

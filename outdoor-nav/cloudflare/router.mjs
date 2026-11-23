@@ -187,7 +187,7 @@ export class WalkRouter {
     }
     return {cost: null, path: null, edges: null, hit};
   }
-  route({lat, lon, building, closures = [], reports = [], stepFree = false, place = null, exit = null}) {
+  route({lat, lon, building, closures = [], reports = [], stepFree = false, place = null, exit = null, entrance: door = null}) {
     let startPlace = null;
     if (place !== null) { startPlace = this.findPlace(place); if (!startPlace) throw new Unreachable(`unknown place: '${place}'`); }
     const b = this.findBuilding(building);
@@ -197,7 +197,10 @@ export class WalkRouter {
       throw new Unreachable(`unknown building: '${building}'`);
     }
     let targets = this.data.targets[b.id] || [];
-    if (stepFree) {   // prefer doors surveyed as step-free (level, ramp or elevator), when there are any
+    if (door !== null) {   // one chosen door (e.g. the one where indoor directions start)
+      if (!targets.includes('E:' + door)) throw new Unreachable(`That door does not belong to ${b.name}.`);
+      targets = ['E:' + door];
+    } else if (stepFree) {   // prefer doors surveyed as step-free (level, ramp or elevator), when there are any
       const ok = new Set((b.entrances || []).filter(e => e.wheelchair === true).map(e => 'E:' + e.id));
       const pref = targets.filter(t => ok.has(t)); if (pref.length) targets = pref;
     }
@@ -264,7 +267,7 @@ export class WalkRouter {
       handoff: {building: b.id, entrance_id: entrance?.id ?? null, entrance_name: entrance?.name ?? null,
         indoor_node: entrance?.indoor_node ?? null, photo: entrance?.photo ?? null, step_free_door: entrance?.wheelchair ?? null, lat: entranceLL[0], lon: entranceLL[1],
         // When this door has no indoor directions, the building's doors that do (so the card can name them).
-        indoor_doors: entrance?.indoor_node ? [] : (b.entrances || []).filter(e => e.indoor_node).map(e => ({id: e.id, name: e.name || e.id}))},
+        indoor_doors: entrance?.indoor_node ? [] : (b.entrances || []).filter(e => e.indoor_node).map(e => ({id: e.id, name: e.short_name || e.name || e.id}))},
       features: [
         {type: 'Feature', properties: {kind: 'route', minutes: round1(found.cost / 60), metres: Math.round(metres)},
           geometry: {type: 'LineString', coordinates: coordinates.map(([a, b]) => [b, a])}},

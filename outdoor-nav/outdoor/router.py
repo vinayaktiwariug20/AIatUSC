@@ -146,7 +146,8 @@ class WalkGraph:
             b["entrances"] = [e for e in b["entrances"] if e["id"] != o["id"]]
             b["entrances"].append({k: o.get(k) for k in
                                    ("id", "lat", "lon", "name", "indoor_node",
-                                    "wheelchair", "photo")} | {"kind": "surveyed"})
+                                    "wheelchair", "photo")} | {"kind": "surveyed"}
+                                  | ({"short_name": o["short_name"]} if o.get("short_name") else {}))
             b["entrance_source"] = "surveyed"
 
     def _wire_entrances(self):
@@ -366,7 +367,7 @@ class WalkGraph:
         return None, None, None, hit
 
     def route(self, lat, lon, building, closures=(), reports=(), step_free=False,
-              place=None):
+              place=None, entrance=None):
         """Returns a GeoJSON FeatureCollection; raises Unreachable.
 
         `place` (e.g. "royal") starts from every walk-out point of that
@@ -387,7 +388,12 @@ class WalkGraph:
                 raise e
             raise Unreachable("unknown building: %r" % (building,))
         targets = self.targets.get(b["id"]) or []
-        if step_free:
+        if entrance is not None:
+            # One chosen door (e.g. the one where indoor directions start).
+            if "E:" + entrance not in targets:
+                raise Unreachable("That door does not belong to %s." % b["name"])
+            targets = ["E:" + entrance]
+        elif step_free:
             # Prefer doors surveyed as step-free (level, ramp or elevator), when there are any.
             ok = {"E:" + e["id"] for e in b.get("entrances", []) if e.get("wheelchair") is True}
             targets = [t for t in targets if t in ok] or targets
@@ -493,7 +499,7 @@ class WalkGraph:
                 "lat": ent_ll[0], "lon": ent_ll[1],
                 # When this door has no indoor directions, the building's doors that do.
                 "indoor_doors": ([] if ent and ent.get("indoor_node") else
-                                 [{"id": e["id"], "name": e.get("name") or e["id"]}
+                                 [{"id": e["id"], "name": e.get("short_name") or e.get("name") or e["id"]}
                                   for e in b.get("entrances", []) if e.get("indoor_node")]),
             },
             "features": [
