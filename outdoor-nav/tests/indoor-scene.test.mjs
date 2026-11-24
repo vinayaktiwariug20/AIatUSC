@@ -131,3 +131,12 @@ test('scene files exist and fit the 25 MiB per-file asset limit', () => {
   assert.equal(total, S.bytes);
   assert.equal(S.scans.length, 11);
 });
+
+test('pins and route pieces on a hidden floor are hidden; stair pieces between floors always show', () => {
+  const html = readFileSync(new URL('../outdoor/static/indoor/index.html', import.meta.url), 'utf8');
+  assert.match(html, /c\.visible = c\.userData\.floor == null \|\| floorVisible\(c\.userData\.floor\)/);
+  assert.match(html, /on = !!p && \(p\.floor == null \|\| floorVisible\(p\.floor\)\)/);
+  assert.match(html, /if \(last\) pieces\.push\(\{floor: null, idx: \[i - 1, i\]\}\);/);
+  // floor switching re-applies it
+  assert.match(html, /floors\[2\]\.visible = mode !== 1;\r?\n  showFloorItems\(\);/);
+});

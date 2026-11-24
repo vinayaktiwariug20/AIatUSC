@@ -302,10 +302,17 @@ function setFloor(mode, byUser) {
   if (byUser) floorChosenByUser = true;
   floors[1].visible = mode !== 2;
   floors[2].visible = mode !== 1;
+  showFloorItems();
   for (const b of document.querySelectorAll('.seg button')) b.setAttribute('aria-pressed', String(Number(b.dataset.floor) === mode));
 }
 for (const b of document.querySelectorAll('.seg button')) b.addEventListener('click', () => setFloor(Number(b.dataset.floor), true));
 const floorVisible = f => floorMode === 0 || floorMode === f;
+// Pins and route pieces on a floor that is hidden are hidden too (a floor-2 room must not look like a floor-1 door).
+// Pieces with no floor (a stair or lift between floors) always show.
+function showFloorItems() {
+  for (const pin of pins) pin.show();
+  for (const c of routeGroup.children) c.visible = c.userData.floor == null || floorVisible(c.userData.floor);
+}
 
 // ---------------------------------------------------------------- camera framing
 let walk = null;                                                   // set while the first-person view is on
@@ -393,13 +400,18 @@ function makePin(color, text, cls) {
   const label = text ? addLabel(text, {x: 0, y: 0, z: 0}, [1, 2], 'pin ' + cls) : null;
   if (label) label.el.hidden = true;
   const pin = {
-    group, dot,
+    group, dot, at: null,
+    show() {
+      const p = pin.at, on = !!p && (p.floor == null || floorVisible(p.floor));
+      group.visible = on;
+      if (label) label.el.hidden = !on;
+    },
     place(p, caption = text) {
-      group.visible = !!p;
+      pin.at = p || null;
       if (p) group.position.set(p.x, p.y, p.z);
+      pin.show();
       if (label) {
-        label.el.hidden = !p;
-        if (p) label.pos.set(p.x, p.y + PIN_H, p.z);
+        if (p) { label.pos.set(p.x, p.y + PIN_H, p.z); if (p.floor != null) label.floors = [p.floor]; }
         if (label.el.textContent !== caption) {
           label.el.textContent = caption;
           label.w = 0;
@@ -443,10 +455,23 @@ function drawRoute(r) {
   current = r;
   if (!r) return;
   const pts = r.points.map(p => new THREE.Vector3(p.x, p.y + 0.09, p.z));
-  const g = ribbon(pts);
-  const ghost = new THREE.Mesh(g, ghostMat); ghost.renderOrder = 5;
-  const main = new THREE.Mesh(g.clone(), routeMat); main.renderOrder = 6;
-  routeGroup.add(ghost, main);
+  // One piece per floor, plus the stair or lift pieces between floors (floor: null).
+  const pieces = [];
+  for (let i = 0; i < r.points.length; i++) {
+    const f = r.points[i].floor, last = pieces.at(-1);
+    if (last && last.floor === f) { last.idx.push(i); continue; }
+    if (last) pieces.push({floor: null, idx: [i - 1, i]});
+    pieces.push({floor: f, idx: [i]});
+  }
+  for (const piece of pieces) {
+    if (piece.idx.length < 2) continue;
+    const g = ribbon(piece.idx.map(i => pts[i]));
+    const ghost = new THREE.Mesh(g, ghostMat); ghost.renderOrder = 5;
+    const main = new THREE.Mesh(g.clone(), routeMat); main.renderOrder = 6;
+    ghost.userData.floor = main.userData.floor = piece.floor;
+    routeGroup.add(ghost, main);
+  }
+  showFloorItems();
   if (!floorChosenByUser) {
     const fs = new Set(r.points.map(p => p.floor));
     setFloor(fs.size === 1 ? [...fs][0] : 0, false);
