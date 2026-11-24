@@ -367,3 +367,19 @@ test('the map words a rate in plain terms: when it starts, how to pay now, and w
  assert.equal(vm.runInContext("payWhen({pay:'phone_or_station'})",ctx),'');
  assert.doesNotMatch(html,/[Aa]ccess requirements/);
 });
+
+// The Staff screen's "Booth sign" buttons post these exact bodies (index.html sgSave).
+test('booth sign cards: Royal lists its cards, and each card saves as an ordinary staff update',async()=>{
+ const royal=parkingState(context,parseTime('2026-11-24T12:00'),[],{}).find(p=>p.id==='royal');
+ assert.deepEqual(royal.booth_signs.map(c=>c.sign+(c.price?c.price:'')),['event50','event40','event35','permits_only','full','available']);
+ const e=env(),times={starts:'2026-11-24T12:00',ends:'2026-11-24T23:59'};
+ for(const f of ['0003_questions.sql','0004_usage.sql','0005_parking_status.sql','0006_staff_keys.sql','0007_parking_rates.sql'])e.DB.db.exec(readFileSync(new URL('../migrations/'+f,import.meta.url),'utf8'));
+ const ev=await api(e,'/api/mobility/rules','POST',{kind:'rate',parking:'royal',option:'event',price:50,pay:'booth',label:'Event parking',...times,note:'Booth sign: EVENT PARKING $50'},'staff');
+ assert.equal(ev.status,201,JSON.stringify(ev.data));
+ const only=await api(e,'/api/mobility/rules','POST',{kind:'parking',parking:'royal',applies:'daily',status:'closed',spaces:null,...times,note:'Booth sign: PERMITS & RESERVATIONS ONLY'},'staff');
+ assert.equal(only.status,201,JSON.stringify(only.data));
+ const full=await api(e,'/api/mobility/rules','POST',{kind:'parking',parking:'royal',applies:'everyone',status:'full',spaces:null,...times,note:'Booth sign: LOT FULL'},'staff');
+ assert.equal(full.status,201,JSON.stringify(full.data));
+ const html=readFileSync(new URL('../outdoor/static/index.html',import.meta.url),'utf8');
+ for(const s of ["kind:'rate',parking:p.id,option:'event',price:c.price,pay:'booth',label:'Event parking'","kind:'parking',parking:p.id,applies:c.sign==='full'?'everyone':'daily',status:c.sign==='full'?'full':'closed'"])assert.ok(html.includes(s),s);
+});
