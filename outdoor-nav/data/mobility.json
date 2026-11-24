@@ -46,9 +46,14 @@
     },
     {
       "id": "jefferson-blvd",
-      "lat": 34.02488,
-      "lon": -118.29026,
-      "location_source": "approximate_intersection"
+      "lat": 34.0253336,
+      "lon": -118.2899669,
+      "location_source": "team_pin",
+      "location_note": "Pinned by the team (2026-11-23), on the driveway in from Jefferson Blvd; the old pin was an intersection guess too close to the structure. The pin is about 12.5 m from Jefferson Blvd, so the closed-gate area sits 10 m south of it, inside campus, and never closes Jefferson.",
+      "area": [
+        34.02524,
+        -118.2899669
+      ]
     },
     {
       "id": "dcc-psd",
