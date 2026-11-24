@@ -475,7 +475,7 @@ $('pkSave').onclick=safe(async()=>{if(!$('token').value.trim())throw new Error('
 // Booth sign: the card on display at a structure's booth, as one tap. Each card is an existing staff update:
 // EVENT PARKING $X -> an event price (paid at the booth); PERMITS & RESERVATIONS ONLY -> closed to daily parkers;
 // a FULL sign -> full for everyone; the general card -> lift this structure's sign updates (posted prices come back).
-const SIGN_TEXT={event:p=>'EVENT PARKING $'+p,permits_only:()=>'PERMITS & RESERVATIONS ONLY',full:()=>'FULL (any wording)',available:()=>'Parking available (the general sign)'};
+const SIGN_TEXT={event:p=>'EVENT PARKING $'+p,permits_only:()=>'PERMITS & RESERVATIONS ONLY',full:()=>'FULL',available:()=>'Parking available (the general sign)'};
 let sgPick=null;
 function sgStructs(){return (mobility?.parking||[]).filter(p=>(p.booth_signs||[]).length);}
 function sgRender(){const list=sgStructs(),was=$('sgStruct').value;
