@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
 import {DatabaseSync} from 'node:sqlite';
 import {createHash} from 'node:crypto';
 import worker from '../cloudflare/worker.mjs';
@@ -149,4 +150,23 @@ test('EVK is found by its short name and links to its owner\'s hours page, not t
   assert.deepEqual(rows.map(b => b.id), ['evk']);
   assert.equal(rows[0].hours_url, 'https://hospitality.usc.edu/hours/');
   assert.ok((await call({}, '/api/buildings?q=doheny')).data.every(b => b.hours_url === null));
+});
+
+test('"campus tour" and "admissions" route to the Admission Center in Sample Hall, e.g. from the Royal booth',async()=>{
+  for(const to of ['campus tour','admissions','USC Admission Center','Sample Hall','SKS']){
+    const r=await (await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{place:'royal'},to})}),{})).json();
+    assert.equal(r.ok,true,to);assert.equal(r.summary.building,'steven-and-katherine-sample-hall',to);assert.equal(r.summary.start_place.id,'royal');
+  }
+});
+
+test('Sample Hall says it is part of the TCC complex, on the arrival card',async()=>{
+  const rows=await (await worker.fetch(new Request('http://test/api/buildings?q=sample'),{})).json();
+  assert.equal(rows.find(b=>b.id==='steven-and-katherine-sample-hall').part_of,'Ronald Tutor Campus Center (TCC)');
+  const html=readFileSync(new URL('../outdoor/static/index.html',import.meta.url),'utf8');
+  const code=html.slice(html.indexOf('// "Part of the Ronald'),html.indexOf('function hoursLink('));
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const ctx=vm.createContext({esc,buildings:rows});vm.runInContext(code,ctx);
+  assert.equal(vm.runInContext("partOf('steven-and-katherine-sample-hall')",ctx),'<div class="dim">Part of the Ronald Tutor Campus Center (TCC) complex</div>');
+  assert.equal(vm.runInContext("partOf('rtcc')",ctx),'');
+  assert.match(html,/esc\(s\.building_name\)\+'<\/h2>'\+partOf\(s\.building\)/);
 });
