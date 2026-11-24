@@ -147,7 +147,22 @@ export function parkingRates(rules,p,when){
   if(event.length)return event.map(staff);
   const published=(p.published_rates||[]).filter(r=>!r.windows||r.windows.some(w=>inWindow(w,when)));
   return RATE_OPTIONS.flatMap(o=>{const s=mine.find(r=>r.option===o);if(s)return [staff(s)];
-    return published.filter(r=>r.option===o).map(r=>({option:r.option,price:r.price,max:r.max??null,validated:null,pay:r.pay||null,label:null,note:r.note||null,source:'published',updated:null,until:null}));});
+    return published.filter(r=>r.option===o).map(r=>{
+      // A window may name its own way to pay (Downey: pay station only until 4 pm); pay_from says what changes later today.
+      const w=r.windows?.find(x=>inWindow(x,when)),pay=w?.pay||r.pay||null,c=clock(when);
+      const next=w&&r.windows.find(x=>x!==w&&x.days.includes(c.day)&&hhmm(x.from)===hhmm(w.to)),later=next?(next.pay||r.pay||null):null;
+      return {option:r.option,price:r.price,max:r.max??null,validated:null,pay,label:null,note:r.note||null,source:'published',updated:null,until:null,
+        ...(next&&later!==pay?{pay_from:{time:next.from,pay:later}}:{})};});});
+}
+// Published prices not on sale yet but starting later today (Downey's daily rate before noon): [{option, price, max, from}].
+// Not when staff posted a price for that option, or an event or free price.
+export function laterRates(rules,p,when){
+  const mine=rules.filter(r=>r.kind==='rate'&&r.parking===p.id&&parkingRuleActive(r,when));
+  if(mine.some(r=>r.option==='event'||r.option==='free'))return [];
+  const now=parkingRates(rules,p,when),c=clock(when);
+  return (p.published_rates||[]).filter(r=>r.windows&&!now.some(x=>x.option===r.option)).flatMap(r=>{
+    const starts=r.windows.filter(w=>w.days.includes(c.day)&&hhmm(w.from)>c.minute).map(w=>w.from).sort();
+    return starts.length?[{option:r.option,price:r.price,max:r.max??null,from:starts[0]}]:[];});
 }
 // "$3/hour (max $18/day)", "All day $18", "Football vs UCLA: $30", "Free"; plus how to pay.
 // The page has the same wording (index.html rateText).
@@ -215,7 +230,7 @@ export function parkingState(context,when,rules=[],credentials={}) {
     const byPermit=permit&&(gate?.permit_access===true||gameRule!==null);
     if(!entrance||!exit) reason='Surveyed entrance or pedestrian exit is missing.';
     const rates=parkingRates(rules,p,when),{published_rates,...pub}=p;
-    return {...pub,rates,rates_source:rates.some(r=>r.source==='published')?context.mobilityData.rates_source:null,rates_apply:!permit,gate:primary.gate,campus_via:primary.campus_via,access,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:space?.status||'unknown',space,availability_basis:space?'staff update; spaces are not guaranteed':'gate hours and published access; spaces are not guaranteed'};
+    return {...pub,rates,rates_later:laterRates(rules,p,when),rates_source:rates.some(r=>r.source==='published')?context.mobilityData.rates_source:null,rates_apply:!permit,gate:primary.gate,campus_via:primary.campus_via,access,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:space?.status||'unknown',space,availability_basis:space?'staff update; spaces are not guaranteed':'gate hours and published access; spaces are not guaranteed'};
   });
 }
 export function circlePolygon(lat,lon,radius=35) {
@@ -446,7 +461,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     }
   }
   candidates.sort((a,b)=>a.score-b.score);
-  if(!candidates.length)return {ok:false,reason:'No eligible parking route. Check gate hours, access requirements, or choose another structure.',parking};
+  if(!candidates.length)return {ok:false,reason:'No parking route works at this time. Check the gate hours and whether you need a USC ID or permit, or choose another structure.',parking};
   const reportAreas=driving.map(c=>({id:c.id,name:c.note||'Approved blockage',basis:'staff_confirmed',geometry:circlePolygon(c.lat,c.lon,c.radius_m||15)}));
   let attempts=0;const checks=[],found=[];const reject=(p,check,extra={})=>checks.push({parking:p.id,check,...extra});
   // A bounded number of requests protects the free-tier quota; choose a specific
