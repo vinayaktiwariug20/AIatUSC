@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
@@ -338,4 +339,31 @@ test('a momentary storage failure is retried once', async () => {
     return '[]'; }}; }}; }};
   assert.deepEqual(await readRules(flaky, Date.now()), []);
   assert.equal(calls, 2);
+});
+
+// Downey's $20 daily rate: Mon-Thu from noon at the pay station, by phone too from 4 pm; all day Fri-Sun.
+test('a published rate says when it goes on sale and how to pay at this hour',()=>{
+ const downey=when=>parkingState(context,parseTime(when),[],{}).find(p=>p.id==='downey');
+ const morning=downey('2026-11-24T10:00');                                   // a Tuesday
+ assert.deepEqual(morning.rates,[]);
+ assert.deepEqual(morning.rates_later,[{option:'daily',price:20,max:null,from:'12:00'}]);
+ const noon=downey('2026-11-24T12:13');
+ assert.equal(noon.rates[0].pay,'pay_station');assert.deepEqual(noon.rates[0].pay_from,{time:'16:00',pay:'phone_or_station'});
+ assert.deepEqual(noon.rates_later,[]);
+ const evening=downey('2026-11-24T17:00');
+ assert.equal(evening.rates[0].pay,'phone_or_station');assert.equal(evening.rates[0].pay_from,undefined);
+ const saturday=downey('2026-11-28T09:00');
+ assert.equal(saturday.rates[0].pay,'phone_or_station');assert.equal(saturday.rates[0].pay_from,undefined);
+ // A staff event price replaces everything, including what would start later.
+ const event={id:'e',kind:'rate',parking:'downey',option:'event',price:45,starts_ms:parseTime('2026-11-24T00:00'),ends_ms:parseTime('2026-11-25T00:00'),created_ms:0,updated:'2026-11-24T00:00'};
+ assert.deepEqual(parkingState(context,parseTime('2026-11-24T10:00'),[event],{}).find(p=>p.id==='downey').rates_later,[]);
+});
+test('the map words a rate in plain terms: when it starts, how to pay now, and who can park',()=>{
+ const html=readFileSync(new URL('../outdoor/static/index.html',import.meta.url),'utf8');
+ const code=html.slice(html.indexOf('function clock12('),html.indexOf('// Map labels: just the prices'));
+ const ctx=vm.createContext({});vm.runInContext(code,ctx);
+ assert.equal(vm.runInContext("clock12('12:00')+'|'+clock12('16:00')+'|'+clock12('09:30')+'|'+clock12('24:00')",ctx),'noon|4 pm|9:30 am|midnight');
+ assert.equal(vm.runInContext("payWhen({pay:'pay_station',pay_from:{time:'16:00',pay:'phone_or_station'}})",ctx),' (pay station now; phone too from 4 pm)');
+ assert.equal(vm.runInContext("payWhen({pay:'phone_or_station'})",ctx),'');
+ assert.doesNotMatch(html,/[Aa]ccess requirements/);
 });
