@@ -33,6 +33,7 @@ body.walking .panel{flex:0 0 auto}
 #view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
 #labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .lab{position:absolute;transform:translate(-50%,-50%);font-size:11px;font-weight:600;letter-spacing:.02em;color:#2b3038;background:rgba(255,255,255,.82);border:1px solid rgba(0,0,0,.08);padding:1px 6px;border-radius:9px;white-space:nowrap}
+.lab.room{min-width:24px;padding:1px 5px;border-color:#fff;border-radius:5px;background:#263932;color:#fff;text-align:center;font-variant-numeric:tabular-nums;box-shadow:0 1px 3px #0003}
 .lab.pin{transform:translate(-50%,-150%);color:#fff;border-color:transparent;font-size:12px;padding:2px 8px}
 .lab.start{background:var(--you)}
 .lab.end{background:var(--brand)}
@@ -284,6 +285,15 @@ function addLabel(text, pos, floorsShown, cls) {
   return l;
 }
 for (const l of B.labels) addLabel(l.text, {x: l.x, y: l.y + 0.4, z: l.z}, l.floors).detail = !!l.detail;
+function roomBadge(room) {
+  const number = (room.name || room.id).replace(/^Room\s+/i, '');
+  return room.estimated ? `≈${number}` : number;
+}
+for (const room of B.rooms) {
+  const door = room.node ? NAV.nodes[room.node] : room;
+  const pos = {x: door.x, y: FLOOR_Y[door.floor] + 1.6, z: door.z};
+  addLabel(roomBadge(room), pos, [door.floor], 'room').roomId = room.id;
+}
 
 // ---------------------------------------------------------------- floor switch
 let floorMode = 0, floorChosenByUser = false;
@@ -292,10 +302,17 @@ function setFloor(mode, byUser) {
   if (byUser) floorChosenByUser = true;
   floors[1].visible = mode !== 2;
   floors[2].visible = mode !== 1;
+  showFloorItems();
   for (const b of document.querySelectorAll('.seg button')) b.setAttribute('aria-pressed', String(Number(b.dataset.floor) === mode));
 }
 for (const b of document.querySelectorAll('.seg button')) b.addEventListener('click', () => setFloor(Number(b.dataset.floor), true));
 const floorVisible = f => floorMode === 0 || floorMode === f;
+// Pins and route pieces on a floor that is hidden are hidden too (a floor-2 room must not look like a floor-1 door).
+// Pieces with no floor (a stair or lift between floors) always show.
+function showFloorItems() {
+  for (const pin of pins) pin.show();
+  for (const c of routeGroup.children) c.visible = c.userData.floor == null || floorVisible(c.userData.floor);
+}
 
 // ---------------------------------------------------------------- camera framing
 let walk = null;                                                   // set while the first-person view is on
@@ -383,11 +400,23 @@ function makePin(color, text, cls) {
   const label = text ? addLabel(text, {x: 0, y: 0, z: 0}, [1, 2], 'pin ' + cls) : null;
   if (label) label.el.hidden = true;
   const pin = {
-    group, dot,
-    place(p) {
-      group.visible = !!p;
+    group, dot, at: null,
+    show() {
+      const p = pin.at, on = !!p && (p.floor == null || floorVisible(p.floor));
+      group.visible = on;
+      if (label) label.el.hidden = !on;
+    },
+    place(p, caption = text) {
+      pin.at = p || null;
       if (p) group.position.set(p.x, p.y, p.z);
-      if (label) { label.el.hidden = !p; if (p) label.pos.set(p.x, p.y + PIN_H, p.z); }
+      pin.show();
+      if (label) {
+        if (p) { label.pos.set(p.x, p.y + PIN_H, p.z); if (p.floor != null) label.floors = [p.floor]; }
+        if (label.el.textContent !== caption) {
+          label.el.textContent = caption;
+          label.w = 0;
+        }
+      }
     },
   };
   pins.push(pin);
@@ -426,10 +455,23 @@ function drawRoute(r) {
   current = r;
   if (!r) return;
   const pts = r.points.map(p => new THREE.Vector3(p.x, p.y + 0.09, p.z));
-  const g = ribbon(pts);
-  const ghost = new THREE.Mesh(g, ghostMat); ghost.renderOrder = 5;
-  const main = new THREE.Mesh(g.clone(), routeMat); main.renderOrder = 6;
-  routeGroup.add(ghost, main);
+  // One piece per floor, plus the stair or lift pieces between floors (floor: null).
+  const pieces = [];
+  for (let i = 0; i < r.points.length; i++) {
+    const f = r.points[i].floor, last = pieces.at(-1);
+    if (last && last.floor === f) { last.idx.push(i); continue; }
+    if (last) pieces.push({floor: null, idx: [i - 1, i]});
+    pieces.push({floor: f, idx: [i]});
+  }
+  for (const piece of pieces) {
+    if (piece.idx.length < 2) continue;
+    const g = ribbon(piece.idx.map(i => pts[i]));
+    const ghost = new THREE.Mesh(g, ghostMat); ghost.renderOrder = 5;
+    const main = new THREE.Mesh(g.clone(), routeMat); main.renderOrder = 6;
+    ghost.userData.floor = main.userData.floor = piece.floor;
+    routeGroup.add(ghost, main);
+  }
+  showFloorItems();
   if (!floorChosenByUser) {
     const fs = new Set(r.points.map(p => p.floor));
     setFloor(fs.size === 1 ? [...fs][0] : 0, false);
@@ -441,6 +483,11 @@ function drawRoute(r) {
 const ends = {from: null, to: null};      // {id, name, end: node id | snapped point}
 let editing = null;                       // 'from' | 'to' while an end that is already set is being changed
 const endPos = e => typeof e.end === 'string' ? NAV.nodes[e.end] : e.end;
+function placeName(place) {
+  const name = place.name || place.id;
+  return place.estimated ? `${name} (estimated)` : name;
+}
+const placeSelection = place => ({id: place.id, name: placeName(place), end: placeEnd(B, place)});
 function mode() {
   if (walk) return 'walk';
   if (editing) return editing;
@@ -449,7 +496,7 @@ function mode() {
   return 'route';
 }
 function setEnd(which, place, point) {
-  if (place) ends[which] = {id: place.id, name: place.name || place.id, end: placeEnd(B, place)};
+  if (place) ends[which] = placeSelection(place);
   else if (point) ends[which] = {id: null, name: `a point in ${point.area} (floor ${point.floor})`, end: point};
   else ends[which] = null;
   editing = null;
@@ -467,7 +514,8 @@ function update() {
   }
   drawRoute(r);
   startPin.place(ends.from && endPos(ends.from));
-  endPin.place(ends.to && endPos(ends.to));
+  const room = B.rooms.find(r => r.id === ends.to?.id);
+  endPin.place(ends.to && endPos(ends.to), room ? roomBadge(room) : undefined);
   if (!r && !floorChosenByUser) {                                   // one end only: show the floor it is on
     const e = ends.from || ends.to;
     if (e) setFloor(endPos(e).floor, false);
@@ -547,7 +595,7 @@ for (const fl of B.floors) {
   $('spots').append(sec);
 }
 for (const r of B.rooms) {
-  const b = Object.assign(document.createElement('button'), {type: 'button', className: 'btn', textContent: r.name || r.id});
+  const b = Object.assign(document.createElement('button'), {type: 'button', className: 'btn', textContent: placeName(r)});
   b.addEventListener('click', () => setEnd('to', findPlace(B, r.id), null));
   $('roomList').append(b);
 }
@@ -759,12 +807,12 @@ canvas.addEventListener('pointerup', e => {
 // ---------------------------------------------------------------- the link from the outdoor map
 // anchor: the door the outdoor map brought you to, so the route starts there without asking. room: where the event is.
 const anchor = !otherBuilding && qs.get('anchor') && findPlace(B, qs.get('anchor'));
-if (anchor) ends.from = {id: anchor.id, name: anchor.name || anchor.id, end: placeEnd(B, anchor)};
+if (anchor) ends.from = placeSelection(anchor);
 const room = qs.get('room');
 if (otherBuilding) { $('notice').hidden = false; $('notice').textContent = `Indoor directions are not set up for that building yet. This is the map of ${B.name}.`; }
 else if (room) {
   const place = findPlace(B, room);
-  if (place) ends.to = {id: place.id, name: place.name || place.id, end: placeEnd(B, place)};
+  if (place) ends.to = placeSelection(place);
   else { $('notice').hidden = false; $('notice').textContent = `Room “${room}” is not on this map yet. Pick the place you are going instead.`; }
 }
 update();
@@ -884,10 +932,13 @@ function tick(now) {
   if (walk) return;
   // place the labels; one that would cover an earlier one is left out
   const taken = [];
+  const overview = floorMode === 0;
   for (const l of labels) {
     if (l.el.hidden) continue;
     v.copy(l.pos).project(camera);
-    let show = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && l.floors.some(floorVisible) && !(l.detail && floorMode === 0);
+    const inView = v.z >= -1 && v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05;
+    const showRoom = !l.roomId || (!overview && l.roomId !== ends.to?.id);
+    let show = inView && l.floors.some(floorVisible) && showRoom && !(l.detail && overview);
     if (show) {
       const x = (v.x + 1) / 2 * vw, y = (1 - v.y) / 2 * vh;
       if (!l.w) { l.el.style.display = ''; l.w = l.el.offsetWidth; l.h = l.el.offsetHeight; }
