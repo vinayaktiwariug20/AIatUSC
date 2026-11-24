@@ -129,3 +129,16 @@ test('a door with no indoor directions names the building doors that have them',
   assert.equal(wrong.ok,false);assert.match(wrong.reason,/does not belong/);
   assert.match(vm.runInContext("arrivalCard({building:'x',building_name:'X'},{building:'x',indoor_doors:[]})",ctx),/not set up for this building yet/);
 });
+
+test('a booth QR link (?from=royal) starts at the structure\'s pedestrian exit; /booth/ makes the links',async()=>{
+  const places=await (await worker.fetch(new Request('http://test/api/places'),{})).json();
+  const royal=places.find(p=>p.id==='royal');assert.deepEqual([royal.lat,royal.lon],[34.0225223,-118.2819022]);
+  assert.ok(places.filter(p=>p.kind==='parking').every(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)));
+  // The map: a named structure becomes a place start (routes leave by its walk-out points), not a point.
+  assert.match(html,/const fromPlace=\(qs\.get\('from'\)\|\|''\)\.trim\(\)\.toLowerCase\(\);/);
+  assert.match(html,/start=\{place:p\.id\};marker\(p\.lat,p\.lon\);/);
+  assert.match(html,/if\(mode==='walking'&&start\?\.place\)\{const f=\(r\.features\|\|\[\]\)\.find\(x=>x\.properties\?\.kind==='start'\);if\(f\)marker\(/);   // the dot moves to the exit used
+  const booth=read('../outdoor/static/booth/index.html');
+  assert.match(booth,/location\.origin\+'\/\?from='\+encodeURIComponent\(id\)/);
+  assert.match(booth,/not affiliated with or endorsed by USC/);
+});

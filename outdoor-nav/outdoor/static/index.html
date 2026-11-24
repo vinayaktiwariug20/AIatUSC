@@ -219,7 +219,10 @@ async function route(fit=true){
   const r=await api('/api/outdoor/route',{method:'POST',signal:controller.signal,body:JSON.stringify({from:start,to:buildingId(),mode,at:$('departAt').value||undefined,parking:$('parking').value,usc_id:$('uscId').checked,parking_pass:$('parkingPass').checked,permit:$('permit').value||undefined,step_free:$('stepFree').checked,entrance:mode==='walking'&&door?.building===buildingId()&&door.id||undefined})});
   if(id!==routeVersion)return;lastRouted=Date.now();
   if(!r.ok){const choices=(r.choices||[]).map(c=>'<button class="small" data-pick="'+esc(c.id)+'">'+esc(c.name)+'</button>').join(' ');$('result').innerHTML='<div class="card error">'+esc(r.reason||r.error)+(choices?'<div class="row wrap" style="margin-top:8px">'+choices+'</div>':'')+'</div>';info('Choose another start or parking structure.');return;}
-  plan=r;drawPlan(r,fit);const s=r.summary;track('route');stat(mode==='driving'?'route_drive':'route_walk');if(mode==='walking'&&s.step_free)stat('step_free');if(r.handoff_only)stat('drive_fallback');const hoIn=(mode==='walking'?r.handoff:r.walking_preview?.handoff)||{};updateIndoorView(s,mode==='walking'?r.handoff||{}:{},!!(hoIn.indoor_node||(hoIn.indoor_doors||[]).length));
+  plan=r;drawPlan(r,fit);const s=r.summary;
+  // Starting at a structure, the route picks the exit: put the start dot on the one it uses.
+  if(mode==='walking'&&start?.place){const f=(r.features||[]).find(x=>x.properties?.kind==='start');if(f)marker(f.geometry.coordinates[1],f.geometry.coordinates[0]);}
+track('route');stat(mode==='driving'?'route_drive':'route_walk');if(mode==='walking'&&s.step_free)stat('step_free');if(r.handoff_only)stat('drive_fallback');const hoIn=(mode==='walking'?r.handoff:r.walking_preview?.handoff)||{};updateIndoorView(s,mode==='walking'?r.handoff||{}:{},!!(hoIn.indoor_node||(hoIn.indoor_doors||[]).length));
   if(mode==='driving'){
    const dt=s.drive_to,apps=mapsButtons(dt);
    if(r.handoff_only){
@@ -819,6 +822,18 @@ $('to').onblur=()=>searchMode(false);
     await refresh();
     if(role)await Promise.all([loadRules(),loadQuestions()]).catch(()=>{});
 
+    // ?from=royal: start at that parking structure's walk-out points (the booth QR sign, /booth/).
+    const fromPlace=(qs.get('from')||'').trim().toLowerCase();
+    if(fromPlace&&!start){
+      const places=await api('/api/places').catch(()=>[]),p=places.find(x=>x.id===fromPlace&&x.lat!=null);
+      if(p){
+        const name=(mobility?.parking||[]).find(x=>x.id===p.id)?.name||p.name;
+        if(mode!=='walking')setMode('walking');
+        start={place:p.id};marker(p.lat,p.lon);$('from').value=name;stat('start_place');
+        if($('to').value)await route(true);
+        else{map.setView([p.lat,p.lon],Math.max(map.getZoom(),16));info('Starting from '+name+'. Where are you walking to?');}
+      }
+    }
     const at=qs.get('at');
     if(at){
       const [lat,lon]=at.split(',').map(Number);

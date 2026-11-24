@@ -351,3 +351,14 @@ def test_avoid_stairs_prefers_a_step_free_door():
     level = g.route(34.0204, -118.2852, "Student Union", step_free=True)
     assert level["handoff"]["entrance_id"] == "su-ramp"
     assert level["handoff"]["step_free_door"] is True
+
+
+def test_places_give_the_pedestrian_exit_to_start_from(tmp_path):
+    # /booth/ QR links (?from=royal) put the start marker here.
+    g = WalkGraph()
+    if "royal" not in g.places:
+        pytest.skip("no data/surveyed.json")
+    app = App(g, ClosureStore(tmp_path / "c.json"), admin_token="")
+    code, rows = app.handle("GET", "/api/places", {}, None, {})
+    royal = next(p for p in rows if p["id"] == "royal")
+    assert code == 200 and (royal["lat"], royal["lon"]) == (34.0225223, -118.2819022)

@@ -68,7 +68,12 @@ class App:
                          "gates": self.gates.status(parse_when(query.get("at", [None])[0]))}
 
         if method == "GET" and path == "/api/places":
-            return 200, [{"id": p["id"], "name": p["name"], "kind": p["kind"]}
+            def walk_out(p):   # where people leave on foot: the first pedestrian exit, else the first point
+                n = next((x for x in p["nodes"] if ".ped." in x), p["nodes"][0])
+                ll = g.nodes.get(n)
+                return (ll[0], ll[1]) if ll else (None, None)
+            return 200, [{"id": p["id"], "name": p["name"], "kind": p["kind"],
+                          "lat": walk_out(p)[0], "lon": walk_out(p)[1]}
                          for p in sorted(g.places.values(), key=lambda p: p["name"])]
 
         m = re.fullmatch(r"/api/buildings/([^/]+)", path)

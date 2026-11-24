@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Booth QR codes · Doorstep</title>
+<link rel="icon" href="data:,">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+:root{--bg:#f5f1ea;--ink:#202329;--dim:#59616e;--line:#e5ddd0;--cardinal:#7a1424;--cardinal-2:#5a0e1a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{background:linear-gradient(135deg,var(--cardinal),var(--cardinal-2));color:#fff;padding:22px 18px}
+header .in,main{max-width:680px;margin:0 auto}
+header small{color:#f3d9a4;letter-spacing:.08em}
+h1{margin:4px 0 0;font-size:24px}
+main{padding:8px 16px 40px}
+.dim{color:var(--dim);font-size:14px}
+label{display:block;font-weight:600;margin:14px 0 4px}
+select{font:inherit;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+button,a.btn{font:inherit;font-size:15px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;text-decoration:none}
+button.primary{background:var(--cardinal);border-color:var(--cardinal);color:#fff}
+code{font-size:13px;overflow-wrap:anywhere}
+a{color:var(--cardinal)}
+/* The sign: what gets printed and taped in the booth window. */
+.sign{background:#fff;border:2px solid var(--cardinal);border-radius:14px;padding:22px 18px;text-align:center;margin:16px 0}
+.sign .big{font-size:26px;font-weight:700;line-height:1.2;margin:0}
+.sign .sub{font-size:18px;margin:8px 0 12px}
+.sign .qr svg{width:min(260px,70vw);height:auto;display:block;margin:0 auto}
+.sign .small{font-size:12px;color:var(--dim);margin-top:12px}
+@media print{
+  header,.noprint{display:none!important}
+  body{background:#fff}
+  main{padding:0;max-width:none}
+  .sign{border:3px solid #000;margin:0;padding:48px 32px;break-inside:avoid}
+  .sign .big{font-size:40px}.sign .sub{font-size:26px}
+  .sign .qr svg{width:9cm}
+}
+</style>
+</head>
+<body>
+<header><div class="in"><small>DOORSTEP</small><h1>Booth QR codes</h1></div></header>
+<main>
+<div class="noprint">
+<p>A QR code for each parking structure. Scanning it opens Doorstep already starting at that structure's pedestrian exit, so a guest only has to type where they're going.</p>
+<p class="dim">Try it from your own phone first. Putting a sign up at a booth is USC Transportation's call: ask a supervisor before printing one for the window.</p>
+<label for="struct">Parking structure</label>
+<select id="struct"></select>
+</div>
+<div class="sign" id="sign">
+  <p class="big">Walking somewhere on campus?</p>
+  <p class="sub" id="sub">Scan for walking directions from here</p>
+  <div class="qr" id="qr" role="img" aria-label="QR code"></div>
+  <p class="small">Doorstep · a student project, not affiliated with or endorsed by USC</p>
+</div>
+<div class="noprint">
+  <div class="row"><button class="primary" id="print">Print the sign</button><a class="btn" id="open" target="_blank" rel="noopener">Open the link</a><button id="copy">Copy the link</button></div>
+  <p class="dim">Link: <code id="link"></code></p>
+  <p class="dim" style="margin-top:28px"><a href="/">Back to the map</a> · <a href="/create/">Make an event link</a></p>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const qs=new URLSearchParams(location.search);
+// Structures: the parking list (proper names), kept to those Doorstep can start a walk from.
+async function load(){
+  const [mob,places]=await Promise.all([fetch('/api/mobility').then(r=>r.json()),fetch('/api/places').then(r=>r.json())]);
+  const startable=new Set(places.filter(p=>p.lat!=null).map(p=>p.id));
+  const list=(mob.parking||[]).filter(p=>startable.has(p.id)).sort((a,b)=>a.name.localeCompare(b.name));
+  $('struct').innerHTML=list.map(p=>'<option value="'+p.id+'">'+p.name.replace(/[&<>"]/g,'')+'</option>').join('');
+  if(list.some(p=>p.id===qs.get('from')))$('struct').value=qs.get('from');
+  show();
+}
+function show(){
+  const id=$('struct').value,name=$('struct').selectedOptions[0]?.textContent||'';
+  const link=location.origin+'/?from='+encodeURIComponent(id);
+  const q=qrcode(0,'M');q.addData(link);q.make();
+  $('qr').innerHTML=q.createSvgTag({cellSize:6,margin:2,scalable:true});
+  $('qr').setAttribute('aria-label','QR code for walking directions from '+name);
+  $('sub').textContent='Scan for walking directions from '+name;
+  $('link').textContent=link;$('open').href=link;
+  history.replaceState(null,'','?from='+encodeURIComponent(id));
+}
+$('struct').onchange=show;
+$('print').onclick=()=>print();
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('link').textContent);$('copy').textContent='Copied';}catch{$('copy').textContent='Copy failed: select the link';}setTimeout(()=>{$('copy').textContent='Copy the link';},2000);};
+load().catch(()=>{$('sub').textContent='Could not load the parking structures. Reload to try again.';});
+</script>
+</body>
+</html>

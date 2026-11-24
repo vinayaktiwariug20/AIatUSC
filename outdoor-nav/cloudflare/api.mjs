@@ -142,7 +142,7 @@ export async function handleApi(request, env, context) {
         .sort((a, b) => a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0);
       return reply(rows, 200, head);
     }
-    if (method === 'GET' && path === '/api/places') return reply(Object.values(data.places).sort((a,b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0).map(p => ({id:p.id,name:p.name,kind:p.kind})), 200, head);
+    if (method === 'GET' && path === '/api/places') return reply(Object.values(data.places).sort((a,b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0).map(p => {const n=p.nodes.find(x=>x.includes('.ped.'))||p.nodes[0],ll=data.nodes[n];return {id:p.id,name:p.name,kind:p.kind,lat:ll?ll[0]:null,lon:ll?ll[1]:null};}), 200, head);
     if (method === 'GET' && ['/api/gates','/api/mobility'].includes(path)) {
       const when=parseTime(url.searchParams.get('at')),rules=await readRules(db,when),credentials={usc_id:url.searchParams.get('usc_id')==='true',parking_pass:url.searchParams.get('parking_pass')==='true',permit:url.searchParams.get('permit')||null};
       if(path==='/api/mobility')return reply(mobilityState(context,when,rules,credentials),200,head);
