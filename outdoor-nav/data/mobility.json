@@ -218,7 +218,7 @@
         {"sign": "full"},
         {"sign": "available"}
       ],
-      "_booth_signs_source": "Sign cards seen in the Royal booth by the team (2026-11-24): EVENT PARKING $50, $40, $35; PERMITS & RESERVATIONS ONLY; LOT FULL remembered. The card on display then was presumably the general one. Not necessarily the full set.",
+      "_booth_signs_source": "Sign cards seen in the Royal booth by the team (2026-11-24): EVENT PARKING $50, $40, $35; PERMITS & RESERVATIONS ONLY; a full sign remembered, exact wording not known (something like LOT FULL). The card on display then was presumably the general one. Not necessarily the full set.",
       "gate": "royal",
       "entrance": "ROYAL.veh.jefferson",
       "exit": "ROYAL.ped.jefferson",
