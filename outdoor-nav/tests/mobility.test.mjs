@@ -168,12 +168,17 @@ test('a driving route starting farther than the limit from the user is still rej
 // Live bug: on evenings/weekends no driving route survived, because closed gates
 // with APPROXIMATE pins (middle of public intersections) became 35 m no-go
 // circles that closed the public streets around campus.
+// Every gate is pinned now; this one is put back on an intersection guess to keep the rule tested.
+const approxContext={...context,mobilityData:{...context.mobilityData,gates:context.mobilityData.gates.map(g=>g.id==='jefferson-blvd'?{id:g.id,lat:34.02488,lon:-118.29026,location_source:'approximate_intersection'}:g)}};
 test('closed gates with approximate pins do not close public streets; surveyed gates get a small circle',async()=>{
  const sat=parseTime('2026-11-14T20:00:00'),areas=avoidance(context,sat,sat+1800000,[],{});
  const ids=areas.map(a=>a.id);
+ assert.ok(!avoidance(approxContext,sat,sat+1800000,[],{}).some(a=>a.id==='gate:jefferson-blvd'));   // approximate pin
  assert.ok(ids.includes('gate:watt'),ids);                                  // surveyed, closed on weekends
  assert.ok(ids.includes('gate:downey-way'),ids);                            // pinned on 36th Pl, closed to cars on weekends
- assert.ok(!ids.includes('gate:jefferson-blvd'));                         // approximate pin
+ // Jefferson is pinned 12.5 m from Jefferson Blvd (at about 34.02545): its circle sits inside campus too.
+const jeff=areas.find(a=>a.id==='gate:jefferson-blvd');assert.ok(jeff,ids);
+ for(const [lon,lat] of jeff.geometry.coordinates[0])assert.ok(lat<34.0254,'circle reaches Jefferson: '+lat);
  // Royal is pinned 12 m from Jefferson: its circle sits inside campus and stays clear of the street.
  const royal=areas.find(a=>a.id==='gate:royal');assert.ok(royal);
  for(const [lon,lat] of royal.geometry.coordinates[0])assert.ok(lat<34.02285,'circle reaches Jefferson: '+lat);
@@ -203,7 +208,7 @@ test('rule modes: default cars; walking needs a surveyed gate pin; bad modes rej
  assert.deepEqual(validateRule(base,context).modes,['driving']);
  assert.deepEqual(validateRule({...base,modes:['walking','driving']},context).modes,['walking','driving']);
  assert.throws(()=>validateRule({...base,modes:['flying']},context),/Closed to/);
- assert.throws(()=>validateRule({...base,gate:'jefferson-blvd',modes:['walking']},context),/approximate/);
+ assert.throws(()=>validateRule({...base,gate:'jefferson-blvd',modes:['walking']},approxContext),/approximate/);
  assert.deepEqual(validateRule({...base,gate:'downey-way',modes:['walking']},context).modes,['walking']);   // now pinned
 });
 test('a walking-only gate closure leaves car access alone; a cars-only one leaves walking alone',()=>{
