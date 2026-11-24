@@ -150,3 +150,10 @@ test('EVK is found by its short name and links to its owner\'s hours page, not t
   assert.equal(rows[0].hours_url, 'https://hospitality.usc.edu/hours/');
   assert.ok((await call({}, '/api/buildings?q=doheny')).data.every(b => b.hours_url === null));
 });
+
+test('"campus tour" and "admissions" route to the Admission Center in TCC, e.g. from the Royal booth',async()=>{
+  for(const to of ['campus tour','admissions','USC Admission Center']){
+    const r=await (await worker.fetch(new Request('http://test/api/outdoor/route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:{place:'royal'},to})}),{})).json();
+    assert.equal(r.ok,true,to);assert.equal(r.summary.building,'rtcc',to);assert.equal(r.summary.start_place.id,'royal');
+  }
+});

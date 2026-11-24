@@ -364,6 +364,19 @@
   "_source": "USC Facilities Planning & Management, UPC base map building list (UPC_BaseMapGrid_36x48_20260116.pdf)"
  },
  {
+  "building": "rtcc",
+  "aliases": [
+   "USC Admission Center",
+   "Admission Center",
+   "Admissions",
+   "Undergraduate Admission",
+   "Campus tour",
+   "Campus tours",
+   "Guided campus tour"
+  ],
+  "_source": "USC Undergraduate Admission, Tours page (admission.usc.edu/prospective-students/meet-us/tours/, checked 2026-11-24): guided tours check in at the Admission Center in the Ronald Tutor Campus Center, 3607 Trousdale Pkwy. Self-guided tours need no check-in, so no alias for them. Which TCC door is nearest the Admission Center is not surveyed yet."
+ },
+ {
   "building": "town-and-gown",
   "aliases": [
    "TGF"
