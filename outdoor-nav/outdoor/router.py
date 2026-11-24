@@ -123,7 +123,8 @@ class WalkGraph:
 
         An entry may also carry building metadata: `aliases` (names people
         actually type), `outline` ([[lat, lon], ...], drawn as the
-        highlight) and `hours_url` (the owner's hours page, shown as a link). An entry with no lat/lon is metadata only: no door."""
+        highlight), `hours_url` (the owner's hours page, shown as a link) and `part_of`
+        (the larger complex people may call it, e.g. Sample Hall in the TCC complex). An entry with no lat/lon is metadata only: no door."""
         for o in overrides:
             b = self.buildings.get(o["building"])
             if b is None:
@@ -138,6 +139,8 @@ class WalkGraph:
                 b["aliases"] = list(dict.fromkeys(list(o["aliases"]) + list(b.get("aliases", []))))
             if str(o.get("hours_url", "")).startswith("https://"):
                 b["hours_url"] = o["hours_url"]   # a link, never typed-in hours: they change for holidays and game days
+            if isinstance(o.get("part_of"), str) and o["part_of"].strip():
+                b["part_of"] = o["part_of"].strip()[:80]
             if o.get("outline"):
                 ring = [list(map(float, pt)) for pt in o["outline"]]
                 b["outline"] = ring if ring[0] == ring[-1] else ring + [ring[0]]
