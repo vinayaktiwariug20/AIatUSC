@@ -1,0 +1,12 @@
+# Security headers for every page and file (Cloudflare static assets; the API sets its own).
+# - frame-ancestors 'none' / X-Frame-Options: no other site can embed Doorstep in a frame,
+#   so nobody can trick a signed-in staff member into clicking Staff buttons hidden under their page.
+# - script-src: only our own scripts and the three CDNs the pages use (cdnjs: QR codes; jsDelivr: three.js
+#   for the indoor viewer; unpkg: Leaflet and MapLibre). blob: is MapLibre's map worker.
+#   'unsafe-inline' stays because the pages keep their scripts inline.
+# Images, map tiles and fonts are not restricted. Adding a script from a new site? Add it here.
+/*
+  Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com blob:; worker-src 'self' blob:
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

@@ -6,6 +6,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {WalkRouter, haversine} from '../cloudflare/router.mjs';
 import {parseTime,campusISO,gateStatus,handleApi} from '../cloudflare/api.mjs';
 import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M,walkingRuleClosures,DIRECTIONS_LIMITS}from '../cloudflare/mobility.mjs';
+import {collectFacts} from '../cloudflare/assistant.mjs';
 const json=name=>JSON.parse(readFileSync(new URL('../'+name,import.meta.url),'utf8'));
 const context={router:new WalkRouter(json('cloudflare/graph.json')),gateData:json('data/gates.json'),mobilityData:json('data/mobility.json'),footballData:json('data/football.json'),survey:json('data/surveyed.json'),time:{parseTime,campusISO,gateStatus}};
 class D1{constructor(){this.db=new DatabaseSync(':memory:');for(const f of ['0001_closures.sql','0002_mobility.sql'])this.db.exec(readFileSync(new URL('../migrations/'+f,import.meta.url),'utf8'));}prepare(sql){let params=[];const db=this.db;return{bind(...values){params=values;return this;},async first(column){const row=db.prepare(sql).get(...params);return row?column?row[column]:row:null;},async run(){return db.prepare(sql).run(...params);}};}}
@@ -382,4 +383,36 @@ test('booth sign cards: Royal lists its cards, and each card saves as an ordinar
  assert.equal(full.status,201,JSON.stringify(full.data));
  const html=readFileSync(new URL('../outdoor/static/index.html',import.meta.url),'utf8');
  for(const s of ["kind:'rate',parking:p.id,option:'event',price:c.price,pay:'booth',label:'Event parking'","kind:'parking',parking:p.id,applies:c.sign==='full'?'everyone':'daily',status:c.sign==='full'?'full':'closed'"])assert.ok(html.includes(s),s);
+});
+
+// Anyone can write a public report's note; until staff approve it, only staff see it.
+test('an unreviewed public report shows the public that it exists, not what it says; staff see the note',async()=>{
+ const e=env(),route=async token=>(await api(e,'/api/outdoor/route','POST',{from:{lat:34.0205,lon:-118.2862},to:'Student Union'},token)).data;
+ const line=(await route()).features.find(f=>f.properties.kind==='route').geometry.coordinates,[lon,lat]=line[Math.floor(line.length/2)];
+ const made=await api(e,'/api/closures','POST',{lat,lon,note:'call 555-0100, gate locked by J. Smith',kind:'<b>anything</b>'});   // on the route
+ assert.equal(made.status,201);assert.equal(made.data.status,'unverified');
+ const pub=(await api(e,'/api/closures')).data.find(c=>c.id===made.data.id);
+ assert.equal(pub.note,'');assert.equal(pub.kind,'report');assert.equal(pub.ai,undefined);
+ const staff=(await api(e,'/api/closures','GET',undefined,'staff')).data.find(c=>c.id===made.data.id);
+ assert.equal(staff.note,'call 555-0100, gate locked by J. Smith');
+ // A walking route past it warns without the note; staff routing sees the note.
+ const w=(await route()).summary.warnings.find(x=>x.id===made.data.id);assert.ok(w,'the route passes the report');
+ assert.equal(w.note,'');assert.equal((await route('staff')).summary.warnings.find(x=>x.id===made.data.id).note,'call 555-0100, gate locked by J. Smith');
+ // The assistant's facts never carry the note either.
+ const facts=collectFacts(context,Date.now(),{closures:[made.data],answers:[],rules:[]});
+ assert.ok(facts.some(f=>f.id==='report:'+made.data.id));assert.ok(!JSON.stringify(facts).includes('555-0100'));
+ // Once approved, it is staff-checked: the note shows.
+ await api(e,'/api/closures/'+made.data.id+'/approve','POST',{},'staff');
+ assert.equal((await api(e,'/api/closures')).data.find(c=>c.id===made.data.id).note,'call 555-0100, gate locked by J. Smith');
+});
+test('pages are served with headers that stop other sites embedding them',()=>{
+ const h=readFileSync(new URL('../outdoor/static/_headers',import.meta.url),'utf8');
+ assert.match(h,/^\/\*$/m);assert.match(h,/frame-ancestors 'none'/);assert.match(h,/X-Frame-Options: DENY/);
+ for(const cdn of ['https://cdnjs.cloudflare.com','https://cdn.jsdelivr.net','https://unpkg.com'])assert.ok(h.includes(cdn),cdn);
+ // Every external script a page loads must be allowed by script-src.
+ const allowed=h.match(/script-src ([^;]+)/)[1].split(' ');
+ for(const page of ['index.html','indoor/index.html','create/index.html','booth/index.html','survey/index.html','stats/index.html']){
+  const html=readFileSync(new URL('../outdoor/static/'+page,import.meta.url),'utf8');
+  for(const [,src] of html.matchAll(/(?:<script[^>]+src="|"(?:three|three\/addons\/)":")(https:\/\/[^/"]+)/g))assert.ok(allowed.includes(src),page+' loads '+src);
+ }
 });

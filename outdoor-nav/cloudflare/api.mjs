@@ -91,6 +91,14 @@ async function active(db, when, until = when + 1) {
   if (approved.length > 100) fail(503, 'Too many approved closures. Staff must review and reduce them.');
   return [...approved,...rows.filter(c=>c.status==='unverified').slice(0,20)];
 }
+// Public reports staff haven't checked: the public sees that there is one, not what it says.
+// (Anyone can write the note and the kind; staff, with a key, see both before approving.)
+export const publicReport = c => c.status === 'unverified' ? {...c, kind: 'report', note: '', ai: undefined} : c;
+function scrubWarnings(out) {
+  for (const s of [out?.summary, out?.walking_preview?.summary])
+    if (Array.isArray(s?.warnings)) s.warnings = s.warnings.map(w => w.status === 'unverified' ? {...w, note: ''} : w);
+  return out;
+}
 function reply(data, status = 200, head = false, extra = {}) {
   return new Response(head ? null : JSON.stringify(data), {status,
     headers: {'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...extra}});
@@ -126,6 +134,7 @@ export async function handleApi(request, env, context) {
     const requireAdmin = () => { if (locked) fail(429, locked); if (!admin) fail(403, 'admin token required'); };
     const requireStaff = () => { if (locked) fail(429, locked); if (!admin && !staff) fail(403, 'staff key or admin token required'); };
     const actor = () => admin ? 'Team admin' : staff?.name;
+    const forPublic = out => admin || staff ? out : scrubWarnings(out);
     if (method === 'GET' && path === '/api/health') {
       if (db && await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='closures'").first('name') !== 'closures') return reply({ok: false, database: 'migration_required'}, 503, head);
       const mobilityReady=!db||await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mobility_rules'").first('name')==='mobility_rules';
@@ -207,7 +216,7 @@ export async function handleApi(request, env, context) {
     }
     const building = /^\/api\/buildings\/([^/]+)$/.exec(path);
     if (method === 'GET' && building) return Object.hasOwn(data.buildings,building[1]) ? reply(data.buildings[building[1]], 200, head) : reply({error:'no such building'},404,head);
-    if (method === 'GET' && path === '/api/closures') return reply(await active(db, parseTime(url.searchParams.get('at'))),200,head);
+    if (method === 'GET' && path === '/api/closures') { const rows = await active(db, parseTime(url.searchParams.get('at'))); return reply(admin || staff ? rows : rows.map(publicReport),200,head); }
     if (method === 'POST' && path === '/api/outdoor/route') {
       const mode=body.mode||'walking';
       if(!['walking','driving'].includes(mode))fail(400,'Mode must be walking or driving.');
@@ -219,7 +228,7 @@ export async function handleApi(request, env, context) {
       const when = parseTime(body.at);
       if(mode==='driving') {
         const rules=await readRules(db,when,when+6*3600000),rows=await active(db,when,when+6*3600000);
-        try{return reply(await drivingRoute(context,body,when,rules,rows,env));}
+        try{return reply(forPublic(await drivingRoute(context,body,when,rules,rows,env)));}
         catch(error){if(error instanceof Unreachable)return reply({ok:false,reason:error.message,blocked_by:error.blockedBy,choices:error.choices});throw error;}
       }
       if (!place && !router.containsStart(lat,lon)) return reply({ok:false,reason:'Start is outside the campus walking map. Choose a campus gate or parking exit.',blocked_by:[]});
@@ -236,7 +245,7 @@ export async function handleApi(request, env, context) {
         if (out.summary.start_place) out.summary.vehicle_access = gateStatus(gateData,when).filter(g => g.place === out.summary.start_place.id);
         out.summary.storage = db ? 'd1' : 'read_only_preview';
         out.mode='walking';
-        return reply({ok:true,...out});
+        return reply(forPublic({ok:true,...out}));
       } catch (error) {
         if (error instanceof Unreachable) return reply({ok:false,reason:error.message,blocked_by:error.blockedBy,choices:error.choices});
         throw error;
@@ -406,6 +415,8 @@ export async function handleApi(request, env, context) {
     return reply({error:'not found'},404,head);
   } catch (error) {
     const known=error instanceof ApiError||error instanceof MobilityError;
+    // Anything else is a bug or an outage: log it (Workers Logs, see wrangler.jsonc observability), never the body.
+    if(!known)console.error('API error',request.method,new URL(request.url).pathname,error);
     return reply({ok:false,error:known?error.message:'Closure storage or routing is unavailable. Please retry.'},known?error.status:503,head);
   }
 }
