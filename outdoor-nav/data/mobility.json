@@ -210,6 +210,15 @@
     {
       "id": "royal",
       "name": "Royal Street Parking Structure",
+      "booth_signs": [
+        {"sign": "event", "price": 50},
+        {"sign": "event", "price": 40},
+        {"sign": "event", "price": 35},
+        {"sign": "permits_only"},
+        {"sign": "full"},
+        {"sign": "available"}
+      ],
+      "_booth_signs_source": "Sign cards seen in the Royal booth by the team (2026-11-24): EVENT PARKING $50, $40, $35; PERMITS & RESERVATIONS ONLY; LOT FULL remembered. The card on display then was presumably the general one. Not necessarily the full set.",
       "gate": "royal",
       "entrance": "ROYAL.veh.jefferson",
       "exit": "ROYAL.ped.jefferson",
