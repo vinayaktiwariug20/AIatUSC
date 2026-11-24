@@ -53,7 +53,8 @@ export function collectFacts(context, when, {closures = [], answers = [], rules 
       add('closure:' + c.id, `Closed for ${(c.modes || ['walking']).join(' and ')}: ${c.note || c.kind}, until ${c.ends}. Routes avoid it.`,
         c.source === 'official' ? 'staff' : 'staff-approved report');
     else if (c.status === 'unverified')
-      add('report:' + c.id, `Unconfirmed public report: ${c.note || c.kind}. Not verified by staff; routes are not changed.`, 'public report');
+      // Not the note: anyone can write it, and staff haven't checked it.
+      add('report:' + c.id, `Unconfirmed public report of a blockage (${(c.modes || ['walking']).join(' and ')}). Not verified by staff; routes are not changed.`, 'public report');
   }
   for (const a of answers) add('answer:' + a.id, `Q: ${a.question}\nA: ${a.answer}`, 'Doorstep team answer' + (a.answered ? ', ' + a.answered : ''));
   for (const [id, text] of HOWTO) add(id, text, 'Doorstep help');

@@ -50,7 +50,8 @@ test('a suggestion is stored with the report but never approves it; the photo is
   assert.equal(calls[0].url, 'https://ai.example.test/triage');
   assert.equal(calls[0].init.headers.Authorization, 'Bearer s3cret');
   assert.equal(calls[0].body.photo, PHOTO);
-  const listed = (await call(e, '/api/closures')).data;
+  const listed = (await call(e, '/api/closures', 'GET', undefined, 'staff')).data;   // staff see the suggestion; the public doesn't
+  assert.equal((await call(e, '/api/closures')).data[0].ai, undefined);
   assert.equal(listed[0].ai.summary, 'Construction fence across the walkway');
   assert.equal(JSON.stringify(listed).includes('/9j/'), false, 'photo must not be persisted');
 });

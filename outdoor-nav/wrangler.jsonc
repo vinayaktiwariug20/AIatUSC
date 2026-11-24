@@ -3,6 +3,7 @@
   "name": "aiatusc-outdoor-nav",
   "main": "cloudflare/worker.mjs",
   "compatibility_date": "2026-11-14",
+  "observability": {"enabled": true},
   "workers_dev": true,
   "assets": {
     "directory": "./outdoor/static",
