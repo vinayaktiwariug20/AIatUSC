@@ -371,7 +371,7 @@ async function directions(coordinates,areas,key,fetcher,db,radiuses=coordinates.
   if(!areas.length)delete body.options;
   await reserveQuota(db);
   let response;
-  try { response=await fetcher('https://api.openrouteservice.org/v2/directions/driving-car/geojson',{method:'POST',headers:{Authorization:key,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(14000)}); }
+  try { response=await fetcher('https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson',{method:'POST',headers:{Authorization:key,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(14000)}); }
   catch {throw new MobilityError(502,'Driving provider is unavailable. Retry later.');}
   if(response.status===429)throw new MobilityError(429,'Driving API quota reached. Wait before retrying.');
   if(response.status===401||response.status===403){
