@@ -425,6 +425,11 @@ export function aroundCampus(from,to){
 }
 // Campus road metres per score point (public roads: 500, walking: 81; see scoreAccess).
 export const CAMPUS_SCORE_M=300;
+// A turn costs this many minutes when routes are compared: a visitor follows a simple route more easily
+// (McClintock: in off Jefferson, one turn to the lot) than a slightly faster one with more turns.
+export const TURN_MINUTES=0.5;
+// openrouteservice step types that are a real turn: left, right, sharp left/right, roundabout, U-turn.
+const TURN_TYPES=new Set([0,1,2,3,7,9]);
 // A long campus leg with no points between gate and entrance is a guess: drawn straight, it ran
 // through buildings (Royal Street Entrance to Lot 2, 594 m across the middle of campus). Such a
 // leg is not drawn, and its length is padded for the turns the real road takes.
@@ -572,11 +577,14 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     catch(error){if(error instanceof Unreachable){reject(p,'no walking route from the parking exit');continue;}throw error;}
     const extra=toRoad>10?[{type:'Feature',properties:{kind:'to_road',metres:Math.round(toRoad)},geometry:{type:'LineString',coordinates:[xy(origin),coords[0]]}}]:[];
     if(campus.length>1)extra.push({type:'Feature',properties:{kind:'campus',metres:Math.round(campusM)},geometry:{type:'LineString',coordinates:[coords.at(-1),...campus.slice(1)]}});
-    const steps=(feature.properties.segments||[]).flatMap(seg=>seg.steps||[]).map(st=>({instruction:st.instruction,distance:st.distance,duration:st.duration}));
+    const rawSteps=(feature.properties.segments||[]).flatMap(seg=>seg.steps||[]);
+    const steps=rawSteps.map(st=>({instruction:st.instruction,distance:st.distance,duration:st.duration}));
+    // Turns on public roads, plus one at each campus junction (campus_via) on the way to the structure.
+    const turns=rawSteps.filter(st=>TURN_TYPES.has(st.type)).length+(hasGate?(p.campus_via||[]).length:0);
     if(hasGate)steps.push({instruction:'Enter campus at '+gate.name+', then about '+Math.round(campusM)+' m on campus roads to '+p.name,distance:Math.round(campusM),duration:Math.round(campusS)});
     found.push({ok:true,type:'FeatureCollection',mode:'driving',features:[...extra,{...feature,properties:{...feature.properties,kind:'route',mode:'driving'}},
       point(xy(target),{kind:'gate',name:gate.name}),point(xy(p.entrance),{kind:'parking',name:p.name})],
-      summary:{minutes:Math.round(duration/6)/10,metres:Math.round(feature.properties.summary.distance+campusM),start_to_road_m:Math.round(toRoad),campus_m:Math.round(campusM),campus_mapped:campusMapped,walking_minutes:arrivalWalk.summary.minutes,
+      summary:{minutes:Math.round(duration/6)/10,metres:Math.round(feature.properties.summary.distance+campusM),start_to_road_m:Math.round(toRoad),campus_m:Math.round(campusM),campus_mapped:campusMapped,turns,walking_minutes:arrivalWalk.summary.minutes,
         building:building.id,building_name:building.name,parking:p,gate,drive_to:driveTo(gate,p,target),arrival:context.time.campusISO(arrival),storage:'d1',
         avoided:actual.map(a=>({id:a.id,name:a.name,basis:a.basis})),provider:'openrouteservice',live_traffic:false,
         ...stayInfo(p),gate_locations_note:context.mobilityData.gate_locations_note,selection:'First valid candidate among at most two ranked parking options; not a guaranteed fastest route.',provider_requests:attempts},
@@ -588,7 +596,9 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
   // Both shortlisted ways in were asked; keep the faster DOOR TO DOOR: drive
   // (provider time + campus leg) plus the walk from the structure. Comparing the
   // drive alone picked a structure with a 10-minute walk over one with 1 minute.
-  if(found.length){found.sort((a,b)=>(a.summary.minutes+a.summary.walking_minutes)-(b.summary.minutes+b.summary.walking_minutes));found[0].summary.provider_requests=attempts;return found[0];}
+  // Door to door (drive + walk), each turn counted as TURN_MINUTES.
+  const cost=r=>r.summary.minutes+r.summary.walking_minutes+TURN_MINUTES*r.summary.turns;
+  if(found.length){found.sort((a,b)=>cost(a)-cost(b));found[0].summary.provider_requests=attempts;return found[0];}
   return {ok:false,reason:'No route passed the gate and closure checks. Try another parking structure or wait for staff access updates.',provider_requests:attempts,checks,parking};
 }
 

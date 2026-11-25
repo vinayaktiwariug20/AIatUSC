@@ -65,7 +65,7 @@
     }
   ],
   "parking_source": "Supplied data/surveyed.json (vehicle entrances and pedestrian exits); gate eligibility from USC Transportation. No occupancy feed.",
-  "campus_via_note": "campus_via: the points a car passes between the gate and the structure entrance. Ids are surveyed points; [lat, lon] pairs are road corners from OpenStreetMap geometry (West 34th Street at McClintock Avenue, checked 2026-11-24), on the team's route Royal -> 34th St -> McClintock -> Downey Way. Watt Way legs are not mapped yet: the page says so instead of drawing a straight line across campus.",
+  "campus_via_note": "campus_via: the points a car passes between the gate and the structure entrance. Ids are surveyed points; [lat, lon] pairs are road corners from OpenStreetMap geometry (West 34th Street at McClintock Avenue, checked 2026-11-24), on the team's route Royal -> 34th St -> McClintock -> Downey Way. Royal Street Entrance is not a way in to Lot 2 or Downey: getting from it to 34th St means driving through the Royal structure (team, 2026-11-24). It stays a way in to the Royal structure itself. Watt Way legs are not mapped yet: the page says so instead of drawing a straight line across campus.",
   "text2park_codes_source": "Location codes from the Text2Park signs, listed by the team 2026-11-24. Each opens its own rate plan on https://usc.park.tez.io/location/<code>; a made-up code shows Location not found. GRND (Grand Ave) and 37ST (37th Street) are valid but not in Doorstep yet. FLWR (Flower Street) added the same way, 2026-11-24.",
   "parking": [
     {
@@ -96,11 +96,6 @@
         {
           "gate": "watt",
           "entrance": "DOWNEY.veh.mcclintock"
-        },
-        {
-          "gate": "royal",
-          "entrance": "DOWNEY.veh.mcclintock",
-          "campus_via": ["ROYAL.junction.34th", [34.0242865, -118.2875897], "ISECT.downey_mcclintock"]
         }
       ],
       "published_rates": [
@@ -414,11 +409,6 @@
         {
           "gate": "watt",
           "entrance": "LOT2.veh.main"
-        },
-        {
-          "gate": "royal",
-          "entrance": "LOT2.veh.main",
-          "campus_via": ["ROYAL.junction.34th", [34.0242865, -118.2875897], "ISECT.downey_mcclintock"]
         }
       ],
       "game_access": "unconfirmed",

@@ -466,11 +466,11 @@ test('event links carry how long people stay, and the map page reads it',()=>{
 test('campus legs follow the campus roads; one nobody has mapped is not drawn as a straight line',()=>{
  const at=parseTime('2026-11-24T12:00'),gates=gateState(context,at,[],{}),park=parkingState(context,at,[],{});
  const leg=(sid,gid)=>{const p=park.find(x=>x.id===sid),o=p.access.find(a=>a.gate===gid);return wayIn(context,gates.find(g=>g.id===gid),{...p,entrance:o.entrance,campus_via:o.campus_via});};
- // Royal Street Entrance to Lot 2: along 34th St to McClintock, then down McClintock, not 594 m across the middle of campus.
- const royal=leg('lot2','royal');
- assert.equal(royal.campusMapped,true);assert.equal(royal.campus.length,5);
+ // McClintock Ave. Entrance to the Royal structure: along 34th St, not straight across the north of campus.
+ const royal=leg('royal','mcclintock');
+ assert.equal(royal.campusMapped,true);assert.equal(royal.campus.length,4);
  assert.ok(royal.campus.some(([lon,lat])=>Math.abs(lat-34.0242865)<1e-6&&Math.abs(lon+118.2875897)<1e-6),'turns at 34th St and McClintock');
- assert.ok(royal.campusM>800,String(royal.campusM));
+ assert.ok(royal.campusM>600,String(royal.campusM));
  // Watt Way to Lot 2 is not mapped: nothing drawn, the length padded, closures still checked on the best guess.
  const watt=leg('lot2','watt');
  assert.equal(watt.campusMapped,false);assert.deepEqual(watt.campus,[]);assert.equal(watt.line.length,2);
@@ -504,4 +504,20 @@ test('from the northeast, the routing service is asked about McClintock, not Dow
  const gates=gateState(context,parseTime('2026-11-24T12:00'),[],{}),asked=mock.calls.map(c=>{const [lon,lat]=c.body.coordinates[1];return gates.find(g=>Math.abs(g.lat-lat)<1e-6&&Math.abs(g.lon-lon)<1e-6)?.id;});
  assert.ok(asked.includes('mcclintock'),asked.join());
  assert.ok(!asked.includes('downey-way')&&!asked.includes('royal'),asked.join());
+});
+
+test('Royal Street Entrance is a way in to the Royal structure only: to reach 34th St you drive through it',()=>{
+ for(const p of context.mobilityData.parking)for(const a of p.access||[])
+   if(a.gate==='royal')assert.equal(p.id,'royal',p.id+' lists Royal Street Entrance as a way in');
+});
+
+test('fewest turns: a slightly faster way in with more turns loses to a simple one',async()=>{
+ // North of campus to Sample Hall: Lot 2 via McClintock (in off Jefferson, one turn to the lot) or via Downey Way
+ // (round to Vermont first). Same drive time; Downey Way has the shorter campus leg but four turns on public roads.
+ const gates=gateState(context,parseTime('2026-11-24T12:00'),[],{}),dw=gates.find(g=>g.id==='downey-way');
+ const fn=async(url,options)=>{const d=JSON.parse(options.body),[lon,lat]=d.coordinates[1],far=Math.abs(lat-dw.lat)<1e-6&&Math.abs(lon-dw.lon)<1e-6;
+   const steps=[{type:11,instruction:'Head south',distance:10,duration:5},...Array.from({length:far?4:1},(_,i)=>({type:i%2,instruction:'Turn',distance:100,duration:20})),{type:10,instruction:'Arrive',distance:0,duration:0}];
+   return new Response(JSON.stringify({type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'LineString',coordinates:d.coordinates},properties:{summary:{duration:240,distance:1200},segments:[{steps}]}}]}),{status:200});};
+ const out=await drivingRoute(context,{...body,from:{lat:34.0336,lon:-118.2817},parking:'lot2',to:'Sample Hall'},parseTime('2026-11-24T12:00'),[],[],env(),fn);
+ assert.equal(out.ok,true);assert.equal(out.summary.gate.id,'mcclintock');assert.equal(out.summary.turns,2);
 });
