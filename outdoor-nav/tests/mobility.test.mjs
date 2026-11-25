@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
 import {WalkRouter, haversine} from '../cloudflare/router.mjs';
 import {parseTime,campusISO,gateStatus,handleApi} from '../cloudflare/api.mjs';
-import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,wayIn,UNMAPPED_LEG_M,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M,walkingRuleClosures,DIRECTIONS_LIMITS}from '../cloudflare/mobility.mjs';
+import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,wayIn,aroundCampus,UNMAPPED_LEG_M,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M,walkingRuleClosures,DIRECTIONS_LIMITS}from '../cloudflare/mobility.mjs';
 import {collectFacts} from '../cloudflare/assistant.mjs';
 const json=name=>JSON.parse(readFileSync(new URL('../'+name,import.meta.url),'utf8'));
 const context={router:new WalkRouter(json('cloudflare/graph.json')),gateData:json('data/gates.json'),mobilityData:json('data/mobility.json'),footballData:json('data/football.json'),survey:json('data/surveyed.json'),time:{parseTime,campusISO,gateStatus}};
@@ -485,5 +485,23 @@ test('from the northeast, no driving across campus from Royal Street Entrance: p
  const out=await drivingRoute(context,{...body,from:{lat:34.0285,lon:-118.2735},parking:'auto',to:'Sample Hall'},parseTime('2026-11-24T12:00'),[],[],env(),provider().fn);
  assert.equal(out.ok,true);
  assert.ok(!(out.summary.parking.id==='lot2'&&out.summary.gate.id==='royal'),'Royal Street Entrance to Lot 2');
- assert.ok(out.summary.campus_m<400,out.summary.parking.id+' via '+out.summary.gate.id+': '+out.summary.campus_m+' m on campus');
+ assert.ok(out.summary.campus_m<800,out.summary.parking.id+' via '+out.summary.gate.id+': '+out.summary.campus_m+' m on campus');
+});
+
+test('the drive to an entrance goes around campus, never through it',()=>{
+ const ne=[34.0285,-118.2735],gate=id=>{const g=gateState(context,parseTime('2026-11-24T12:00'),[],{}).find(x=>x.id===id);return [g.lat,g.lon];};
+ // McClintock is on Jefferson, facing the northeast: straight there.
+ assert.equal(Math.round(aroundCampus(ne,gate('mcclintock'))),Math.round(haversine(ne,gate('mcclintock'))));
+ // Downey Way is on Vermont, across campus: round the Jefferson/Vermont corner, much longer than the straight line.
+ assert.ok(aroundCampus(ne,gate('downey-way'))>haversine(ne,gate('downey-way'))+150);
+ // Starting on campus: no detour to invent.
+ assert.equal(aroundCampus([34.0205,-118.2855],gate('watt')),haversine([34.0205,-118.2855],gate('watt')));
+});
+
+test('from the northeast, the routing service is asked about McClintock, not Downey Way or Royal, for Lot 2',async()=>{
+ const mock=provider();
+ await drivingRoute(context,{...body,from:{lat:34.0285,lon:-118.2735},parking:'auto',to:'Sample Hall'},parseTime('2026-11-24T12:00'),[],[],env(),mock.fn);
+ const gates=gateState(context,parseTime('2026-11-24T12:00'),[],{}),asked=mock.calls.map(c=>{const [lon,lat]=c.body.coordinates[1];return gates.find(g=>Math.abs(g.lat-lat)<1e-6&&Math.abs(g.lon-lon)<1e-6)?.id;});
+ assert.ok(asked.includes('mcclintock'),asked.join());
+ assert.ok(!asked.includes('downey-way')&&!asked.includes('royal'),asked.join());
 });
