@@ -406,12 +406,20 @@ export const START_TO_ROAD_LIMIT_M=300;
 export const END_TO_ENTRANCE_LIMIT_M=150;
 // Speed on campus roads (gate -> structure): slow, pedestrians everywhere.
 export const CAMPUS_DRIVE_MPS=4.5;
-// Public roads end at the gate; the campus leg follows surveyed points to the entrance.
-function wayIn(context,gate,p) {
+// A long campus leg with no points between gate and entrance is a guess: drawn straight, it ran
+// through buildings (Royal Street Entrance to Lot 2, 594 m across the middle of campus). Such a
+// leg is not drawn, and its length is padded for the turns the real road takes.
+export const UNMAPPED_LEG_M=150,UNMAPPED_DETOUR=1.4;
+// Public roads end at the gate; the campus leg follows campus_via to the entrance: surveyed point
+// ids, or [lat, lon] corners taken from OpenStreetMap road geometry (see mobility.json).
+export function wayIn(context,gate,p) {
   const hasGate=gate.lat!==undefined,target=hasGate?{lat:gate.lat,lon:gate.lon}:p.entrance;
-  const campus=hasGate?[xy(target),...(p.campus_via||[]).map(id=>context.survey.nodes.find(n=>n.id===id)).filter(Boolean).map(xy),xy(p.entrance)]:[];
-  const campusM=campus.slice(1).reduce((sum,c,i)=>sum+haversine([campus[i][1],campus[i][0]],[c[1],c[0]]),0);
-  return {hasGate,target,campus,campusM,campusS:campusM/CAMPUS_DRIVE_MPS};
+  const via=(p.campus_via||[]).map(v=>Array.isArray(v)?{lat:v[0],lon:v[1]}:context.survey.nodes.find(n=>n.id===v)).filter(Boolean);
+  const line=hasGate?[xy(target),...via.map(xy),xy(p.entrance)]:[];
+  const lineM=line.slice(1).reduce((sum,c,i)=>sum+haversine([line[i][1],line[i][0]],[c[1],c[0]]),0);
+  const mapped=!hasGate||via.length>0||lineM<=UNMAPPED_LEG_M,campusM=mapped?lineM:lineM*UNMAPPED_DETOUR;
+  // `line` is still what closures are checked against: the best guess we have, never less safe than before.
+  return {hasGate,target,campus:mapped?line:[],line,campusM,campusS:campusM/CAMPUS_DRIVE_MPS,campusMapped:mapped};
 }
 // Where a phone's maps app should drive to: the gate (public roads end there).
 const driveTo=(gate,p,target)=>({lat:target.lat,lon:target.lon,name:gate.lat!==undefined?gate.name:p.name,
@@ -421,7 +429,7 @@ const driveTo=(gate,p,target)=>({lat:target.lat,lon:target.lon,name:gate.lat!==u
 // our walk from it. The page offers Google / Apple Maps for the drive to the gate.
 function handoffOnly(context,body,when,building,p,rules,credentials,walking,why) {
   const gate=gateState(context,when,rules,credentials).find(g=>g.id===p.gate);
-  const {hasGate,target,campus,campusM}=wayIn(context,gate,p);
+  const {hasGate,target,campus,campusM,campusMapped}=wayIn(context,gate,p);
   const arrival=when+1800000;      // no drive time without a provider: check the walk half an hour out
   let walk;
   try{walk=context.router.route({building:building.id,place:p.id,exit:p.exit,stepFree:body.step_free===true,
@@ -432,7 +440,7 @@ function handoffOnly(context,body,when,building,p,rules,credentials,walking,why)
   const features=[point(xy(target),{kind:'gate',name:gate.name}),point(xy(p.entrance),{kind:'parking',name:p.name})];
   if(campus.length>1)features.unshift({type:'Feature',properties:{kind:'campus',metres:Math.round(campusM)},geometry:{type:'LineString',coordinates:campus}});
   return {ok:true,type:'FeatureCollection',mode:'driving',handoff_only:true,why,features,
-    summary:{minutes:null,metres:null,start_to_road_m:0,campus_m:Math.round(campusM),walking_minutes:walk.summary.minutes,
+    summary:{minutes:null,metres:null,start_to_road_m:0,campus_m:Math.round(campusM),campus_mapped:campusMapped,walking_minutes:walk.summary.minutes,
       building:building.id,building_name:building.name,parking:p,gate,drive_to:driveTo(gate,p,target),storage:'d1',
       provider:null,live_traffic:false,provider_requests:0,
       selection:'Ranked by distance only: driving directions were '+(why==='busy'?'busy':'unavailable')+'.'},
@@ -488,7 +496,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     // continue to the entrance, it touched the gate, turned back and parked on the
     // nearest public street instead. The campus leg follows surveyed points where
     // we have them (Downey: down McClintock to the Downey Way intersection).
-    const {hasGate,target,campus,campusM,campusS}=wayIn(context,gate,p);
+    const {hasGate,target,campus,line,campusM,campusS,campusMapped}=wayIn(context,gate,p);
     const targetRadius=hasGate?(knownGate(gate)?30:60):END_TO_ENTRANCE_LIMIT_M;
     const coordinates=[xy(origin),xy(target)],radiuses=[START_TO_ROAD_LIMIT_M,targetRadius];
     // Start with a conservative horizon; recheck the exact resulting arrival.
@@ -511,7 +519,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     if(!feature||feature.failed){reject(p,'provider returned no route',feature?{status:feature.failed,detail:feature.detail}:{});continue;}
     const coords=feature.geometry.coordinates,duration=feature.properties.summary.duration+campusS,arrival=when+duration*1000;
     const actual=[...avoidance(context,when,arrival,rules,credentials),...reportAreas];
-    const crossed=actual.filter(a=>intersectsPolygon(coords,a.geometry)||(campus.length>1&&intersectsPolygon(campus,a.geometry)));
+    const crossed=actual.filter(a=>intersectsPolygon(coords,a.geometry)||(line.length>1&&intersectsPolygon(line,a.geometry)));
     if(crossed.length){reject(p,'route crosses an avoided area',{areas:crossed.map(a=>a.name||a.id)});continue;}
     const toRoad=haversine([coords[0][1],coords[0][0]],ll(origin));
     const endGap=haversine([coords.at(-1)[1],coords.at(-1)[0]],ll(target));
@@ -545,7 +553,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     if(hasGate)steps.push({instruction:'Enter campus at '+gate.name+', then about '+Math.round(campusM)+' m on campus roads to '+p.name,distance:Math.round(campusM),duration:Math.round(campusS)});
     found.push({ok:true,type:'FeatureCollection',mode:'driving',features:[...extra,{...feature,properties:{...feature.properties,kind:'route',mode:'driving'}},
       point(xy(target),{kind:'gate',name:gate.name}),point(xy(p.entrance),{kind:'parking',name:p.name})],
-      summary:{minutes:Math.round(duration/6)/10,metres:Math.round(feature.properties.summary.distance+campusM),start_to_road_m:Math.round(toRoad),campus_m:Math.round(campusM),walking_minutes:arrivalWalk.summary.minutes,
+      summary:{minutes:Math.round(duration/6)/10,metres:Math.round(feature.properties.summary.distance+campusM),start_to_road_m:Math.round(toRoad),campus_m:Math.round(campusM),campus_mapped:campusMapped,walking_minutes:arrivalWalk.summary.minutes,
         building:building.id,building_name:building.name,parking:p,gate,drive_to:driveTo(gate,p,target),arrival:context.time.campusISO(arrival),storage:'d1',
         avoided:actual.map(a=>({id:a.id,name:a.name,basis:a.basis})),provider:'openrouteservice',live_traffic:false,
         ...stayInfo(p),gate_locations_note:context.mobilityData.gate_locations_note,selection:'First valid candidate among at most two ranked parking options; not a guaranteed fastest route.',provider_requests:attempts},

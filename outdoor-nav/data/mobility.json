@@ -65,10 +65,13 @@
     }
   ],
   "parking_source": "Supplied data/surveyed.json (vehicle entrances and pedestrian exits); gate eligibility from USC Transportation. No occupancy feed.",
+  "campus_via_note": "campus_via: the points a car passes between the gate and the structure entrance. Ids are surveyed points; [lat, lon] pairs are road corners from OpenStreetMap geometry (West 34th Street at McClintock Avenue, checked 2026-11-24), on the team's route Royal -> 34th St -> McClintock -> Downey Way. Watt Way legs are not mapped yet: the page says so instead of drawing a straight line across campus.",
+  "text2park_codes_source": "Location codes from the Text2Park signs, listed by the team 2026-11-24. Each opens its own rate plan on https://usc.park.tez.io/location/<code>; a made-up code shows Location not found. GRND (Grand Ave) and 37ST (37th Street) are valid but not in Doorstep yet. Flower Street's code is not known.",
   "parking": [
     {
       "id": "downey",
       "name": "Downey Way Parking Structure",
+      "text2park": "DWNY",
       "gate": "mcclintock",
       "entrance": "DOWNEY.veh.mcclintock",
       "exit": "DOWNEY.ped.main",
@@ -96,7 +99,8 @@
         },
         {
           "gate": "royal",
-          "entrance": "DOWNEY.veh.mcclintock"
+          "entrance": "DOWNEY.veh.mcclintock",
+          "campus_via": ["ROYAL.junction.34th", [34.0242865, -118.2875897], "ISECT.downey_mcclintock"]
         }
       ],
       "published_rates": [
@@ -143,6 +147,7 @@
     {
       "id": "jefferson",
       "name": "Jefferson Boulevard Parking Structure",
+      "text2park": "JEFF",
       "gate": "jefferson-blvd",
       "entrance": "JEFFERSON.veh.main",
       "exit": "JEFFERSON.ped.small",
@@ -210,6 +215,7 @@
     {
       "id": "royal",
       "name": "Royal Street Parking Structure",
+      "text2park": "ROYL",
       "booth_signs": [
         {"sign": "event", "price": 50},
         {"sign": "event", "price": 40},
@@ -256,11 +262,13 @@
         },
         {
           "gate": "mcclintock",
-          "entrance": "ROYAL.veh.jefferson"
+          "entrance": "ROYAL.veh.jefferson",
+          "campus_via": [[34.0242865, -118.2875897], "ROYAL.junction.34th"]
         },
         {
           "gate": "downey-way",
-          "entrance": "ROYAL.veh.jefferson"
+          "entrance": "ROYAL.veh.jefferson",
+          "campus_via": ["ISECT.downey_mcclintock", [34.0242865, -118.2875897], "ROYAL.junction.34th"]
         },
         {
           "gate": "watt",
@@ -271,6 +279,7 @@
     {
       "id": "mccarthy",
       "name": "McCarthy Way Parking Structure",
+      "text2park": "MCCY",
       "gate": "mccarthy-way",
       "entrance": "MCCARTHY.veh.main",
       "exit": "MCCARTHY.ped.hellman",
@@ -294,6 +303,7 @@
     {
       "id": "figueroa",
       "name": "Figueroa Street Parking Structure",
+      "text2park": "FIGS",
       "gate": "figueroa",
       "entrance": "FIGUEROA.veh.hotel",
       "exit": "FIGUEROA.veh.hotel",
@@ -344,6 +354,7 @@
     {
       "id": "shrine",
       "name": "USC Shrine Parking Structure",
+      "text2park": "SHRN",
       "gate": "shrine",
       "entrance": "SHRINE.veh.main",
       "exit": "SHRINE.ped.main",
@@ -391,11 +402,13 @@
       "access": [
         {
           "gate": "mcclintock",
-          "entrance": "LOT2.veh.main"
+          "entrance": "LOT2.veh.main",
+          "campus_via": ["ISECT.downey_mcclintock"]
         },
         {
           "gate": "downey-way",
-          "entrance": "LOT2.veh.main"
+          "entrance": "LOT2.veh.main",
+          "campus_via": ["ISECT.downey_mcclintock"]
         },
         {
           "gate": "watt",
@@ -403,7 +416,8 @@
         },
         {
           "gate": "royal",
-          "entrance": "LOT2.veh.main"
+          "entrance": "LOT2.veh.main",
+          "campus_via": ["ROYAL.junction.34th", [34.0242865, -118.2875897], "ISECT.downey_mcclintock"]
         }
       ],
       "game_access": "unconfirmed",
@@ -425,6 +439,7 @@
     {
       "id": "lotv",
       "name": "Lot V",
+      "text2park": "LOTV",
       "gate": "lot-v",
       "entrance": "LOTV.veh.main",
       "exit": "LOTV.veh.main",
