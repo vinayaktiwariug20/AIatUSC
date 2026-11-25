@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
 import {WalkRouter, haversine} from '../cloudflare/router.mjs';
 import {parseTime,campusISO,gateStatus,handleApi} from '../cloudflare/api.mjs';
-import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,wayIn,aroundCampus,UNMAPPED_LEG_M,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M,walkingRuleClosures,DIRECTIONS_LIMITS}from '../cloudflare/mobility.mjs';
+import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,wayIn,aroundCampus,cutLoop,UNMAPPED_LEG_M,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M,walkingRuleClosures,DIRECTIONS_LIMITS}from '../cloudflare/mobility.mjs';
 import {collectFacts} from '../cloudflare/assistant.mjs';
 const json=name=>JSON.parse(readFileSync(new URL('../'+name,import.meta.url),'utf8'));
 const context={router:new WalkRouter(json('cloudflare/graph.json')),gateData:json('data/gates.json'),mobilityData:json('data/mobility.json'),footballData:json('data/football.json'),survey:json('data/surveyed.json'),time:{parseTime,campusISO,gateStatus}};
@@ -524,4 +524,21 @@ test('fewest turns: a slightly faster way in with more turns loses to a simple o
    return new Response(JSON.stringify({type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'LineString',coordinates:d.coordinates},properties:{summary:{duration:240,distance:1200},segments:[{steps}]}}]}),{status:200});};
  const out=await drivingRoute(context,{...body,from:{lat:34.0336,lon:-118.2817},parking:'lot2',to:'Sample Hall'},parseTime('2026-11-24T12:00'),[],[],env(),fn);
  assert.equal(out.ok,true);assert.equal(out.summary.gate.id,'mcclintock');assert.equal(out.summary.turns,2);
+});
+
+test('a route that reaches the entrance, drives on to turn round and comes back is cut where it got there',()=>{
+ // The screenshot: down to Jefferson at McClintock, west 426 m to Vermont, U-turn, 417 m back to the entrance.
+ const gate={lat:34.0250085,lon:-118.2871694},north=[-118.2869,34.0262],corner=[-118.28715,34.02522],vermont=[-118.291553,34.02549],back=[-118.287132,34.025069];
+ const steps=[{type:11,instruction:'Head south on McClintock',distance:135,duration:30},{type:1,instruction:'Turn right onto West Jefferson Boulevard',distance:426,duration:60},
+   {type:2,instruction:'Turn sharp left onto West Jefferson Boulevard',distance:417,duration:60},{type:10,instruction:'Arrive',distance:0,duration:0}];
+ const route=coords=>({type:'Feature',geometry:{type:'LineString',coordinates:coords},properties:{summary:{duration:150,distance:978},segments:[{steps}]}});
+ const cut=cutLoop(route([north,corner,vermont,back]),gate,30);
+ assert.deepEqual(cut.geometry.coordinates,[north,corner]);
+ assert.deepEqual(cut.properties.segments[0].steps.map(x=>x.instruction),['Head south on McClintock']);
+ assert.ok(cut.properties.summary.distance<200&&cut.properties.summary.duration<40,JSON.stringify(cut.properties.summary));
+ assert.ok(cut.properties.loop_cut_m>800);
+ // Arriving straight in: nothing to cut.
+ const straight=route([north,corner,back]);assert.equal(cutLoop(straight,gate,30),straight);
+ // A few metres on past the pin to the curb is not a loop.
+ const curb=route([north,corner,[-118.2873,34.02505],back]);assert.equal(cutLoop(curb,gate,30),curb);
 });

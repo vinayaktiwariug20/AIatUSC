@@ -369,6 +369,23 @@ export async function orsUsage(db,geocodeLimits,now=Date.now()){
       note:'Typed street addresses in the start box.'},
     day_basis:'UTC day; openrouteservice counts its day from the first request'};
 }
+// openrouteservice stops on the side of the road the gate pin is on. Where the road is divided (Jefferson at
+// McClintock), a driver arriving on the far side was sent past the entrance to the next U-turn (Vermont) and
+// back, about 840 m. A driver who has already reached the entrance turns in: cut the route where it first gets
+// within reach of it, when what follows is a loop of more than LOOP_CUT_M. Time scales with the distance kept.
+export const LOOP_CUT_M=100;
+export function cutLoop(feature,target,radius){
+  const c=feature.geometry.coordinates,t=[target.lat,target.lon],leg=i=>haversine([c[i-1][1],c[i-1][0]],[c[i][1],c[i][0]]);
+  const at=c.findIndex(p=>haversine([p[1],p[0]],t)<=radius);
+  if(at<0||at===c.length-1)return feature;
+  let before=0,after=0;for(let i=1;i<c.length;i++){if(i<=at)before+=leg(i);else after+=leg(i);}
+  if(after<=LOOP_CUT_M)return feature;
+  const s=feature.properties.summary,keep=before/(before+after||1);
+  // Steps that begin before the cut stay; "turn right onto Jefferson" at the entrance itself is the loop.
+  let start=0;const segments=(feature.properties.segments||[]).map(seg=>({...seg,steps:(seg.steps||[]).filter(st=>{const s0=start;start+=st.distance||0;return s0<before-1;})}));
+  return {...feature,geometry:{...feature.geometry,coordinates:c.slice(0,at+1)},
+    properties:{...feature.properties,segments,loop_cut_m:Math.round(after),summary:{...s,distance:s.distance*keep,duration:s.duration*keep}}};
+}
 async function directions(coordinates,areas,key,fetcher,db,radiuses=coordinates.map(()=>25)) {
   const body={coordinates,radiuses,instructions:true,geometry_simplify:false,units:'m',language:'en',
     options:{avoid_polygons:{type:'MultiPolygon',coordinates:areas.map(a=>a.geometry.coordinates)}}};
@@ -545,6 +562,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
       throw error;
     }
     if(!feature||feature.failed){reject(p,'provider returned no route',feature?{status:feature.failed,detail:feature.detail}:{});continue;}
+    feature=cutLoop(feature,target,Math.min(targetRadius,30));   // only where the route truly reached it, not a street nearby
     const coords=feature.geometry.coordinates,duration=feature.properties.summary.duration+campusS,arrival=when+duration*1000;
     const actual=[...avoidance(context,when,arrival,rules,credentials),...reportAreas];
     const crossed=actual.filter(a=>intersectsPolygon(coords,a.geometry)||(line.length>1&&intersectsPolygon(line,a.geometry)));
