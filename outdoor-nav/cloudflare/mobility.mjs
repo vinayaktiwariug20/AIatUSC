@@ -369,6 +369,23 @@ export async function orsUsage(db,geocodeLimits,now=Date.now()){
       note:'Typed street addresses in the start box.'},
     day_basis:'UTC day; openrouteservice counts its day from the first request'};
 }
+// openrouteservice stops on the side of the road the gate pin is on. Where the road is divided (Jefferson at
+// McClintock), a driver arriving on the far side was sent past the entrance to the next U-turn (Vermont) and
+// back, about 840 m. A driver who has already reached the entrance turns in: cut the route where it first gets
+// within reach of it, when what follows is a loop of more than LOOP_CUT_M. Time scales with the distance kept.
+export const LOOP_CUT_M=100;
+export function cutLoop(feature,target,radius){
+  const c=feature.geometry.coordinates,t=[target.lat,target.lon],leg=i=>haversine([c[i-1][1],c[i-1][0]],[c[i][1],c[i][0]]);
+  const at=c.findIndex(p=>haversine([p[1],p[0]],t)<=radius);
+  if(at<0||at===c.length-1)return feature;
+  let before=0,after=0;for(let i=1;i<c.length;i++){if(i<=at)before+=leg(i);else after+=leg(i);}
+  if(after<=LOOP_CUT_M)return feature;
+  const s=feature.properties.summary,keep=before/(before+after||1);
+  // Steps that begin before the cut stay; "turn right onto Jefferson" at the entrance itself is the loop.
+  let start=0;const segments=(feature.properties.segments||[]).map(seg=>({...seg,steps:(seg.steps||[]).filter(st=>{const s0=start;start+=st.distance||0;return s0<before-1;})}));
+  return {...feature,geometry:{...feature.geometry,coordinates:c.slice(0,at+1)},
+    properties:{...feature.properties,segments,loop_cut_m:Math.round(after),summary:{...s,distance:s.distance*keep,duration:s.duration*keep}}};
+}
 async function directions(coordinates,areas,key,fetcher,db,radiuses=coordinates.map(()=>25)) {
   const body={coordinates,radiuses,instructions:true,geometry_simplify:false,units:'m',language:'en',
     options:{avoid_polygons:{type:'MultiPolygon',coordinates:areas.map(a=>a.geometry.coordinates)}}};
@@ -437,9 +454,14 @@ export const UNMAPPED_LEG_M=150,UNMAPPED_DETOUR=1.4;
 // Public roads end at the gate; the campus leg follows campus_via to the entrance: surveyed point
 // ids, or [lat, lon] corners taken from OpenStreetMap road geometry (see mobility.json).
 export function wayIn(context,gate,p) {
-  const hasGate=gate.lat!==undefined,target=hasGate?{lat:gate.lat,lon:gate.lon}:p.entrance;
+  // Where the drive on public roads ends: the gate pin, or the gate's drive_to, a point every direction can reach.
+  // McClintock: the pin is beside the eastbound side of Jefferson (mapped as two one-way roads), reachable only
+  // from the west, so a car coming down McClintock was sent to Vermont to turn round. drive_to is the short
+  // stretch of McClintock between the two sides, straight ahead from the north and a left turn from either side.
+  const hasGate=gate.lat!==undefined,stop=Array.isArray(gate.drive_to)?{lat:gate.drive_to[0],lon:gate.drive_to[1]}:null;
+  const target=hasGate?(stop||{lat:gate.lat,lon:gate.lon}):p.entrance;
   const via=(p.campus_via||[]).map(v=>Array.isArray(v)?{lat:v[0],lon:v[1]}:context.survey.nodes.find(n=>n.id===v)).filter(Boolean);
-  const line=hasGate?[xy(target),...via.map(xy),xy(p.entrance)]:[];
+  const line=hasGate?[xy(target),...(stop?[xy({lat:gate.lat,lon:gate.lon})]:[]),...via.map(xy),xy(p.entrance)]:[];
   const lineM=line.slice(1).reduce((sum,c,i)=>sum+haversine([line[i][1],line[i][0]],[c[1],c[0]]),0);
   const mapped=!hasGate||via.length>0||lineM<=UNMAPPED_LEG_M,campusM=mapped?lineM:lineM*UNMAPPED_DETOUR;
   // `line` is still what closures are checked against: the best guess we have, never less safe than before.
@@ -545,6 +567,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
       throw error;
     }
     if(!feature||feature.failed){reject(p,'provider returned no route',feature?{status:feature.failed,detail:feature.detail}:{});continue;}
+    feature=cutLoop(feature,target,Math.min(targetRadius,30));   // only where the route truly reached it, not a street nearby
     const coords=feature.geometry.coordinates,duration=feature.properties.summary.duration+campusS,arrival=when+duration*1000;
     const actual=[...avoidance(context,when,arrival,rules,credentials),...reportAreas];
     const crossed=actual.filter(a=>intersectsPolygon(coords,a.geometry)||(line.length>1&&intersectsPolygon(line,a.geometry)));
@@ -558,7 +581,8 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     // time, as well as departure/arrival. A route is discarded on any violation.
     let cumulative=0;const distances=coords.slice(1).map((c,i)=>haversine([coords[i][1],coords[i][0]],[c[1],c[0]])),total=distances.reduce((x,y)=>x+y,0)||1;
     let invalid=false;
-    const mappedGates=gateState(context,when,rules,credentials).filter(knownGate);
+    // Gates for people on foot (DCC-PSD, onto 34th St) never limit cars: driving past one on Figueroa is fine.
+    const mappedGates=gateState(context,when,rules,credentials).filter(g=>knownGate(g)&&!g.pedestrian_only);
     for(let i=1;i<coords.length;i++) {
       for(const g of mappedGates) {
         if(pointSegment(ll(g),[coords[i-1][1],coords[i-1][0]],[coords[i][1],coords[i][0]])<=GATE_AVOID_RADIUS_M) {

@@ -11,7 +11,9 @@
       "id": "mcclintock",
       "lat": 34.0250085,
       "lon": -118.2871694,
-      "location_source": "field_survey"
+      "location_source": "field_survey",
+      "drive_to": [34.0251038, -118.2870874],
+      "drive_to_note": "Where the drive on public roads ends. OpenStreetMap maps Jefferson here as two one-way roads joined by a 10 m stretch of McClintock (way 326418958); this is its middle. The gate pin is beside the eastbound side, reachable only from the west: aimed at it, a car coming down McClintock was sent to Vermont to turn round. The team confirms it is a four-way intersection (2026-11-24)."
     },
     {
       "id": "watt",
@@ -65,7 +67,7 @@
     }
   ],
   "parking_source": "Supplied data/surveyed.json (vehicle entrances and pedestrian exits); gate eligibility from USC Transportation. No occupancy feed.",
-  "campus_via_note": "campus_via: the points a car passes between the gate and the structure entrance. Ids are surveyed points; [lat, lon] pairs are road corners from OpenStreetMap geometry (West 34th Street at McClintock Avenue, checked 2026-11-24), on the team's route Royal -> 34th St -> McClintock -> Downey Way. Royal Street Entrance is not a way in to Lot 2 or Downey: getting from it to 34th St means driving through the Royal structure (team, 2026-11-24). It stays a way in to the Royal structure itself. From McClintock or Downey Way, drivers reach Royal by its 34th St car entrance (team, 2026-11-24). Watt Way legs are not mapped yet: the page says so instead of drawing a straight line across campus.",
+  "campus_via_note": "campus_via: the points a car passes between the gate and the structure entrance. Ids are surveyed points; [lat, lon] pairs are road corners from OpenStreetMap geometry (West 34th Street at McClintock Avenue, checked 2026-11-24), on the team's route Royal -> 34th St -> McClintock -> Downey Way. Royal Street Entrance is not a way in to Lot 2 or Downey: getting from it to 34th St means driving through the Royal structure (team, 2026-11-24). It stays a way in to the Royal structure itself. From McClintock or Downey Way, drivers reach Royal by its 34th St car entrance (team, 2026-11-24). Watt Way runs straight from Exposition to Downey Way, crossing it at [34.0203897, -118.28774] (a shared OpenStreetMap node), 65 m from Lot 2's entrance. Watt Way to the Royal structure is not mapped yet: the page says so instead of drawing a straight line across campus.",
   "text2park_codes_source": "Location codes from the Text2Park signs, listed by the team 2026-11-24. Each opens its own rate plan on https://usc.park.tez.io/location/<code>; a made-up code shows Location not found. GRND (Grand Ave) and 37ST (37th Street) are valid but not in Doorstep yet. FLWR (Flower Street) added the same way, 2026-11-24.",
   "parking": [
     {
@@ -95,7 +97,8 @@
         },
         {
           "gate": "watt",
-          "entrance": "DOWNEY.veh.mcclintock"
+          "entrance": "DOWNEY.veh.mcclintock",
+          "campus_via": [[34.0203897, -118.28774], "ISECT.downey_mcclintock"]
         }
       ],
       "published_rates": [
@@ -408,7 +411,8 @@
         },
         {
           "gate": "watt",
-          "entrance": "LOT2.veh.main"
+          "entrance": "LOT2.veh.main",
+          "campus_via": [[34.0203897, -118.28774]]
         }
       ],
       "game_access": "unconfirmed",
