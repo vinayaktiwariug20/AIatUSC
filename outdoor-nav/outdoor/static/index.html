@@ -222,7 +222,8 @@ function clearanceHtml(p){const c=p?.clearance_in;if(p?.open_lot)return '<div cl
  return Number.isFinite(c)?'<div><b>Clearance '+Math.floor(c/12)+'′'+(c%12?' '+c%12+'″':'')+'</b> <span class="dim">· check the sign at the entrance</span></div>':'<div class="dim">Clearance not on file: check the sign at the entrance.</div>';}
 // Lot 2's 2-hour limit, what was skipped for the stay, and Text2Park's pay page.
 function stayHtml(s){const p=s.parking||{},sk=s.skipped_for_stay||[],alt=s.longer_stay_option;let h='';
- if(p.max_stay_hours!=null)h+='<div class="notice"><b>'+esc(p.max_stay_hours)+'-hour limit</b> at '+esc(p.name)+'.'+(alt?' Staying longer? <button class="small" data-longer="'+esc(alt.id)+'">Park at '+esc(alt.name)+' instead</button>':'')+'</div>';
+ // The price line already says "2 hours max", so with somewhere longer to offer the box only offers it.
+ if(p.max_stay_hours!=null)h+='<div class="notice">'+(alt?'Staying longer than '+esc(p.max_stay_hours)+' hours? <button class="small" data-longer="'+esc(alt.id)+'">Park at '+esc(alt.name)+' instead</button>':'<b>'+esc(p.max_stay_hours)+'-hour limit</b> at '+esc(p.name)+'.')+'</div>';
  if(sk.length)h+='<div class="dim">'+esc(sk.map(t=>t.name+' is closer, but has a '+t.max_stay_hours+'-hour limit').join('; '))+'.</div>';
  return h+payHtml(p);}
 // The driver enters their phone number and payment on Text2Park's page, never in Doorstep.
