@@ -406,6 +406,8 @@ export const START_TO_ROAD_LIMIT_M=300;
 export const END_TO_ENTRANCE_LIMIT_M=150;
 // Speed on campus roads (gate -> structure): slow, pedestrians everywhere.
 export const CAMPUS_DRIVE_MPS=4.5;
+// How much more campus roads count than public roads when choosing a way in (see scoreAccess).
+export const CAMPUS_SCORE_M=200,CAMPUS_TIME_WEIGHT=2;
 // A long campus leg with no points between gate and entrance is a guess: drawn straight, it ran
 // through buildings (Royal Street Entrance to Lot 2, 594 m across the middle of campus). Such a
 // leg is not drawn, and its length is padded for the turns the real road takes.
@@ -470,8 +472,12 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
   const auto=!body.parking||body.parking==='auto',tooShort=[];
   const gatesNow=gateState(context,when,rules,credentials);
   // Lower is better: the walk from the structure counts most, then the drive to its way in.
+  // Campus roads are measured along campus_via (not as the crow flies) and cost 2.5x public roads: a guest
+  // should stay on public streets to the entrance nearest the structure, not drive 1 km past pedestrians
+  // (Royal Street Entrance to Lot 2 was picked when that leg was measured as a 594 m straight line).
   const scoreAccess=(p,o)=>{const g=gatesNow.find(x=>x.id===o.gate),door=g&&g.lat!==undefined?[g.lat,g.lon]:ll(o.entrance);
-    return haversine(ll(p.exit_node),[building.lat,building.lon])/81+haversine(ll(origin),door)/500+haversine(door,ll(o.entrance))/300+(p.occupancy==='filling'?5:0);};
+    const campusM=g?wayIn(context,g,{...p,entrance:o.entrance,campus_via:o.campus_via}).campusM:0;
+    return haversine(ll(p.exit_node),[building.lat,building.lon])/81+haversine(ll(origin),door)/500+campusM/CAMPUS_SCORE_M+(p.occupancy==='filling'?5:0);};
   for(const p of parking.filter(p=>p.eligible&&(auto||p.id===body.parking))) {
     if(auto&&stay!==null&&p.max_stay_hours!=null&&stay>p.max_stay_hours){tooShort.push({id:p.id,name:p.name,max_stay_hours:p.max_stay_hours});continue;}
     for(const o of p.access.filter(o=>o.eligible&&o.entrance)) {
@@ -565,7 +571,9 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
   // Both shortlisted ways in were asked; keep the faster DOOR TO DOOR: drive
   // (provider time + campus leg) plus the walk from the structure. Comparing the
   // drive alone picked a structure with a 10-minute walk over one with 1 minute.
-  if(found.length){found.sort((a,b)=>(a.summary.minutes+a.summary.walking_minutes)-(b.summary.minutes+b.summary.walking_minutes));found[0].summary.provider_requests=attempts;return found[0];}
+  // Door to door, with each campus-road minute counted CAMPUS_TIME_WEIGHT times (same reason as scoreAccess).
+  const cost=r=>r.summary.minutes+r.summary.walking_minutes+(CAMPUS_TIME_WEIGHT-1)*r.summary.campus_m/CAMPUS_DRIVE_MPS/60;
+  if(found.length){found.sort((a,b)=>cost(a)-cost(b));found[0].summary.provider_requests=attempts;return found[0];}
   return {ok:false,reason:'No route passed the gate and closure checks. Try another parking structure or wait for staff access updates.',provider_requests:attempts,checks,parking};
 }
 
