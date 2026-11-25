@@ -416,3 +416,42 @@ test('pages are served with headers that stop other sites embedding them',()=>{
   for(const [,src] of html.matchAll(/(?:<script[^>]+src="|"(?:three|three\/addons\/)":")(https:\/\/[^/"]+)/g))assert.ok(allowed.includes(src),page+' loads '+src);
  }
 });
+
+test('Lot 2: its 2-hour limit and its Text2Park page; an event price or a permit lifts the limit',()=>{
+ const at=parseTime('2026-11-24T12:00'),lot2=(rules=[],cred={})=>parkingState(context,at,rules,cred).find(p=>p.id==='lot2');
+ assert.equal(lot2().max_stay_hours,2);
+ assert.equal(lot2().pay_url,'https://usc.park.tez.io/location/LOT2');
+ // No code on file: no pay link (codes come from the signs, never guessed).
+ assert.ok(parkingState(context,at,[],{}).filter(p=>p.id!=='lot2').every(p=>p.pay_url===null));
+ const event={id:'e',kind:'rate',parking:'lot2',option:'event',price:20,starts_ms:at-3600000,ends_ms:at+3600000,created_ms:0,updated:'2026-11-24T11:00'};
+ assert.equal(lot2([event]).max_stay_hours,null);
+ assert.equal(lot2([event]).pay_url,null);      // staff's event price is paid however staff said, not by Text2Park
+});
+
+test('a stay longer than a structure\'s time limit skips it, says so, and a chosen structure is never second-guessed',async()=>{
+ const tour={...body,from:{lat:34.0336,lon:-118.2817},parking:'auto',to:'Sample Hall'},when=parseTime('2026-11-24T12:00');
+ const unsure=await drivingRoute(context,tour,when,[],[],env(),provider().fn);
+ assert.equal(unsure.ok,true);
+ assert.equal(unsure.summary.parking.id,'lot2');{
+   // Not sure how long: the closest pick stands, with its limit and a named way out.
+   assert.equal(unsure.summary.parking.max_stay_hours,2);
+   assert.ok(unsure.summary.longer_stay_option&&unsure.summary.longer_stay_option.id!=='lot2');
+ }
+ const long=await drivingRoute(context,{...tour,stay_hours:4},when,[],[],env(),provider().fn);
+ assert.equal(long.ok,true);assert.notEqual(long.summary.parking.id,'lot2');
+ assert.equal(long.summary.longer_stay_option,null);
+ assert.deepEqual(long.summary.skipped_for_stay.map(t=>t.id),['lot2']);
+ const short=await drivingRoute(context,{...tour,stay_hours:2},when,[],[],env(),provider().fn);
+ assert.equal(short.summary.parking.id,unsure.summary.parking.id);
+ const chosen=await drivingRoute(context,{...tour,parking:'lot2',stay_hours:4},when,[],[],env(),provider().fn);
+ assert.equal(chosen.ok,true);assert.equal(chosen.summary.parking.id,'lot2');
+ await assert.rejects(drivingRoute(context,{...tour,stay_hours:25},when,[],[],env(),provider().fn),/between 0 and 24/);
+});
+
+test('event links carry how long people stay, and the map page reads it',()=>{
+ const page=readFileSync(new URL('../outdoor/static/index.html',import.meta.url),'utf8');
+ for(const v of ['2','4','10'])assert.match(page,new RegExp('<select id="stay">.*<option value="'+v+'">'));
+ assert.match(page,/stay_hours:mode==='driving'&&\$\('stay'\)\.value/);
+ // The pay link only ever points at Text2Park's own location page.
+ assert.ok(page.includes(String.raw`/^https:\/\/usc\.park\.tez\.io\/location\/[A-Z0-9_-]+$/.test(p.pay_url)`));
+});

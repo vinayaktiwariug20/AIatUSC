@@ -229,8 +229,12 @@ export function parkingState(context,when,rules=[],credentials={}) {
     // True only when the permit is what lets this driver in (not when the structure is open to everyone).
     const byPermit=permit&&(gate?.permit_access===true||gameRule!==null);
     if(!entrance||!exit) reason='Surveyed entrance or pedestrian exit is missing.';
-    const rates=parkingRates(rules,p,when),{published_rates,...pub}=p;
-    return {...pub,rates,rates_later:laterRates(rules,p,when),rates_source:rates.some(r=>r.source==='published')?context.mobilityData.rates_source:null,rates_apply:!permit,gate:primary.gate,campus_via:primary.campus_via,access,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:space?.status||'unknown',space,availability_basis:space?'staff update; spaces are not guaranteed':'gate hours and published access; spaces are not guaranteed'};
+    const rates=parkingRates(rules,p,when),{published_rates,max_stay_hours,text2park,...pub}=p;
+    // A posted time limit (Lot 2: 2 hours) binds visitors paying the posted rate, not permit holders or an event price staff posted.
+    const limit=Number.isFinite(max_stay_hours)&&!permit&&!rates.some(r=>r.option==='event'||r.option==='free')?max_stay_hours:null;
+    // Text2Park's own page for this structure; the driver enters their phone and payment THERE (Doorstep never asks for a phone number).
+    const payUrl=typeof text2park==='string'&&/^[A-Z0-9_-]{1,20}$/.test(text2park)&&rates.some(r=>r.pay==='text2park'||r.pay==='phone_or_station')?'https://usc.park.tez.io/location/'+text2park:null;
+    return {...pub,rates,max_stay_hours:limit,pay_url:payUrl,rates_later:laterRates(rules,p,when),rates_source:rates.some(r=>r.source==='published')?context.mobilityData.rates_source:null,rates_apply:!permit,gate:primary.gate,campus_via:primary.campus_via,access,entrance,exit_node:exit,gate_name:gate?.name,eligible:!reason,reason,permit_access:!reason&&byPermit,occupancy:space?.status||'unknown',space,availability_basis:space?'staff update; spaces are not guaranteed':'gate hours and published access; spaces are not guaranteed'};
   });
 }
 export function circlePolygon(lat,lon,radius=35) {
@@ -452,16 +456,27 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
   const candidates=[];
   // One candidate per open way in (gate + entrance): the router can enter Downey
   // through the Downey Way gate when it is open and nearer, McClintock otherwise.
+  // How long the driver will stay, in hours (optional). Structures with a shorter posted limit are skipped, unless chosen by name.
+  let stay=null;
+  if(body.stay_hours!==undefined&&body.stay_hours!==null&&body.stay_hours!==''){stay=Number(body.stay_hours);if(!Number.isFinite(stay)||stay<=0||stay>24)throw new MobilityError(400,'Stay must be between 0 and 24 hours.');}
+  const auto=!body.parking||body.parking==='auto',tooShort=[];
   const gatesNow=gateState(context,when,rules,credentials);
-  for(const p of parking.filter(p=>p.eligible&&(!body.parking||body.parking==='auto'||p.id===body.parking))) {
+  // Lower is better: the walk from the structure counts most, then the drive to its way in.
+  const scoreAccess=(p,o)=>{const g=gatesNow.find(x=>x.id===o.gate),door=g&&g.lat!==undefined?[g.lat,g.lon]:ll(o.entrance);
+    return haversine(ll(p.exit_node),[building.lat,building.lon])/81+haversine(ll(origin),door)/500+haversine(door,ll(o.entrance))/300+(p.occupancy==='filling'?5:0);};
+  for(const p of parking.filter(p=>p.eligible&&(auto||p.id===body.parking))) {
+    if(auto&&stay!==null&&p.max_stay_hours!=null&&stay>p.max_stay_hours){tooShort.push({id:p.id,name:p.name,max_stay_hours:p.max_stay_hours});continue;}
     for(const o of p.access.filter(o=>o.eligible&&o.entrance)) {
-      const g=gatesNow.find(x=>x.id===o.gate),door=g&&g.lat!==undefined?[g.lat,g.lon]:ll(o.entrance);
-      const score=haversine(ll(p.exit_node),[building.lat,building.lon])/81+haversine(ll(origin),door)/500+haversine(door,ll(o.entrance))/300+(p.occupancy==='filling'?5:0);
-      candidates.push({p:{...p,gate:o.gate,gate_name:o.gate_name,entrance:o.entrance,campus_via:o.campus_via},score});
+      candidates.push({p:{...p,gate:o.gate,gate_name:o.gate_name,entrance:o.entrance,campus_via:o.campus_via},score:scoreAccess(p,o)});
     }
   }
   candidates.sort((a,b)=>a.score-b.score);
-  if(!candidates.length)return {ok:false,reason:'No parking route works at this time. Check the gate hours and whether you need a USC ID or permit, or choose another structure.',parking};
+  if(!candidates.length)return {ok:false,reason:tooShort.length?'The structures open now all have a time limit shorter than your stay ('+tooShort.map(t=>t.name+': '+t.max_stay_hours+' h').join(', ')+'). Choose a shorter stay or a structure by name.':'No parking route works at this time. Check the gate hours and whether you need a USC ID or permit, or choose another structure.',parking};
+  // Skipped for the stay: only the ones that would have ranked ahead of the pick are worth saying ("Lot 2 is closer, but...").
+  const scoreOf=p=>Math.min(...p.access.filter(o=>o.eligible&&o.entrance).map(o=>scoreAccess(p,o)));
+  // With no stay given and a time-limited pick, name the best structure without that limit, so the page can offer it.
+  const longer=c=>{if(stay!==null||!auto||c.max_stay_hours==null)return null;const alt=candidates.find(x=>x.p.max_stay_hours==null);return alt?{id:alt.p.id,name:alt.p.name}:null;};
+  const stayInfo=p=>({stay_hours:stay,skipped_for_stay:tooShort.filter(t=>scoreOf(parking.find(x=>x.id===t.id))<scoreOf(p)),longer_stay_option:longer(p)});
   const reportAreas=driving.map(c=>({id:c.id,name:c.note||'Approved blockage',basis:'staff_confirmed',geometry:circlePolygon(c.lat,c.lon,c.radius_m||15)}));
   let attempts=0;const checks=[],found=[];const reject=(p,check,extra={})=>checks.push({parking:p.id,check,...extra});
   // A bounded number of requests protects the free-tier quota; choose a specific
@@ -486,8 +501,10 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     catch(error){
       // Our cap or openrouteservice's ran out, or the service is down: the phone's
       // own maps app drives them to the gate instead, and Doorstep does the walk.
-      if(error instanceof MobilityError&&(error.status===429||error.status===502)&&!found.length)
-        return handoffOnly(context,body,when,building,candidates[0].p,rules,credentials,walking,error.status===429?'busy':'unavailable');
+      if(error instanceof MobilityError&&(error.status===429||error.status===502)&&!found.length){
+        const out=handoffOnly(context,body,when,building,candidates[0].p,rules,credentials,walking,error.status===429?'busy':'unavailable');
+        if(out.ok)Object.assign(out.summary,stayInfo(candidates[0].p));
+        return out;}
       if(error instanceof MobilityError&&(error.status===429||error.status===502))break;
       throw error;
     }
@@ -531,7 +548,7 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
       summary:{minutes:Math.round(duration/6)/10,metres:Math.round(feature.properties.summary.distance+campusM),start_to_road_m:Math.round(toRoad),campus_m:Math.round(campusM),walking_minutes:arrivalWalk.summary.minutes,
         building:building.id,building_name:building.name,parking:p,gate,drive_to:driveTo(gate,p,target),arrival:context.time.campusISO(arrival),storage:'d1',
         avoided:actual.map(a=>({id:a.id,name:a.name,basis:a.basis})),provider:'openrouteservice',live_traffic:false,
-        gate_locations_note:context.mobilityData.gate_locations_note,selection:'First valid candidate among at most two ranked parking options; not a guaranteed fastest route.',provider_requests:attempts},
+        ...stayInfo(p),gate_locations_note:context.mobilityData.gate_locations_note,selection:'First valid candidate among at most two ranked parking options; not a guaranteed fastest route.',provider_requests:attempts},
       steps,
       walking_preview:arrivalWalk,handoff:{action:'parked',parking:p.id,exit:p.exit,lat:p.exit?context.survey.nodes.find(n=>n.id===p.exit).lat:null,
         lon:p.exit?context.survey.nodes.find(n=>n.id===p.exit).lon:null,building:building.id},

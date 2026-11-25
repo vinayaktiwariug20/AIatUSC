@@ -44,3 +44,9 @@ test('what an organizer types resolves to one building: label, name, id or code'
   assert.equal(findBuilding(buildings, 'DMC')?.id, buildings[1].id);
   assert.equal(findBuilding(buildings, 'Tutor'), null);                 // partial text is not a choice
 });
+
+test('an event link can say how long people stay; anything else is dropped', () => {
+  assert.equal(new URL(eventLink(BASE, {building: 'x', stay: '4'})).searchParams.get('stay'), '4');
+  assert.equal(new URL(eventLink(BASE, {building: 'x', stay: '7'})).searchParams.get('stay'), null);
+  assert.equal(new URL(eventLink(BASE, {building: 'x'})).searchParams.get('stay'), null);
+});

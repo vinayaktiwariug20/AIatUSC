@@ -77,6 +77,9 @@ footer a{color:var(--cardinal)}
       <input id="roomLabel" maxlength="40" placeholder="e.g. Room 218, or Lobby">
       <div class="hint">Shown to attendees next to the building name.</div>
     </div>
+    <label for="stay">How long do people stay? (optional)</label>
+    <select id="stay"><option value="">Not sure</option><option value="2">Under 2 hours</option><option value="4">2 to 4 hours</option><option value="10">Most of the day</option></select>
+    <div class="hint">For people who drive: Doorstep won't send them to a lot with a shorter time limit (Lot 2 allows 2 hours).</div>
     <div class="row" style="margin-top:14px"><button class="primary" id="make">Make link</button></div>
     <div id="err" role="alert"></div>
   </section>
@@ -146,7 +149,7 @@ $('make').onclick = () => {
   if (!b) { $('err').textContent = 'Pick the building from the list (name or code).'; return; }
   const hasIndoor = !$('indoorBox').hidden, roomSel = $('room').selectedOptions[0];
   const roomId = hasIndoor ? $('room').value : '', roomName = hasIndoor && roomId ? roomSel.textContent : $('roomLabel').value;
-  link = eventLink(location.href, {building: b.id, event: $('event').value, room: roomId, roomLabel: roomName, anchor: hasIndoor ? $('anchor').value : ''});
+  link = eventLink(location.href, {building: b.id, event: $('event').value, room: roomId, roomLabel: roomName, anchor: hasIndoor ? $('anchor').value : '', stay: $('stay').value});
   $('link').value = link; $('open').href = link; $('out').hidden = false;
   const svg = qrFor(link).createSvgTag({cellSize: 6, margin: 2, scalable: true});
   $('qr').innerHTML = svg; $('fQr').innerHTML = svg;

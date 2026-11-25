@@ -88,6 +88,7 @@ details>summary{color:var(--cardinal-2)}
 <div class="row"><input class="grow" id="to" list="blds" placeholder="Event building / destination" autocomplete="off" aria-label="Destination"><datalist id="blds"></datalist><button id="goBtn" class="primary">Find route</button></div><div id="eventLine" class="dim" style="margin-top:6px;font-size:14px" hidden></div>
 <div class="row wrap" style="margin-top:9px"><button id="locBtn" class="small">Use my location</button><label class="check"><input type="checkbox" id="stepFree">Avoid stairs</label><button id="repBtn" class="small" aria-pressed="false">Report blockage</button></div>
 <div id="driveOptions" class="stack" hidden>
+<label class="fieldLabel">How long will you stay?<select id="stay"><option value="">Not sure</option><option value="2">Under 2 hours</option><option value="4">2 to 4 hours</option><option value="10">All day</option></select></label>
 <label class="fieldLabel">Parking<select id="parking"><option value="auto">Auto · gate access and walking distance</option></select></label>
 <div class="row wrap"><label class="check"><input type="checkbox" id="uscId">I have a USC ID</label><label class="check"><input type="checkbox" id="parkingPass">I have a prepaid pass for this structure</label></div>
 <label class="fieldLabel">USC parking permit<select id="permit"><option value="">No permit</option></select></label>
@@ -208,6 +209,13 @@ function payWhen(r){if(!r.pay_from)return '';const later=r.pay==='pay_station'&&
 function rateShort(r){return r.option==='free'?'Free':r.option==='hourly'?dollars(r.price)+'/hr':r.option==='daily'?dollars(r.price)+'/day':dollars(r.price)+' event'+(r.validated?' ('+dollars(r.validated.price)+' validated)':'');}
 function ratesHtml(p){if(!p?.rates?.length&&!p?.rates_later?.length)return '';
  return '<div class="dim">Visitor price: '+esc([...(p.rates||[]).map(rateText),...(p.rates_later||[]).map(r=>rateText(r)+' (from '+clock12(r.from)+' today)')].join('; '))+(p.rates_apply===false?' (your permit covers you here)':'')+' · '+(p.rates.some(r=>r.source==='staff')?'staff update '+esc(p.rates.find(r=>r.source==='staff').updated.slice(5,10).replace('-','/')):'<a href="'+esc(p.rates_source?.url||'')+'" target="_blank" rel="noopener">USC Transportation rates</a>, space-available')+'</div>';}
+// Lot 2's 2-hour limit, what was skipped for the stay, and Text2Park's pay page.
+function stayHtml(s){const p=s.parking||{},sk=s.skipped_for_stay||[],alt=s.longer_stay_option;let h='';
+ if(p.max_stay_hours!=null)h+='<div class="notice"><b>'+esc(p.max_stay_hours)+'-hour limit</b> at '+esc(p.name)+'.'+(alt?' Staying longer? <button class="small" data-longer="'+esc(alt.id)+'">Park at '+esc(alt.name)+' instead</button>':'')+'</div>';
+ if(sk.length)h+='<div class="dim">'+esc(sk.map(t=>t.name+' is closer, but has a '+t.max_stay_hours+'-hour limit').join('; '))+'.</div>';
+ return h+payHtml(p);}
+// The driver enters their phone number and payment on Text2Park's page, never in Doorstep.
+function payHtml(p){return p?.pay_url&&/^https:\/\/usc\.park\.tez\.io\/location\/[A-Z0-9_-]+$/.test(p.pay_url)?'<div class="row" style="margin-top:8px"><a class="maplink" target="_blank" rel="noopener" href="'+esc(p.pay_url)+'">Pay for parking (Text2Park)</a></div><div class="dim">Opens Text2Park\'s page for '+esc(p.name)+'. You enter your phone number and payment there, not in Doorstep.</div>':'';}
 function spaceText(p){const s=p?.space;if(!s||s.status==='closed')return 'Space availability unknown';
  return SPACE_WORD[s.status]+(s.spaces!=null?', about '+s.spaces+' spaces left':'')+' (staff update '+s.updated.slice(11,16)+(s.stale?', may be out of date':'')+')';}
 function mapsButtons(dt){if(!dt||!Number.isFinite(dt.lat))return '';const at=dt.lat.toFixed(6)+','+dt.lon.toFixed(6);
@@ -218,7 +226,7 @@ async function route(fit=true){
  const id=++routeVersion;controller?.abort();controller=new AbortController();busy=true;$('goBtn').disabled=true;$('parkedBtn').hidden=true;plan=null;updateIndoorView();
  if(routeLayer){routeLayer.remove();routeLayer=null;}if(walkingLayer){walkingLayer.remove();walkingLayer=null;}$('result').innerHTML='';info('Checking access and routes…');
  try{
-  const r=await api('/api/outdoor/route',{method:'POST',signal:controller.signal,body:JSON.stringify({from:start,to:buildingId(),mode,at:$('departAt').value||undefined,parking:$('parking').value,usc_id:$('uscId').checked,parking_pass:$('parkingPass').checked,permit:$('permit').value||undefined,step_free:$('stepFree').checked,entrance:mode==='walking'&&door?.building===buildingId()&&door.id||undefined})});
+  const r=await api('/api/outdoor/route',{method:'POST',signal:controller.signal,body:JSON.stringify({from:start,to:buildingId(),mode,at:$('departAt').value||undefined,parking:$('parking').value,usc_id:$('uscId').checked,parking_pass:$('parkingPass').checked,permit:$('permit').value||undefined,stay_hours:mode==='driving'&&$('stay').value||undefined,step_free:$('stepFree').checked,entrance:mode==='walking'&&door?.building===buildingId()&&door.id||undefined})});
   if(id!==routeVersion)return;lastRouted=Date.now();
   if(!r.ok){const choices=(r.choices||[]).map(c=>'<button class="small" data-pick="'+esc(c.id)+'">'+esc(c.name)+'</button>').join(' ');$('result').innerHTML='<div class="card error">'+esc(r.reason||r.error)+(choices?'<div class="row wrap" style="margin-top:8px">'+choices+'</div>':'')+'</div>';info('Choose another start or parking structure.');return;}
   plan=r;drawPlan(r,fit);const s=r.summary;
@@ -228,10 +236,10 @@ track('route');stat(mode==='driving'?'route_drive':'route_walk');if(mode==='walk
   if(mode==='driving'){
    const dt=s.drive_to,apps=mapsButtons(dt);
    if(r.handoff_only){
-    $('result').innerHTML='<section class="card"><div class="dim">DRIVE → PARK → WALK</div><div class="big">Drive to '+esc(dt.name)+', then '+esc(s.walking_minutes)+' min walk</div>'+'<div class="notice">Doorstep\'s driving directions are '+(r.why==='busy'?'busy right now':'unavailable right now')+'. Use your maps app for the drive; Doorstep shows the rest.</div>'+apps+'<h2 style="margin-top:10px">'+esc(s.parking.name)+'</h2>'+(s.campus_m>10?'<div class="dim">Enter at '+esc(s.gate.name)+', then about '+esc(s.campus_m)+' m on campus roads to the structure (dashed).</div>':'')+'<div class="dim">'+esc(s.parking.address)+' · '+esc(spaceText(s.parking))+'</div>'+ratesHtml(s.parking)+''+(dt.approximate?'<div class="notice">The gate pin is approximate. Follow posted signs.</div>':'')+'</section>';
+    $('result').innerHTML='<section class="card"><div class="dim">DRIVE → PARK → WALK</div><div class="big">Drive to '+esc(dt.name)+', then '+esc(s.walking_minutes)+' min walk</div>'+'<div class="notice">Doorstep\'s driving directions are '+(r.why==='busy'?'busy right now':'unavailable right now')+'. Use your maps app for the drive; Doorstep shows the rest.</div>'+apps+'<h2 style="margin-top:10px">'+esc(s.parking.name)+'</h2>'+(s.campus_m>10?'<div class="dim">Enter at '+esc(s.gate.name)+', then about '+esc(s.campus_m)+' m on campus roads to the structure (dashed).</div>':'')+'<div class="dim">'+esc(s.parking.address)+' · '+esc(spaceText(s.parking))+'</div>'+ratesHtml(s.parking)+stayHtml(s)+''+(dt.approximate?'<div class="notice">The gate pin is approximate. Follow posted signs.</div>':'')+'</section>';
     $('parkedBtn').hidden=false;info('Open your maps app for the drive. Select the parking button after you have parked.');
    }else{
-   $('result').innerHTML='<section class="card"><div class="dim">DRIVE → PARK → WALK</div><div class="big">About '+esc(s.minutes)+' min drive + '+esc(s.walking_minutes)+' min walk</div>'+apps+(r.walking_preview?.summary?.step_free?'<div class="success">Walk after parking is step-free: no mapped stairs.</div><div class="dim">Stairs come from OpenStreetMap. Curbs, slopes and doors are not checked.</div>':'')+'<h2 style="margin-top:8px">'+esc(s.parking.name)+'</h2><div>Via '+esc(s.gate.name)+'</div>'+(s.start_to_road_m>10?'<div class="dim">Starts at the nearest road, '+esc(s.start_to_road_m)+' m from you (dotted line).</div>':'')+(s.campus_m>10?'<div class="dim">Enter at '+esc(s.gate.name)+', then about '+esc(s.campus_m)+' m on campus roads to the structure (dashed).</div>':'')+'<div class="dim">'+esc(s.parking.address)+' · '+esc(spaceText(s.parking))+'</div>'+ratesHtml(s.parking)+'<div class="notice">'+(s.gate.location_source==='approximate_intersection'?'The gate pin is approximate. Follow posted signs. ':'')+'Estimated time does not include live traffic.</div><div class="dim">Routes crossing closed gate areas or registered closures are excluded. Auto selection tries up to two candidates and does not guarantee the fastest route.</div>'+(r.steps.length?'<details><summary>Driving directions</summary><ol id="routeSteps">'+r.steps.map(step=>'<li>'+esc(step.instruction)+' <small>'+Math.round(step.distance||0)+' m</small></li>').join('')+'</ol></details>':'')+'</section>';
+   $('result').innerHTML='<section class="card"><div class="dim">DRIVE → PARK → WALK</div><div class="big">About '+esc(s.minutes)+' min drive + '+esc(s.walking_minutes)+' min walk</div>'+apps+(r.walking_preview?.summary?.step_free?'<div class="success">Walk after parking is step-free: no mapped stairs.</div><div class="dim">Stairs come from OpenStreetMap. Curbs, slopes and doors are not checked.</div>':'')+'<h2 style="margin-top:8px">'+esc(s.parking.name)+'</h2><div>Via '+esc(s.gate.name)+'</div>'+(s.start_to_road_m>10?'<div class="dim">Starts at the nearest road, '+esc(s.start_to_road_m)+' m from you (dotted line).</div>':'')+(s.campus_m>10?'<div class="dim">Enter at '+esc(s.gate.name)+', then about '+esc(s.campus_m)+' m on campus roads to the structure (dashed).</div>':'')+'<div class="dim">'+esc(s.parking.address)+' · '+esc(spaceText(s.parking))+'</div>'+ratesHtml(s.parking)+stayHtml(s)+'<div class="notice">'+(s.gate.location_source==='approximate_intersection'?'The gate pin is approximate. Follow posted signs. ':'')+'Estimated time does not include live traffic.</div><div class="dim">Routes crossing closed gate areas or registered closures are excluded. Auto selection tries up to two candidates and does not guarantee the fastest route.</div>'+(r.steps.length?'<details><summary>Driving directions</summary><ol id="routeSteps">'+r.steps.map(step=>'<li>'+esc(step.instruction)+' <small>'+Math.round(step.distance||0)+' m</small></li>').join('')+'</ol></details>':'')+'</section>';
    $('parkedBtn').hidden=false;info('Blue: driving · dotted green: walking after parking. Select the parking button after you have parked.');
    }
   }else{
@@ -240,7 +248,7 @@ track('route');stat(mode==='driving'?'route_drive':'route_walk');if(mode==='walk
    if(s.step_free){const door=r.handoff?.step_free_door;h+='<div class="success">Step-free route: no mapped stairs'+(door===true?', and the door is step-free (checked on site).':'.')+'</div>'
     +(door===false?'<div class="notice">This door has steps, and no step-free door is recorded for this building.</div>':'')
     +'<div class="dim">Stairs come from OpenStreetMap. Curbs and slopes are not checked'+(door===true?'.':', and neither is the door.')+'</div>';};
-   if(s.start_place)h+='<div class="dim">Starting at the parking pedestrian exit. Select Use my location to recalculate from your actual position.</div>';
+   if(s.start_place)h+='<div class="dim">Starting at the parking pedestrian exit. Select Use my location to recalculate from your actual position.</div>'+payHtml((mobility?.parking||[]).find(x=>x.id===s.start_place.id));
    if(s.entrance_source==='outline')h+='<div class="notice">A door has not been mapped. This route ends at the building outline.</div>';
    if(s.off_network)h+='<div class="notice">You are '+esc(s.snap_m)+' m from the walking map. Check where the route joins the mapped paths.</div>';
    for(const a of s.avoided)h+='<div class="success">Avoiding a blockage · about '+esc(a.extra_min)+' extra min</div>';
@@ -392,6 +400,8 @@ $('result').onclick=safe(async e=>{
     return;
   }
 
+  const lg=e.target.closest('button[data-longer]');
+  if(lg){$('parking').value=lg.dataset.longer;await route();return;}
   const d=e.target.closest('button[data-door]');
 
   if(d){door={id:d.dataset.door,building:buildingId()};await route();return;}
@@ -836,6 +846,7 @@ $('to').onblur=()=>searchMode(false);
         else{map.setView([p.lat,p.lon],Math.max(map.getZoom(),16));info('Starting from '+name+'. Where are you walking to?');}
       }
     }
+    if([...$('stay').options].some(o=>o.value&&o.value===qs.get('stay')))$('stay').value=qs.get('stay');
     const at=qs.get('at');
     if(at){
       const [lat,lon]=at.split(',').map(Number);

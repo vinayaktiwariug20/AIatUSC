@@ -409,6 +409,9 @@
       "game_access": "unconfirmed",
       "address": "Open lot by the USC Bookstore, off McClintock Ave",
       "note": "Open surface lot. Car entrance and walkways from Google Maps pins; not yet checked on site. Drivers can come in at McClintock, Downey Way or Watt Way: the campus roads connect (team, 2026-11-19).",
+      "max_stay_hours": 2,
+      "text2park": "LOT2",
+      "_max_stay_hours_and_text2park_source": "Sign seen by the team 2026-11-19 ($5/hour, 2 hours max). Text2Park's page https://usc.park.tez.io/location/LOT2 names it 'UPC Bookstore (Lot 2)', '$5 per hour 2 hour max' (checked 2026-11-24). Other structures' codes are not guessed: DOWNEY gives 'Location not found'; take them from the signs.",
       "published_rates": [
         {
           "option": "hourly",
