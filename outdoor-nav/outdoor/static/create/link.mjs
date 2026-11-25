@@ -12,7 +12,10 @@ export const LIMITS = {event: 80, room_label: 40};
 
 const clean = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
-export function eventLink(base, {building, event = '', room = '', roomLabel = '', anchor = ''} = {}) {
+// How long attendees park, in hours: the values of the map page's "How long will you stay?" list.
+export const STAYS = ['2', '4', '10'];
+
+export function eventLink(base, {building, event = '', room = '', roomLabel = '', anchor = '', stay = ''} = {}) {
   const id = clean(building, 200);
   if (!id) throw new Error('Choose a building first.');
   const url = new URL('/', base);
@@ -25,6 +28,7 @@ export function eventLink(base, {building, event = '', room = '', roomLabel = ''
   if (label) url.searchParams.set('room_label', label);
   const a = clean(anchor, 60);
   if (a) url.searchParams.set('anchor', a);
+  if (STAYS.includes(String(stay))) url.searchParams.set('stay', String(stay));
   return url.toString();
 }
 
