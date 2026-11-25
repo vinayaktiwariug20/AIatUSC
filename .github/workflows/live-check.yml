@@ -1,0 +1,45 @@
+# Once a day, ask the LIVE site for one driving route and one street-address search.
+# Both depend on openrouteservice (HeiGIT), an outside service that can change under us:
+# on 2026-11-24 its old address was switched off and Drive + park failed for every building
+# without anyone noticing. A failed run here is that warning.
+#
+# Who hears about it: GitHub emails a failed scheduled run to the person who last changed
+# the `cron` line below. When Doorstep changes hands, the new owner should edit that line
+# (any change, even the minute) so the emails go to them. GitHub also pauses scheduled
+# workflows in a repo with no commits for 60 days; re-enable it under Actions if so.
+#
+# Cost: 1-2 driving requests and 1 address search per day, out of the shared quota.
+
+name: live-check
+
+on:
+  schedule:
+    - cron: "15 15 * * *"   # 15:15 UTC = 7:15 am Los Angeles winter time, 8:15 am summer time
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      SITE: https://aiatusc-outdoor-nav.doorstepusc.workers.dev
+    steps:
+      - name: Drive + park returns a route (or at least the routing service answers)
+        run: |
+          code=$(curl -s -o route.json -w '%{http_code}' -X POST "$SITE/api/outdoor/route" \
+            -H 'content-type: application/json' \
+            -d '{"mode":"driving","from":{"lat":34.0336,"lon":-118.2817},"to":"jmc"}')
+          echo "HTTP $code"; head -c 600 route.json; echo
+          [ "$code" = 200 ] || { echo "::error::Driving route request failed (HTTP $code)."; exit 1; }
+          if [ "$(jq -r .ok route.json)" = true ]; then echo "Driving route OK."; exit 0; fi
+          # No route can be legitimate (every structure closed or full right now). A provider
+          # failure is not: that means openrouteservice refused or could not be reached.
+          if jq -e '[.checks[]?.check] | any(. == "provider returned no route")' route.json >/dev/null; then
+            echo "::error::openrouteservice returned no route: $(jq -c '[.checks[]?|{status,detail}]' route.json)"; exit 1
+          fi
+          echo "::warning::No driving route, but not because of the routing service: $(jq -r .reason route.json)"
+
+      - name: Street-address search works
+        run: |
+          curl -s "$SITE/api/geocode?q=Figueroa%20St" -o geo.json
+          head -c 400 geo.json; echo
+          [ "$(jq -r .address geo.json)" = ok ] || { echo "::error::Address search is '$(jq -r .address geo.json)', not ok."; exit 1; }
