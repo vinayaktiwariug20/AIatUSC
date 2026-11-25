@@ -33,7 +33,7 @@ export function campusPlaces(context, q, limit = 5) {
 /** Street addresses near USC, or null if the search is unavailable. */
 export async function addressSearch(env, q, fetcher = fetch) {
   if (!env.ORS_API_KEY) return null;
-  const u = new URL('https://api.openrouteservice.org/geocode/autocomplete');
+  const u = new URL('https://api.heigit.org/pelias/v1/autocomplete');
   u.searchParams.set('text', q);
   u.searchParams.set('size', '5');
   u.searchParams.set('focus.point.lat', String(USC.lat));
