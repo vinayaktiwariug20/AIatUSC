@@ -124,7 +124,9 @@ class WalkGraph:
         An entry may also carry building metadata: `aliases` (names people
         actually type), `outline` ([[lat, lon], ...], drawn as the
         highlight), `hours_url` (the owner's hours page, shown as a link) and `part_of`
-        (the larger complex people may call it, e.g. Sample Hall in the TCC complex). An entry with no lat/lon is metadata only: no door."""
+        (the larger complex people may call it, e.g. Sample Hall in the TCC complex) and
+        `building_name` (the correct name when OSM's is wrong; the old one stays searchable as an alias).
+        An entry with no lat/lon is metadata only: no door."""
         for o in overrides:
             b = self.buildings.get(o["building"])
             if b is None:
@@ -134,6 +136,9 @@ class WalkGraph:
                     "id": o["building"], "name": o.get("building_name", o["building"]),
                     "aliases": [], "lat": o["lat"], "lon": o["lon"],
                     "entrances": []}
+            elif isinstance(o.get("building_name"), str) and o["building_name"].strip() and o["building_name"].strip() != b["name"]:
+                b["aliases"] = [b["name"]] + [a for a in b.get("aliases", []) if a != b["name"]]
+                b["name"] = o["building_name"].strip()[:120]
             # Ours first: official codes (e.g. TCC) come before OSM's (RTCC), and labels show the first.
             if o.get("aliases"):
                 b["aliases"] = list(dict.fromkeys(list(o["aliases"]) + list(b.get("aliases", []))))
