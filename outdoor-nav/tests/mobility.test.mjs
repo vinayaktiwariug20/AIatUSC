@@ -475,8 +475,8 @@ test('campus legs follow the campus roads; one nobody has mapped is not drawn as
  for(const g of ['mcclintock','downey-way'])assert.equal(r.access.find(a=>a.gate===g).entrance.id,'ROYAL.veh.34th',g);
  assert.equal(r.access.find(a=>a.gate==='royal').entrance.id,'ROYAL.veh.jefferson');
  assert.ok(royal.campusM>500&&royal.campusM<700,String(royal.campusM));
- // Watt Way to Lot 2 is not mapped: nothing drawn, the length padded, closures still checked on the best guess.
- const watt=leg('lot2','watt');
+ // Watt Way to the Royal structure is not mapped: nothing drawn, the length padded, closures still checked on the best guess.
+ const watt=leg('royal','watt');
  assert.equal(watt.campusMapped,false);assert.deepEqual(watt.campus,[]);assert.equal(watt.line.length,2);
  assert.ok(watt.campusM>watt.line.slice(1).reduce((s,c,i)=>s+haversine([watt.line[i][1],watt.line[i][0]],[c[1],c[0]]),0));
  // Every way in with a long leg either has points to follow or is knowingly unmapped (Watt Way only, for now).
@@ -541,4 +541,22 @@ test('a route that reaches the entrance, drives on to turn round and comes back 
  const straight=route([north,corner,back]);assert.equal(cutLoop(straight,gate,30),straight);
  // A few metres on past the pin to the curb is not a loop.
  const curb=route([north,corner,[-118.2873,34.02505],back]);assert.equal(cutLoop(curb,gate,30),curb);
+});
+
+test('driving past a gate for people on foot is not driving through a closed gate',async()=>{
+ // From Jefferson / Figueroa the drive goes down Figueroa past the DCC-PSD gate (locked, on foot only): both options were rejected.
+ const psd=context.mobilityData.gates.find(g=>g.id==='dcc-psd'),wed=parseTime('2026-11-25T12:00');
+ assert.equal(gateState(context,wed,[],{}).find(g=>g.id==='dcc-psd').pedestrian.status,'closed');
+ const past=provider(([a,b])=>[a,[psd.lon,psd.lat],b]);
+ const out=await drivingRoute(context,{...body,from:{lat:34.021904,lon:-118.280003},parking:'mccarthy',to:'Sample Hall'},wed,[],[],env(),past.fn);
+ assert.equal(out.ok,true,JSON.stringify(out.checks));
+});
+
+test('Watt Way: up to Downey Way, then along it to Lot 2 or to McClintock for Downey',()=>{
+ const at=parseTime('2026-11-24T12:00'),gates=gateState(context,at,[],{}),park=parkingState(context,at,[],{});
+ const leg=sid=>{const p=park.find(x=>x.id===sid),o=p.access.find(a=>a.gate==='watt');return wayIn(context,gates.find(g=>g.id==='watt'),{...p,entrance:o.entrance,campus_via:o.campus_via});};
+ const lot2=leg('lot2'),downey=leg('downey');
+ assert.equal(lot2.campusMapped,true);assert.equal(downey.campusMapped,true);
+ assert.ok(lot2.campusM>280&&lot2.campusM<340,String(lot2.campusM));   // 244 m up Watt Way + 65 m along Downey Way
+ assert.ok(lot2.campus.some(([lon,lat])=>Math.abs(lat-34.0203897)<1e-6&&Math.abs(lon+118.28774)<1e-6));
 });

@@ -576,7 +576,8 @@ export async function drivingRoute(context,body,when,rules,closures,env,fetcher=
     // time, as well as departure/arrival. A route is discarded on any violation.
     let cumulative=0;const distances=coords.slice(1).map((c,i)=>haversine([coords[i][1],coords[i][0]],[c[1],c[0]])),total=distances.reduce((x,y)=>x+y,0)||1;
     let invalid=false;
-    const mappedGates=gateState(context,when,rules,credentials).filter(knownGate);
+    // Gates for people on foot (DCC-PSD, onto 34th St) never limit cars: driving past one on Figueroa is fine.
+    const mappedGates=gateState(context,when,rules,credentials).filter(g=>knownGate(g)&&!g.pedestrian_only);
     for(let i=1;i<coords.length;i++) {
       for(const g of mappedGates) {
         if(pointSegment(ll(g),[coords[i-1][1],coords[i-1][0]],[coords[i][1],coords[i][0]])<=GATE_AVOID_RADIUS_M) {
