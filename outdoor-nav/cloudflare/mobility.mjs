@@ -454,9 +454,14 @@ export const UNMAPPED_LEG_M=150,UNMAPPED_DETOUR=1.4;
 // Public roads end at the gate; the campus leg follows campus_via to the entrance: surveyed point
 // ids, or [lat, lon] corners taken from OpenStreetMap road geometry (see mobility.json).
 export function wayIn(context,gate,p) {
-  const hasGate=gate.lat!==undefined,target=hasGate?{lat:gate.lat,lon:gate.lon}:p.entrance;
+  // Where the drive on public roads ends: the gate pin, or the gate's drive_to, a point every direction can reach.
+  // McClintock: the pin is beside the eastbound side of Jefferson (mapped as two one-way roads), reachable only
+  // from the west, so a car coming down McClintock was sent to Vermont to turn round. drive_to is the short
+  // stretch of McClintock between the two sides, straight ahead from the north and a left turn from either side.
+  const hasGate=gate.lat!==undefined,stop=Array.isArray(gate.drive_to)?{lat:gate.drive_to[0],lon:gate.drive_to[1]}:null;
+  const target=hasGate?(stop||{lat:gate.lat,lon:gate.lon}):p.entrance;
   const via=(p.campus_via||[]).map(v=>Array.isArray(v)?{lat:v[0],lon:v[1]}:context.survey.nodes.find(n=>n.id===v)).filter(Boolean);
-  const line=hasGate?[xy(target),...via.map(xy),xy(p.entrance)]:[];
+  const line=hasGate?[xy(target),...(stop?[xy({lat:gate.lat,lon:gate.lon})]:[]),...via.map(xy),xy(p.entrance)]:[];
   const lineM=line.slice(1).reduce((sum,c,i)=>sum+haversine([line[i][1],line[i][0]],[c[1],c[0]]),0);
   const mapped=!hasGate||via.length>0||lineM<=UNMAPPED_LEG_M,campusM=mapped?lineM:lineM*UNMAPPED_DETOUR;
   // `line` is still what closures are checked against: the best guess we have, never less safe than before.

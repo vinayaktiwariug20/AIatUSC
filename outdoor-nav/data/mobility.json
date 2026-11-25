@@ -11,7 +11,9 @@
       "id": "mcclintock",
       "lat": 34.0250085,
       "lon": -118.2871694,
-      "location_source": "field_survey"
+      "location_source": "field_survey",
+      "drive_to": [34.0251038, -118.2870874],
+      "drive_to_note": "Where the drive on public roads ends. OpenStreetMap maps Jefferson here as two one-way roads joined by a 10 m stretch of McClintock (way 326418958); this is its middle. The gate pin is beside the eastbound side, reachable only from the west: aimed at it, a car coming down McClintock was sent to Vermont to turn round. The team confirms it is a four-way intersection (2026-11-24)."
     },
     {
       "id": "watt",
