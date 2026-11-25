@@ -421,9 +421,9 @@ test('Lot 2: its 2-hour limit and its Text2Park page; an event price or a permit
  const at=parseTime('2026-11-24T12:00'),lot2=(rules=[],cred={})=>parkingState(context,at,rules,cred).find(p=>p.id==='lot2');
  assert.equal(lot2().max_stay_hours,2);
  assert.equal(lot2().pay_url,'https://usc.park.tez.io/location/LOT2');
- // Codes come from the signs, never guessed: Flower's isn't known, so no pay link there.
+ // Codes come from the signs, never guessed. Flower takes Text2Park only, so its link is always there.
  const all=parkingState(context,at,[],{});
- assert.equal(all.find(p=>p.id==='flower').pay_url,null);
+ assert.equal(all.find(p=>p.id==='flower').pay_url,'https://usc.park.tez.io/location/FLWR');
  // Downey before 4 pm Mon-Thu is pay station only: no Text2Park link until it takes phones.
  assert.equal(all.find(p=>p.id==='downey').pay_url,null);
  assert.equal(parkingState(context,parseTime('2026-11-24T17:00'),[],{}).find(p=>p.id==='downey').pay_url,'https://usc.park.tez.io/location/DWNY');
