@@ -365,8 +365,8 @@
  },
  {
   "building": "steven-and-katherine-sample-hall",
+  "building_name": "Steven and Kathryn Sample Hall",
   "aliases": [
-   "Steven and Kathryn Sample Hall",
    "Sample Hall",
    "SKS",
    "USC Admission Center",
@@ -378,7 +378,7 @@
    "Guided campus tour"
   ],
   "part_of": "Ronald Tutor Campus Center (TCC)",
-  "_source": "USC events calendar location 'Admission Center - Steven and Kathryn Sample Hall (SKS)' (calendar.usc.edu, checked 2026-11-24), and the team. Guided tours check in at the Admission Center; self-guided tours need no check-in (admission.usc.edu Tours page), so no alias for them. The door used is the team-surveyed one facing International Plaza; whether it is the nearest to the Admission Center is not checked."
+  "_source": "USC events calendar location 'Admission Center - Steven and Kathryn Sample Hall (SKS)' (calendar.usc.edu, checked 2026-11-24), and the team. building_name fixes OSM's 'Katherine' (the id keeps it so links don't break). Guided tours check in at the Admission Center; self-guided tours need no check-in (admission.usc.edu Tours page), so no alias for them. The door used is the team-surveyed one facing International Plaza; whether it is the nearest to the Admission Center is not checked."
  },
  {
   "building": "town-and-gown",
