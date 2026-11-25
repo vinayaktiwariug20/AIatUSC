@@ -434,23 +434,25 @@ test('Lot 2: its 2-hour limit and its Text2Park page; an event price or a permit
 });
 
 test('a stay longer than a structure\'s time limit skips it, says so, and a chosen structure is never second-guessed',async()=>{
- const tour={...body,from:{lat:34.0336,lon:-118.2817},parking:'auto',to:'Sample Hall'},when=parseTime('2026-11-24T12:00');
- const unsure=await drivingRoute(context,tour,when,[],[],env(),provider().fn);
+ // From the west with Downey closed by staff, Lot 2 is the closest structure to Sample Hall.
+ const tour={...body,from:{lat:34.0230,lon:-118.2950},parking:'auto',to:'Sample Hall'},when=parseTime('2026-11-24T12:00');
+ const shut=[{id:'s',kind:'parking',parking:'downey',applies:'everyone',status:'closed',starts_ms:when-3600000,ends_ms:when+36000000,ends:'2026-11-24T22:00',created_ms:0,updated:'2026-11-24T11:00',note:''}];
+ const unsure=await drivingRoute(context,tour,when,shut,[],env(),provider().fn);
  assert.equal(unsure.ok,true);
  assert.equal(unsure.summary.parking.id,'lot2');{
    // Not sure how long: the closest pick stands, with its limit and a named way out.
    assert.equal(unsure.summary.parking.max_stay_hours,2);
    assert.ok(unsure.summary.longer_stay_option&&unsure.summary.longer_stay_option.id!=='lot2');
  }
- const long=await drivingRoute(context,{...tour,stay_hours:4},when,[],[],env(),provider().fn);
+ const long=await drivingRoute(context,{...tour,stay_hours:4},when,shut,[],env(),provider().fn);
  assert.equal(long.ok,true);assert.notEqual(long.summary.parking.id,'lot2');
  assert.equal(long.summary.longer_stay_option,null);
  assert.deepEqual(long.summary.skipped_for_stay.map(t=>t.id),['lot2']);
- const short=await drivingRoute(context,{...tour,stay_hours:2},when,[],[],env(),provider().fn);
+ const short=await drivingRoute(context,{...tour,stay_hours:2},when,shut,[],env(),provider().fn);
  assert.equal(short.summary.parking.id,unsure.summary.parking.id);
- const chosen=await drivingRoute(context,{...tour,parking:'lot2',stay_hours:4},when,[],[],env(),provider().fn);
+ const chosen=await drivingRoute(context,{...tour,parking:'lot2',stay_hours:4},when,shut,[],env(),provider().fn);
  assert.equal(chosen.ok,true);assert.equal(chosen.summary.parking.id,'lot2');
- await assert.rejects(drivingRoute(context,{...tour,stay_hours:25},when,[],[],env(),provider().fn),/between 0 and 24/);
+ await assert.rejects(drivingRoute(context,{...tour,stay_hours:25},when,shut,[],env(),provider().fn),/between 0 and 24/);
 });
 
 test('event links carry how long people stay, and the map page reads it',()=>{
@@ -476,4 +478,12 @@ test('campus legs follow the campus roads; one nobody has mapped is not drawn as
  // Every way in with a long leg either has points to follow or is knowingly unmapped (Watt Way only, for now).
  for(const p of park)for(const o of p.access){const w=wayIn(context,gates.find(g=>g.id===o.gate),{...p,entrance:o.entrance,campus_via:o.campus_via});
    if(!w.campusMapped)assert.equal(o.gate,'watt',p.id+' via '+o.gate+' is a long unmapped leg');}
+});
+
+test('from the northeast, no driving across campus from Royal Street Entrance: public roads to a nearer entrance',async()=>{
+ // The screenshot case: Sample Hall from near the 110. Same provider time for every way in, so campus roads decide.
+ const out=await drivingRoute(context,{...body,from:{lat:34.0285,lon:-118.2735},parking:'auto',to:'Sample Hall'},parseTime('2026-11-24T12:00'),[],[],env(),provider().fn);
+ assert.equal(out.ok,true);
+ assert.ok(!(out.summary.parking.id==='lot2'&&out.summary.gate.id==='royal'),'Royal Street Entrance to Lot 2');
+ assert.ok(out.summary.campus_m<400,out.summary.parking.id+' via '+out.summary.gate.id+': '+out.summary.campus_m+' m on campus');
 });
