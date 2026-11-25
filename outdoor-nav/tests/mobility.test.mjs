@@ -428,6 +428,8 @@ test('Lot 2: its 2-hour limit and its Text2Park page; an event price or a permit
  assert.equal(all.find(p=>p.id==='downey').pay_url,null);
  assert.equal(parkingState(context,parseTime('2026-11-24T17:00'),[],{}).find(p=>p.id==='downey').pay_url,'https://usc.park.tez.io/location/DWNY');
  assert.ok(all.every(p=>p.pay_url===null||/^https:\/\/usc\.park\.tez\.io\/location\/[A-Z0-9]+$/.test(p.pay_url)));
+ // Height limits reach the page; Lot 2 is open, and a structure with no figure on file says so (no guess).
+ assert.equal(all.find(p=>p.id==='royal').clearance_in,74);assert.equal(all.find(p=>p.id==='lot2').open_lot,true);assert.equal(all.find(p=>p.id==='flower').clearance_in,undefined);
  const event={id:'e',kind:'rate',parking:'lot2',option:'event',price:20,starts_ms:at-3600000,ends_ms:at+3600000,created_ms:0,updated:'2026-11-24T11:00'};
  assert.equal(lot2([event]).max_stay_hours,null);
  assert.equal(lot2([event]).pay_url,null);      // staff's event price is paid however staff said, not by Text2Park
