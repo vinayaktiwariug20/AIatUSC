@@ -68,12 +68,14 @@
   ],
   "parking_source": "Supplied data/surveyed.json (vehicle entrances and pedestrian exits); gate eligibility from USC Transportation. No occupancy feed.",
   "campus_via_note": "campus_via: the points a car passes between the gate and the structure entrance. Ids are surveyed points; [lat, lon] pairs are road corners from OpenStreetMap geometry (West 34th Street at McClintock Avenue, checked 2026-11-24), on the team's route Royal -> 34th St -> McClintock -> Downey Way. Royal Street Entrance is not a way in to Lot 2 or Downey: getting from it to 34th St means driving through the Royal structure (team, 2026-11-24). It stays a way in to the Royal structure itself. From McClintock or Downey Way, drivers reach Royal by its 34th St car entrance (team, 2026-11-24). Watt Way runs straight from Exposition to Downey Way, crossing it at [34.0203897, -118.28774] (a shared OpenStreetMap node), 65 m from Lot 2's entrance. Watt Way to the Royal structure is not mapped yet: the page says so instead of drawing a straight line across campus.",
+  "clearance_source": "clearance_in is the height limit in inches. Royal 6ft2in, McCarthy 6ft4in, Jefferson and Downey 6ft8in from the team's USC Transportation booth card (Downey checked against its posted sign, 2026-08-26); Figueroa 8ft2in and Shrine 8ft4in from USC Transportation's gate attendant reference, Fall 2026. Flower and Lot V are not on file yet. The posted sign at the entrance wins.",
   "text2park_codes_source": "Location codes from the Text2Park signs, listed by the team 2026-11-24. Each opens its own rate plan on https://usc.park.tez.io/location/<code>; a made-up code shows Location not found. GRND (Grand Ave) and 37ST (37th Street) are valid but not in Doorstep yet. FLWR (Flower Street) added the same way, 2026-11-24.",
   "parking": [
     {
       "id": "downey",
       "name": "Downey Way Parking Structure",
       "text2park": "DWNY",
+      "clearance_in": 80,
       "gate": "mcclintock",
       "entrance": "DOWNEY.veh.mcclintock",
       "exit": "DOWNEY.ped.main",
@@ -146,6 +148,7 @@
       "id": "jefferson",
       "name": "Jefferson Boulevard Parking Structure",
       "text2park": "JEFF",
+      "clearance_in": 80,
       "gate": "jefferson-blvd",
       "entrance": "JEFFERSON.veh.main",
       "exit": "JEFFERSON.ped.small",
@@ -214,6 +217,7 @@
       "id": "royal",
       "name": "Royal Street Parking Structure",
       "text2park": "ROYL",
+      "clearance_in": 74,
       "booth_signs": [
         {"sign": "event", "price": 50},
         {"sign": "event", "price": 40},
@@ -278,6 +282,7 @@
       "id": "mccarthy",
       "name": "McCarthy Way Parking Structure",
       "text2park": "MCCY",
+      "clearance_in": 76,
       "gate": "mccarthy-way",
       "entrance": "MCCARTHY.veh.main",
       "exit": "MCCARTHY.ped.hellman",
@@ -302,6 +307,7 @@
       "id": "figueroa",
       "name": "Figueroa Street Parking Structure",
       "text2park": "FIGS",
+      "clearance_in": 98,
       "gate": "figueroa",
       "entrance": "FIGUEROA.veh.hotel",
       "exit": "FIGUEROA.veh.hotel",
@@ -354,6 +360,7 @@
       "id": "shrine",
       "name": "USC Shrine Parking Structure",
       "text2park": "SHRN",
+      "clearance_in": 100,
       "gate": "shrine",
       "entrance": "SHRINE.veh.main",
       "exit": "SHRINE.ped.main",
@@ -420,6 +427,7 @@
       "note": "Open surface lot. Car entrance and walkways from Google Maps pins; not yet checked on site. Drivers can come in at McClintock, Downey Way or Watt Way: the campus roads connect (team, 2026-11-19).",
       "max_stay_hours": 2,
       "text2park": "LOT2",
+      "open_lot": true,
       "_max_stay_hours_and_text2park_source": "Sign seen by the team 2026-11-19 ($5/hour, 2 hours max). Text2Park's page https://usc.park.tez.io/location/LOT2 names it 'UPC Bookstore (Lot 2)', '$5 per hour 2 hour max' (checked 2026-11-24). Other structures' codes are not guessed: DOWNEY gives 'Location not found'; take them from the signs.",
       "published_rates": [
         {
