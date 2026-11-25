@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
 import {WalkRouter, haversine} from '../cloudflare/router.mjs';
 import {parseTime,campusISO,gateStatus,handleApi} from '../cloudflare/api.mjs';
-import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M,walkingRuleClosures,DIRECTIONS_LIMITS}from '../cloudflare/mobility.mjs';
+import {gateState,parkingState,footballContext,avoidance,intersectsPolygon,drivingRoute,wayIn,UNMAPPED_LEG_M,validateRule,readRules,circlePolygon,GATE_AVOID_RADIUS_M,walkingRuleClosures,DIRECTIONS_LIMITS}from '../cloudflare/mobility.mjs';
 import {collectFacts} from '../cloudflare/assistant.mjs';
 const json=name=>JSON.parse(readFileSync(new URL('../'+name,import.meta.url),'utf8'));
 const context={router:new WalkRouter(json('cloudflare/graph.json')),gateData:json('data/gates.json'),mobilityData:json('data/mobility.json'),footballData:json('data/football.json'),survey:json('data/surveyed.json'),time:{parseTime,campusISO,gateStatus}};
@@ -421,8 +421,13 @@ test('Lot 2: its 2-hour limit and its Text2Park page; an event price or a permit
  const at=parseTime('2026-11-24T12:00'),lot2=(rules=[],cred={})=>parkingState(context,at,rules,cred).find(p=>p.id==='lot2');
  assert.equal(lot2().max_stay_hours,2);
  assert.equal(lot2().pay_url,'https://usc.park.tez.io/location/LOT2');
- // No code on file: no pay link (codes come from the signs, never guessed).
- assert.ok(parkingState(context,at,[],{}).filter(p=>p.id!=='lot2').every(p=>p.pay_url===null));
+ // Codes come from the signs, never guessed: Flower's isn't known, so no pay link there.
+ const all=parkingState(context,at,[],{});
+ assert.equal(all.find(p=>p.id==='flower').pay_url,null);
+ // Downey before 4 pm Mon-Thu is pay station only: no Text2Park link until it takes phones.
+ assert.equal(all.find(p=>p.id==='downey').pay_url,null);
+ assert.equal(parkingState(context,parseTime('2026-11-24T17:00'),[],{}).find(p=>p.id==='downey').pay_url,'https://usc.park.tez.io/location/DWNY');
+ assert.ok(all.every(p=>p.pay_url===null||/^https:\/\/usc\.park\.tez\.io\/location\/[A-Z0-9]+$/.test(p.pay_url)));
  const event={id:'e',kind:'rate',parking:'lot2',option:'event',price:20,starts_ms:at-3600000,ends_ms:at+3600000,created_ms:0,updated:'2026-11-24T11:00'};
  assert.equal(lot2([event]).max_stay_hours,null);
  assert.equal(lot2([event]).pay_url,null);      // staff's event price is paid however staff said, not by Text2Park
@@ -454,4 +459,21 @@ test('event links carry how long people stay, and the map page reads it',()=>{
  assert.match(page,/stay_hours:mode==='driving'&&\$\('stay'\)\.value/);
  // The pay link only ever points at Text2Park's own location page.
  assert.ok(page.includes(String.raw`/^https:\/\/usc\.park\.tez\.io\/location\/[A-Z0-9_-]+$/.test(p.pay_url)`));
+});
+
+test('campus legs follow the campus roads; one nobody has mapped is not drawn as a straight line',()=>{
+ const at=parseTime('2026-11-24T12:00'),gates=gateState(context,at,[],{}),park=parkingState(context,at,[],{});
+ const leg=(sid,gid)=>{const p=park.find(x=>x.id===sid),o=p.access.find(a=>a.gate===gid);return wayIn(context,gates.find(g=>g.id===gid),{...p,entrance:o.entrance,campus_via:o.campus_via});};
+ // Royal Street Entrance to Lot 2: along 34th St to McClintock, then down McClintock, not 594 m across the middle of campus.
+ const royal=leg('lot2','royal');
+ assert.equal(royal.campusMapped,true);assert.equal(royal.campus.length,5);
+ assert.ok(royal.campus.some(([lon,lat])=>Math.abs(lat-34.0242865)<1e-6&&Math.abs(lon+118.2875897)<1e-6),'turns at 34th St and McClintock');
+ assert.ok(royal.campusM>800,String(royal.campusM));
+ // Watt Way to Lot 2 is not mapped: nothing drawn, the length padded, closures still checked on the best guess.
+ const watt=leg('lot2','watt');
+ assert.equal(watt.campusMapped,false);assert.deepEqual(watt.campus,[]);assert.equal(watt.line.length,2);
+ assert.ok(watt.campusM>watt.line.slice(1).reduce((s,c,i)=>s+haversine([watt.line[i][1],watt.line[i][0]],[c[1],c[0]]),0));
+ // Every way in with a long leg either has points to follow or is knowingly unmapped (Watt Way only, for now).
+ for(const p of park)for(const o of p.access){const w=wayIn(context,gates.find(g=>g.id===o.gate),{...p,entrance:o.entrance,campus_via:o.campus_via});
+   if(!w.campusMapped)assert.equal(o.gate,'watt',p.id+' via '+o.gate+' is a long unmapped leg');}
 });
