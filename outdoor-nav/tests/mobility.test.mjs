@@ -470,7 +470,11 @@ test('campus legs follow the campus roads; one nobody has mapped is not drawn as
  const royal=leg('royal','mcclintock');
  assert.equal(royal.campusMapped,true);assert.equal(royal.campus.length,4);
  assert.ok(royal.campus.some(([lon,lat])=>Math.abs(lat-34.0242865)<1e-6&&Math.abs(lon+118.2875897)<1e-6),'turns at 34th St and McClintock');
- assert.ok(royal.campusM>600,String(royal.campusM));
+ // ...to its 34th St car entrance, not round to the Jefferson one on the far side of the structure.
+ const r=parkingState(context,parseTime('2026-11-24T12:00'),[],{}).find(x=>x.id==='royal');
+ for(const g of ['mcclintock','downey-way'])assert.equal(r.access.find(a=>a.gate===g).entrance.id,'ROYAL.veh.34th',g);
+ assert.equal(r.access.find(a=>a.gate==='royal').entrance.id,'ROYAL.veh.jefferson');
+ assert.ok(royal.campusM>500&&royal.campusM<700,String(royal.campusM));
  // Watt Way to Lot 2 is not mapped: nothing drawn, the length padded, closures still checked on the best guess.
  const watt=leg('lot2','watt');
  assert.equal(watt.campusMapped,false);assert.deepEqual(watt.campus,[]);assert.equal(watt.line.length,2);
