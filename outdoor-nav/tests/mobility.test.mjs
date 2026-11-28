@@ -573,3 +573,12 @@ test('McClintock: the drive ends in the middle of the intersection, reachable fr
  const mock=provider();await drivingRoute(context,{...body,from:{lat:34.0336,lon:-118.2817},parking:'lot2',to:'Sample Hall'},at,[],[],env(),mock.fn);
  assert.ok(mock.calls.some(c=>{const [lon,lat]=c.body.coordinates[1];return lat===gate.drive_to[0]&&lon===gate.drive_to[1];}),JSON.stringify(mock.calls.map(c=>c.body.coordinates[1])));
 });
+
+test('USC holidays use each gate\'s Holiday hours: Jefferson Blvd is closed the day after Thanksgiving, open the Tuesday before',()=>{
+ const friday=parseTime('2026-11-27T16:00'),tuesday=parseTime('2026-11-24T16:00'),saturday=parseTime('2026-11-28T10:00');
+ const jeff=at=>gateState(context,at).find(g=>g.id==='jefferson-blvd');
+ assert.equal(jeff(friday).vehicle.column,'holiday');assert.equal(jeff(friday).eligible,false);
+ assert.equal(jeff(tuesday).vehicle.column,'weekday');assert.equal(jeff(tuesday).eligible,true);
+ assert.equal(jeff(saturday).vehicle.column,'weekend');            // Thanksgiving weekend keeps weekend hours
+ assert.ok(context.gateData.holidays.every(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&![0,6].includes(new Date(d+'T12:00Z').getUTCDay())),'holidays are weekdays');
+});
