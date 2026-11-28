@@ -3,8 +3,8 @@
  "retrieved": "2026-11-14",
  "scope": "Vehicle hours come from the public page above. Pedestrian hours, for gates with pedestrian_hours, come from pedestrian_source; elsewhere pedestrian status is 'not_stated' unless someone observed it. Holidays have no pedestrian hours, so they show 'not_stated'.",
  "pedestrian_source": "USC Transportation's 2026 UPC Pedestrian and Vehicle Gate Schedule (given to the team by Transportation, Nov 2026). DPS opens and closes some gates within an hour; that hour is listed as uncertain.",
- "holidays": [],
- "holidays_note": "The page has a Holiday column but no list of dates. Add ISO dates here (e.g. 2026-11-26) or holiday hours never apply.",
+ "holidays": ["2026-09-07", "2026-11-11", "2026-11-25", "2026-11-26", "2026-11-27", "2026-12-25", "2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31", "2027-01-01", "2027-01-18", "2027-02-15", "2027-05-31", "2027-06-18", "2027-07-05"],
+ "holidays_note": "Weekdays the gates keep their Holiday hours. From USC's 2026-2027 academic calendar (https://www.usc.edu/academic-calendar/calendar/, read 2026-11-27): every entry named Holiday (Labor Day, Veterans Day, Thanksgiving Wed-Fri, MLK Day, Presidents' Day, Memorial Day, Juneteenth, Independence Day observed Mon 2027-07-05), plus the weekdays of its Winter Holiday 2026-12-25 to 2027-01-01. Not included: the Fall, Winter and Spring Recesses (no classes, but the university is open) and the Saturday and Sunday of Thanksgiving (weekend hours apply). Transportation has not yet confirmed this list. Add 2027-2028 dates when USC publishes that calendar.",
  "gates": [
   {"id": "watt", "name": "Watt Way Entrance", "where": "Exposition Blvd at Watt Way (east of Vermont)",
    "place": "gate.watt",
