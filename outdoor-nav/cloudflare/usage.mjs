@@ -47,6 +47,7 @@ export const SITE_KINDS = [
   'arrive', 'inside',                                            // got all the way there
   'ask_answered', 'ask_escalated', 'report',                     // the other features
   'drive_handoff', 'drive_fallback',                             // opened a maps app; our driving line was unavailable
+  'route_right', 'route_wrong', 'feedback',                      // "Was this route right?" answers; footer feedback sent
 ];
 
 /** Daily counts of every site kind for the last `days` days (Los Angeles dates), oldest first. */

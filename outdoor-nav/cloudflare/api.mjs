@@ -5,6 +5,7 @@ import {campusPlaces, addressSearch, reserveGeocodeQuota, hasHouseNumber, census
 import {collectFacts, cleanAnswer, askModel, recentAnswers, storeQuestion, getQuestion, setAnswer, dismiss, staffList, reserveAskQuota, QUESTION_MAX, ANSWER_MAX} from './assistant.mjs';
 const questionsReady=async db=>await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='questions'").first('name')==='questions';
 import {adminGuard} from './adminguard.mjs';
+import {feedbackReady, cleanFeedback, storeFeedback, feedbackList, setFeedbackStatus, reserveFeedbackQuota} from './feedback.mjs';
 import {findStaff, createStaffKey, listStaffKeys, revokeStaffKey, removeStaffKey, rollWords} from './staffkeys.mjs';
 import {MobilityError, readRules, mobilityState, gateState, validateRule, validateParkingStatus, validateParkingRate, drivingRoute, forMode, reserveReportQuota, walkingRuleClosures, orsUsage, softGates} from './mobility.mjs';
 
@@ -381,6 +382,28 @@ export async function handleApi(request, env, context) {
       return reply({ok: true, answered: false, question_id: q.id, destination,
         message: raw ? "I don't have verified information on that, so I've sent your question to the Doorstep team. Their answer will appear here."
                      : "The assistant is unavailable right now, so I've sent your question to the Doorstep team. Their answer will appear here."}, 201);
+    }
+    // ---- Feedback: anyone can send; staff read it in the Staff panel ----------
+    if (method === 'POST' && path === '/api/feedback') {
+      if (!db) fail(503, 'Feedback is unavailable right now.');
+      if (!(await feedbackReady(db))) fail(503, 'Feedback is paused: the database needs an update (migration 0008).');
+      const {item, error} = cleanFeedback(body);
+      if (error) fail(400, error);
+      const now = Date.now();
+      if (!(await reserveFeedbackQuota(db, now))) fail(429, 'Lots of feedback right now. Please try again in a minute.');
+      await storeFeedback(db, item, now, campusISO);
+      return reply({ok: true}, 201);
+    }
+    const fMatch = /^\/api\/feedback\/([0-9a-f]{16})\/(done|reopen)$/.exec(path);
+    if (path === '/api/feedback' || fMatch) {
+      requireStaff();
+      if (!db) fail(503, 'D1 is not connected.');
+      if (!(await feedbackReady(db))) fail(503, 'The database needs an update (migration 0008). Run npm run db:remote.');
+      if (method === 'GET' && path === '/api/feedback') return reply(await feedbackList(db), 200, head);
+      if (method === 'POST' && fMatch) {
+        const f = await setFeedbackStatus(db, fMatch[1], fMatch[2] === 'done' ? 'done' : 'open', Date.now());
+        return f ? reply(f) : reply({error: 'not found'}, 404);
+      }
     }
     const qMatch = /^\/api\/questions\/([0-9a-f]{16})(?:\/(answer|dismiss))?$/.exec(path);
     if (method === 'GET' && qMatch && !qMatch[2]) {
